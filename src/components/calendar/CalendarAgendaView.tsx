@@ -1,6 +1,7 @@
 import React from 'react';
 import { CalendarEvent } from '../../types';
 import { Clock, MapPin } from 'lucide-react';
+import { formatFullDayHeader, getRelativeDayLabel, isToday, isPast, isFuture } from '../../utils/dateUtils';
 
 interface CalendarAgendaViewProps {
   events: CalendarEvent[];
@@ -25,23 +26,27 @@ export const CalendarAgendaView: React.FC<CalendarAgendaViewProps> = ({
     <div className="w-full bg-[#0F1217] border border-white/8 rounded-xl p-4 sm:p-6 shadow-sm flex flex-col gap-6">
       {Object.entries(grouped).map(([dateStr, dateEventsList]) => {
         const dateEvents = dateEventsList as CalendarEvent[];
-        let displayHeader = dateStr;
-        try {
-          const parts = dateStr.split('-');
-          const d = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
-          displayHeader = d.toLocaleDateString('en-US', {
-            weekday: 'long',
-            month: 'short',
-            day: 'numeric',
-            year: 'numeric',
-          });
-        } catch {}
+        const displayHeader = formatFullDayHeader(dateStr);
+        const relativeBadge = getRelativeDayLabel(dateStr);
+        const isCurrentDay = isToday(dateStr);
 
         return (
           <div key={dateStr} className="flex flex-col gap-2.5">
-            <h4 className="text-xs font-semibold text-[#6C63FF] uppercase tracking-wider">
-              {displayHeader}
-            </h4>
+            <div className="flex items-center gap-2">
+              <h4 className="text-xs font-semibold text-[#6C63FF] uppercase tracking-wider">
+                {displayHeader}
+              </h4>
+              {isCurrentDay && (
+                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-[#6C63FF] text-white">
+                  TODAY
+                </span>
+              )}
+              {!isCurrentDay && relativeBadge !== displayHeader && (
+                <span className="px-2 py-0.5 rounded text-[10px] font-medium bg-white/5 text-[#A6AEC0] border border-white/8">
+                  {relativeBadge}
+                </span>
+              )}
+            </div>
 
             <div className="flex flex-col gap-2">
               {dateEvents.map((evt) => (

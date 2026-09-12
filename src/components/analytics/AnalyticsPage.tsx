@@ -33,18 +33,26 @@ import {
   initialAnalyticsAchievements,
   getTimeRangeKpi,
 } from '../../data/analyticsMockData';
-import { AnalyticsTimeRange } from '../../types';
+import { AnalyticsTimeRange, UserProfile, TaskItem, Quest, DetailedGoal, AnalyticsGoalItem } from '../../types';
 
 interface AnalyticsPageProps {
   isDark: boolean;
   setIsDark: (dark: boolean) => void;
   onToggleMobileMenu: () => void;
+  liveUser?: UserProfile;
+  liveTasks?: TaskItem[];
+  liveQuests?: Quest[];
+  liveGoals?: DetailedGoal[];
 }
 
 export const AnalyticsPage: React.FC<AnalyticsPageProps> = ({
   isDark,
   setIsDark,
   onToggleMobileMenu,
+  liveUser,
+  liveTasks,
+  liveQuests,
+  liveGoals,
 }) => {
   const [timeRange, setTimeRange] = useState<AnalyticsTimeRange>('7d');
   const [dateRangeText, setDateRangeText] = useState('Sep 5, 2025 – Sep 11, 2025');
@@ -52,8 +60,40 @@ export const AnalyticsPage: React.FC<AnalyticsPageProps> = ({
   const [bottomTab, setBottomTab] = useState<'insights' | 'milestones'>('insights');
   const [activeDetailModal, setActiveDetailModal] = useState<string | null>(null);
 
-  // Dynamic KPI based on selected time range
-  const currentKpi = getTimeRangeKpi(timeRange);
+  // Dynamic KPI synchronized with live backend state
+  const dynamicKpi = React.useMemo(() => {
+    const baseKpi = getTimeRangeKpi(timeRange);
+    if (!liveUser && !liveTasks && !liveQuests) return baseKpi;
+    const completedTasks = liveTasks ? liveTasks.filter((t) => t.completed).length : baseKpi.tasksCompleted;
+    const totalTasks = liveTasks ? liveTasks.length : baseKpi.tasksTotal;
+    const streak = liveUser ? (liveUser as any).streakDays ?? liveUser.streakDays : baseKpi.currentStreakDays;
+    const mp = liveUser ? (liveUser as any).momentumPoints ?? liveUser.totalPoints : baseKpi.momentumPoints;
+    const completedQuests = liveQuests ? liveQuests.filter((q) => q.completed).length : 0;
+    const totalQuests = liveQuests ? liveQuests.length : 4;
+    const ratio = Math.round(((completedTasks + completedQuests) / Math.max(1, totalTasks + totalQuests)) * 100);
+
+    return {
+      ...baseKpi,
+      overallConsistency: ratio > 0 ? ratio : baseKpi.overallConsistency,
+      currentStreakDays: streak !== undefined ? streak : baseKpi.currentStreakDays,
+      tasksCompleted: completedTasks,
+      tasksTotal: totalTasks,
+      momentumPoints: mp,
+    };
+  }, [timeRange, liveUser, liveTasks, liveQuests]);
+
+  // Synchronized goals from Goals page & Backend
+  const dynamicGoals: AnalyticsGoalItem[] = React.useMemo(() => {
+    if (!liveGoals || liveGoals.length === 0) return initialAnalyticsGoals;
+    return liveGoals.map((g) => ({
+      id: g.id,
+      title: g.title,
+      percentage: g.progress,
+      category: g.category,
+      icon: g.category === 'Career' ? 'dsa' : g.category === 'Health' ? 'shape' : g.category === 'Projects' ? 'portfolio' : 'books',
+      color: g.color || '#6366F1',
+    }));
+  }, [liveGoals]);
 
   const handleTimeRangeChange = (range: AnalyticsTimeRange) => {
     setTimeRange(range);
@@ -175,7 +215,7 @@ export const AnalyticsPage: React.FC<AnalyticsPageProps> = ({
 
         {/* KPI Cards (Overall Consistency, Current Streak, Tasks Completed, Momentum Points) */}
         <AnalyticsKpiGrid
-          data={currentKpi}
+          data={dynamicKpi}
           onOpenKpiDetail={(type) => setActiveDetailModal(type)}
         />
 
@@ -213,7 +253,7 @@ export const AnalyticsPage: React.FC<AnalyticsPageProps> = ({
           {/* Goal Progress: 4-5 cols on desktop */}
           <div className="lg:col-span-5 flex flex-col">
             <GoalProgressCard
-              goals={initialAnalyticsGoals}
+              goals={dynamicGoals}
               onSeeAll={() => setActiveDetailModal('goals')}
             />
           </div>

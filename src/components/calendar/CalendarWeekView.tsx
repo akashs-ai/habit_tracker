@@ -1,5 +1,11 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { CalendarEvent } from '../../types';
+import { 
+  getWeekDaysForDate, 
+  getLiveTodayISO, 
+  getCurrentTimeInfo,
+  isTimeSlotMatching 
+} from '../../utils/dateUtils';
 
 interface CalendarWeekViewProps {
   selectedDate: string;
@@ -16,28 +22,34 @@ export const CalendarWeekView: React.FC<CalendarWeekViewProps> = ({
   onSelectEvent,
   onAddEventOnDate,
 }) => {
-  // Week days surrounding March 11, 2025 (Sun Mar 9 to Sat Mar 15)
-  const weekDays = [
-    { name: 'Sun', day: 9, date: '2025-03-09' },
-    { name: 'Mon', day: 10, date: '2025-03-10' },
-    { name: 'Tue', day: 11, date: '2025-03-11', isToday: true },
-    { name: 'Wed', day: 12, date: '2025-03-12' },
-    { name: 'Thu', day: 13, date: '2025-03-13' },
-    { name: 'Fri', day: 14, date: '2025-03-14' },
-    { name: 'Sat', day: 15, date: '2025-03-15' },
-  ];
+  const todayISO = useMemo(() => getLiveTodayISO(), []);
+  const weekDays = useMemo(() => getWeekDaysForDate(selectedDate, todayISO), [selectedDate, todayISO]);
 
   const hours = [
-    '7 AM', '8 AM', '9 AM', '10 AM', '11 AM', '12 PM', 
+    '6 AM', '7 AM', '8 AM', '9 AM', '10 AM', '11 AM', '12 PM', 
     '1 PM', '2 PM', '3 PM', '4 PM', '5 PM', '6 PM', 
     '7 PM', '8 PM', '9 PM', '10 PM', '11 PM'
   ];
 
+  // Local live time position indicator
+  const timeInfo = useMemo(() => getCurrentTimeInfo(), []);
+  const currentHour = timeInfo.hour24;
+  const currentMinute = timeInfo.minute;
+  const showNowLine = currentHour >= 6 && currentHour <= 23;
+
+  // Helper to match event to an hour slot using unified dateUtils
+  const isEventInHour = (evt: CalendarEvent, hourLabel: string): boolean => {
+    return isTimeSlotMatching(evt.startTime, hourLabel);
+  };
+
   return (
-    <div className="w-full bg-[#0F1217] border border-white/8 rounded-xl overflow-x-auto">
+    <div 
+      id="calendar-week-grid-container"
+      className="w-full bg-[#0F1217] border border-white/8 rounded-xl overflow-x-auto shadow-sm"
+    >
       {/* Header with week days */}
-      <div className="grid grid-cols-8 border-b border-white/8 bg-[#111318] min-w-[700px]">
-        <div className="p-3 text-xs font-semibold text-[#6F7789] text-center border-r border-white/8">
+      <div className="grid grid-cols-8 border-b border-white/8 bg-[#111318] min-w-[760px] sticky top-0 z-10">
+        <div className="p-3 text-xs font-semibold text-[#6F7789] text-center border-r border-white/8 flex items-center justify-center">
           Time
         </div>
         {weekDays.map((wd) => {
@@ -46,18 +58,26 @@ export const CalendarWeekView: React.FC<CalendarWeekViewProps> = ({
             <div
               key={wd.date}
               onClick={() => onSelectDate(wd.date)}
-              className={`p-2 text-center cursor-pointer transition-colors ${
-                isSelected ? 'bg-[#6C63FF]/10' : 'hover:bg-white/[0.02]'
+              className={`p-2.5 text-center cursor-pointer transition-colors border-r border-white/8 last:border-r-0 ${
+                isSelected 
+                  ? 'bg-[#6C63FF]/15' 
+                  : wd.isToday 
+                  ? 'bg-white/[0.03]' 
+                  : 'hover:bg-white/[0.02]'
               }`}
             >
-              <div className="text-[11px] font-medium text-[#6F7789]">{wd.name}</div>
+              <div className={`text-[11px] font-semibold uppercase tracking-wider ${
+                wd.isToday ? 'text-[#6C63FF]' : 'text-[#6F7789]'
+              }`}>
+                {wd.name}
+              </div>
               <div
-                className={`w-6 h-6 mx-auto rounded-full flex items-center justify-center text-xs mt-0.5 ${
+                className={`w-7 h-7 mx-auto rounded-full flex items-center justify-center text-xs mt-1 transition-all ${
                   wd.isToday
-                    ? 'bg-[#6C63FF] text-white font-bold'
+                    ? 'bg-[#6C63FF] text-white font-bold ring-2 ring-[#6C63FF]/30'
                     : isSelected
-                    ? 'text-[#6C63FF] font-semibold'
-                    : 'text-[#F5F7FF]'
+                    ? 'bg-white/10 text-[#6C63FF] font-bold'
+                    : 'text-[#F5F7FF] font-medium'
                 }`}
               >
                 {wd.day}
@@ -68,46 +88,70 @@ export const CalendarWeekView: React.FC<CalendarWeekViewProps> = ({
       </div>
 
       {/* Week Body Grid */}
-      <div className="divide-y divide-white/8 min-w-[700px]">
-        {hours.map((hour) => (
-          <div key={hour} className="grid grid-cols-8 min-h-[52px]">
-            {/* Hour label */}
-            <div className="p-2 text-[10px] font-medium text-[#6F7789] text-center border-r border-white/8">
-              {hour}
-            </div>
+      <div className="divide-y divide-white/8 min-w-[760px] relative">
+        {hours.map((hour) => {
+          const [hNumStr, hPeriod] = hour.split(' ');
+          let h24 = parseInt(hNumStr, 10);
+          if (hPeriod === 'PM' && h24 !== 12) h24 += 12;
+          if (hPeriod === 'AM' && h24 === 12) h24 = 0;
+          const isCurrentHourSlot = h24 === currentHour;
 
-            {/* 7 Columns */}
-            {weekDays.map((wd) => {
-              // Find events matching this date and approximate hour
-              const dayEvts = events.filter(
-                (e) => e.date === wd.date && (e.startTime?.startsWith(hour.split(' ')[0]) || (hour === '10 AM' && e.title.includes('UI')) || (hour === '1 PM' && e.title.includes('Lunch')) || (hour === '10 PM' && e.title.includes('Free Fire')))
-              );
+          return (
+            <div key={hour} className="grid grid-cols-8 min-h-[58px] relative group">
+              {/* Hour label */}
+              <div className="p-2 text-[11px] font-medium text-[#6F7789] text-center border-r border-white/8 bg-[#0D0F13]/50 flex items-center justify-center">
+                {hour}
+              </div>
 
-              return (
-                <div
-                  key={wd.date}
-                  onClick={() => onAddEventOnDate(wd.date)}
-                  className="border-r border-white/8 p-1 hover:bg-white/[0.02] transition-colors relative cursor-pointer"
-                >
-                  {dayEvts.map((evt) => (
-                    <div
-                      key={evt.id}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onSelectEvent(evt);
-                      }}
-                      className="p-1.5 rounded text-[10px] font-medium bg-[#151820] hover:bg-[#1A1D24] border border-white/10 text-[#F5F7FF] truncate cursor-pointer shadow-xs"
-                      style={{ borderLeftWidth: '3px', borderLeftColor: evt.color }}
-                    >
-                      <div className="font-semibold truncate">{evt.title}</div>
-                      <div className="text-[9px] text-[#A6AEC0]">{evt.startTime}</div>
+              {/* 7 Columns */}
+              {weekDays.map((wd) => {
+                const dayEvts = events.filter((e) => e.date === wd.date && isEventInHour(e, hour));
+                const isTodayCol = wd.date === todayISO;
+
+                return (
+                  <div
+                    key={wd.date}
+                    onClick={() => onAddEventOnDate(wd.date)}
+                    className={`border-r border-white/8 last:border-r-0 p-1.5 hover:bg-white/[0.03] transition-colors relative cursor-pointer ${
+                      wd.date === selectedDate ? 'bg-[#6C63FF]/5' : ''
+                    }`}
+                  >
+                    {/* Live time indicator line across today's column */}
+                    {isTodayCol && isCurrentHourSlot && showNowLine && (
+                      <div 
+                        className="absolute left-0 right-0 z-20 pointer-events-none flex items-center"
+                        style={{ top: `${(currentMinute / 60) * 100}%` }}
+                      >
+                        <div className="w-2 h-2 rounded-full bg-[#EF4444] -ml-1 ring-2 ring-white/50" />
+                        <div className="flex-1 h-[2px] bg-[#EF4444]" />
+                      </div>
+                    )}
+
+                    <div className="flex flex-col gap-1 w-full h-full">
+                      {dayEvts.map((evt) => (
+                        <div
+                          key={evt.id}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onSelectEvent(evt);
+                          }}
+                          className="p-1.5 rounded-md text-[10px] font-medium bg-[#151820] hover:bg-[#1A1D24] border border-white/10 text-[#F5F7FF] cursor-pointer shadow-xs transition-all relative overflow-hidden"
+                          style={{ borderLeftWidth: '3.5px', borderLeftColor: evt.color }}
+                        >
+                          <div className="font-semibold truncate text-[#F5F7FF]">{evt.title}</div>
+                          <div className="text-[9px] text-[#A6AEC0] flex items-center gap-1 mt-0.5">
+                            <span>{evt.startTime}</span>
+                            {evt.endTime && <span>– {evt.endTime}</span>}
+                          </div>
+                        </div>
+                      ))}
                     </div>
-                  ))}
-                </div>
-              );
-            })}
-          </div>
-        ))}
+                  </div>
+                );
+              })}
+            </div>
+          );
+        })}
       </div>
     </div>
   );

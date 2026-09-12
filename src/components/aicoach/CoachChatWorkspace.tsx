@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   Send,
   Paperclip,
@@ -11,40 +11,107 @@ import {
   TrendingUp,
   Brain,
   Zap,
-  CheckCircle2
+  CheckCircle2,
+  Loader2,
+  Lock,
+  ExternalLink,
+  Bot,
+  AlertCircle,
+  RefreshCw
 } from 'lucide-react';
 import { CoachRobotAvatar } from './CoachRobotAvatar';
-import { CoachChatMessage, SuggestedTask, CoachPack, CoachInsightItem } from '../../types';
+import {
+  CoachChatMessage,
+  SuggestedTask,
+  CoachPack,
+  CoachInsightItem,
+  AIIntegrationModel
+} from '../../types';
 import {
   initialSuggestedTasks,
   initialCoachInsights,
-  initialCoachPacks,
-  getCoachResponse
+  initialCoachPacks
 } from '../../data/aiCoachMockData';
+import { ChatGPTLogo, ClaudeLogo, GeminiLogo } from '../aiintegration/ModelLogos';
 
 interface CoachChatWorkspaceProps {
   messages: CoachChatMessage[];
+  agents: AIIntegrationModel[];
+  selectedModelId: string;
+  onSelectModelId: (id: string) => void;
+  onOpenConnectModal: (model: AIIntegrationModel) => void;
+  isGenerating?: boolean;
   onSendMessage: (text: string) => void;
   onAddTaskToToday?: (taskTitle: string) => void;
   selectedPackId: string;
   onSelectPackId: (id: string) => void;
+  onNavigateToIntegrations?: () => void;
+  onSyncModels?: () => void;
+  isSyncingModels?: boolean;
+  lastSyncedTime?: string | null;
 }
 
 export const CoachChatWorkspace: React.FC<CoachChatWorkspaceProps> = ({
   messages,
+  agents,
+  selectedModelId,
+  onSelectModelId,
+  onOpenConnectModal,
+  isGenerating = false,
   onSendMessage,
   onAddTaskToToday,
   selectedPackId,
   onSelectPackId,
+  onNavigateToIntegrations,
+  onSyncModels,
+  isSyncingModels = false,
+  lastSyncedTime,
 }) => {
   const [activeTab, setActiveTab] = useState<'chat' | 'planner' | 'insights' | 'resources'>('chat');
-  const [selectedModel, setSelectedModel] = useState('GPT-5 (LifeRPG)');
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [inputText, setInputText] = useState('');
   const [suggestedTasks, setSuggestedTasks] = useState<SuggestedTask[]>(initialSuggestedTasks);
   const [addedRecommendationIds, setAddedRecommendationIds] = useState<Record<string, boolean>>({});
 
+  const dropdownRef = useRef<HTMLDivElement>(null);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  // Close dropdown on click outside
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setIsDropdownOpen(false);
+      }
+    }
+    if (isDropdownOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [isDropdownOpen]);
+
+  // Auto-scroll chat to bottom on new messages
+  useEffect(() => {
+    if (activeTab === 'chat') {
+      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [messages, isGenerating, activeTab]);
+
+  const activeAgent = agents.find((a) => a.id === selectedModelId) || agents[0] || {
+    id: 'chatgpt',
+    name: 'ChatGPT',
+    status: 'connected' as const,
+    selected: true,
+    description: '',
+    tags: [],
+    iconType: 'chatgpt' as const,
+    modelTier: 'GPT-4o (Omni)',
+  };
+
+  const connectedAgents = agents.filter((a) => a.status === 'connected');
+  const notConnectedAgents = agents.filter((a) => a.status !== 'connected');
+
   const handleSend = () => {
-    if (!inputText.trim()) return;
+    if (!inputText.trim() || isGenerating) return;
     onSendMessage(inputText.trim());
     setInputText('');
   };
@@ -70,15 +137,27 @@ export const CoachChatWorkspace: React.FC<CoachChatWorkspaceProps> = ({
     onAddTaskToToday?.(title);
   };
 
+  const renderAgentLogo = (iconType: 'chatgpt' | 'claude' | 'gemini' | string, size = 'w-5 h-5') => {
+    switch (iconType) {
+      case 'chatgpt':
+        return <ChatGPTLogo className={size} />;
+      case 'claude':
+        return <ClaudeLogo className={size} />;
+      case 'gemini':
+      default:
+        return <GeminiLogo className={size} />;
+    }
+  };
+
   const selectedPack = initialCoachPacks.find((p) => p.id === selectedPackId) || initialCoachPacks[0];
 
   return (
     <div
       id="ai-coach-workspace-card"
-      className="rounded-2xl bg-[#0F1723] border border-white/7 flex flex-col justify-between overflow-hidden shadow-xl"
+      className="rounded-2xl bg-[#0F1723] border border-white/8 flex flex-col justify-between overflow-hidden shadow-xl"
     >
       {/* Top Workspace Header Bar */}
-      <div className="px-4 sm:px-6 py-3 border-b border-white/6 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 bg-[#0C121D]">
+      <div className="px-4 sm:px-6 py-3 border-b border-white/6 flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-[#0C121D]">
         {/* Left Segmented Tabs */}
         <div className="flex items-center gap-1 overflow-x-auto scrollbar-none">
           <button
@@ -123,56 +202,239 @@ export const CoachChatWorkspace: React.FC<CoachChatWorkspaceProps> = ({
           </button>
         </div>
 
-        {/* Right Model Dropdown Selector */}
-        <div className="flex items-center gap-2 self-end sm:self-auto">
-          <button
-            onClick={() => {
-              setSelectedModel((m) =>
-                m === 'GPT-5 (LifeRPG)' ? 'Gemini 2.5 Flash' : 'GPT-5 (LifeRPG)'
-              );
-            }}
-            className="h-7 sm:h-8 px-2.5 rounded-lg bg-white/4 hover:bg-white/7 border border-white/6 text-xs text-[#94A3B8] hover:text-white flex items-center gap-1.5 transition-colors cursor-pointer"
-          >
-            <span className="font-medium text-white/90">{selectedModel}</span>
-            <ChevronDown className="w-3.5 h-3.5 text-[#64748B]" />
-          </button>
+        {/* Right AI Agent Model Dropdown Selector & Sync Button */}
+        <div className="flex items-center gap-1.5">
+          {onSyncModels && (
+            <button
+              type="button"
+              onClick={onSyncModels}
+              disabled={isSyncingModels}
+              className="h-8 w-8 rounded-xl bg-[#141D2A] hover:bg-[#1A2536] border border-white/10 text-[#94A3B8] hover:text-white flex items-center justify-center transition-colors shadow-sm disabled:opacity-50"
+              title="Sync AI Models"
+              aria-label="Sync AI Models"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 text-[#818CF8] ${isSyncingModels ? 'animate-spin' : ''}`} />
+            </button>
+          )}
+
+          <div className="relative" ref={dropdownRef}>
+            <button
+              type="button"
+              onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+              className="h-8 px-3 rounded-xl bg-[#141D2A] hover:bg-[#1A2536] border border-white/10 text-xs text-[#F5F7FB] flex items-center gap-2 transition-colors cursor-pointer shadow-sm"
+              aria-label="Select AI Model"
+            >
+              {renderAgentLogo(activeAgent.iconType, 'w-4 h-4')}
+              <span className="font-semibold text-white truncate max-w-[140px]">
+                {activeAgent.modelTier || activeAgent.name}
+              </span>
+              <span className="w-1.5 h-1.5 rounded-full bg-[#22C55E]" />
+              <ChevronDown
+                className={`w-3.5 h-3.5 text-[#64748B] transition-transform duration-200 ${
+                  isDropdownOpen ? 'rotate-180' : ''
+                }`}
+              />
+            </button>
+
+            {/* Dropdown Menu Popup */}
+            {isDropdownOpen && (
+              <div className="absolute right-0 top-full mt-2 w-72 sm:w-80 rounded-2xl bg-[#101722] border border-white/10 shadow-2xl p-2 z-50 animate-fadeIn">
+                <div className="px-3 py-2 border-b border-white/6 mb-1.5 flex items-center justify-between">
+                  <div>
+                    <p className="text-[11px] font-bold text-[#818CF8] uppercase tracking-wider">
+                      Select AI Coach Agent
+                    </p>
+                    <p className="text-[11px] text-[#64748B] mt-0.5">
+                      Switch between your connected intelligence models
+                    </p>
+                  </div>
+                  {onSyncModels && (
+                    <button
+                      type="button"
+                      onClick={onSyncModels}
+                      disabled={isSyncingModels}
+                      className="p-1 rounded-lg hover:bg-white/5 text-[#818CF8] transition-colors"
+                      title="Sync AI Models"
+                    >
+                      <RefreshCw className={`w-3.5 h-3.5 ${isSyncingModels ? 'animate-spin' : ''}`} />
+                    </button>
+                  )}
+                </div>
+
+                {/* Connected Agents */}
+                <div className="space-y-1">
+                  <div className="px-3 py-1 text-[10px] font-semibold text-[#94A3B8] uppercase">
+                    Connected Models ({connectedAgents.length})
+                  </div>
+
+                  {connectedAgents.map((agent) => {
+                    const isSelected = agent.id === activeAgent.id;
+                    return (
+                      <button
+                        key={agent.id}
+                        type="button"
+                        onClick={() => {
+                          onSelectModelId(agent.id);
+                          setIsDropdownOpen(false);
+                        }}
+                        className={`w-full p-2.5 rounded-xl flex items-center justify-between text-left transition-colors ${
+                          isSelected
+                            ? 'bg-[#6366F1]/15 border border-[#6366F1]/30 text-white'
+                            : 'hover:bg-white/5 text-[#F5F7FB]'
+                        }`}
+                      >
+                        <div className="flex items-center gap-2.5 min-w-0">
+                          {renderAgentLogo(agent.iconType, 'w-6 h-6')}
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-1.5">
+                              <span className="text-xs font-bold text-white truncate">
+                                {agent.name}
+                              </span>
+                              <span className="text-[10px] px-1.5 py-0.2 rounded bg-emerald-500/20 text-emerald-400 font-medium">
+                                Active
+                              </span>
+                            </div>
+                            <p className="text-[11px] text-[#94A3B8] truncate">
+                              {agent.modelTier || agent.tags.join(', ')}
+                            </p>
+                          </div>
+                        </div>
+
+                        {isSelected && (
+                          <div className="w-5 h-5 rounded-full bg-[#6366F1] flex items-center justify-center text-white shrink-0 ml-2">
+                            <Check className="w-3 h-3 stroke-[3]" />
+                          </div>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {/* Not Connected Section */}
+                {notConnectedAgents.length > 0 && (
+                  <div className="mt-2 pt-2 border-t border-white/6 space-y-1">
+                    <div className="px-3 py-1 text-[10px] font-semibold text-[#64748B] uppercase">
+                      Available to Connect ({notConnectedAgents.length})
+                    </div>
+                    {notConnectedAgents.map((agent) => (
+                      <div
+                        key={agent.id}
+                        className="p-2.5 rounded-xl bg-white/[0.02] border border-white/4 flex items-center justify-between gap-2"
+                      >
+                        <div className="flex items-center gap-2.5 min-w-0">
+                          {renderAgentLogo(agent.iconType, 'w-6 h-6 opacity-75')}
+                          <div className="min-w-0">
+                            <p className="text-xs font-semibold text-[#94A3B8] truncate">
+                              {agent.name}
+                            </p>
+                            <p className="text-[10px] text-[#64748B] truncate">
+                              {agent.modelTier || agent.description}
+                            </p>
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setIsDropdownOpen(false);
+                            onOpenConnectModal(agent);
+                          }}
+                          className="px-2.5 py-1 rounded-lg bg-[#6366F1] hover:bg-[#5558E6] text-[11px] font-semibold text-white whitespace-nowrap transition-colors shrink-0 shadow-sm"
+                        >
+                          + Connect
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Link to AI Integration Hub */}
+                {onNavigateToIntegrations && (
+                  <div className="mt-2 pt-2 border-t border-white/6">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsDropdownOpen(false);
+                        onNavigateToIntegrations();
+                      }}
+                      className="w-full py-1.5 px-3 rounded-lg text-left text-[11px] font-medium text-[#818CF8] hover:text-white hover:bg-white/5 flex items-center justify-between transition-colors"
+                    >
+                      <span>Manage all AI Integrations</span>
+                      <ExternalLink className="w-3 h-3" />
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
       {/* Tab 1: Interactive Chat View */}
       {activeTab === 'chat' && (
-        <div className="flex flex-col flex-1 min-h-[300px] sm:min-h-[340px]">
+        <div className="flex flex-col flex-1 min-h-[340px]">
+          {/* Active Model Subtitle Bar */}
+          <div className="px-4 sm:px-6 py-2 bg-[#090E17] border-b border-white/4 flex items-center justify-between text-[11px] text-[#94A3B8]">
+            <div className="flex items-center gap-2">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+              <span>
+                Chatting with <strong className="text-[#F5F7FB]">{activeAgent.name}</strong> ({activeAgent.modelTier || 'Active Model'})
+              </span>
+            </div>
+            <span className="text-[#64748B] hidden sm:inline">
+              Backed by LifeRPG Momentum Engine
+            </span>
+          </div>
+
           {/* Messages Scroll Area */}
           <div className="flex-1 p-4 sm:p-6 overflow-y-auto max-h-[440px] space-y-4">
             {messages.map((msg) => {
               const isCoach = msg.sender === 'coach';
               const isActionAdded = addedRecommendationIds[msg.id];
+              const msgAgentId = msg.agentId || activeAgent.id;
 
               return (
                 <div
                   key={msg.id}
                   className={`flex gap-3 items-start ${isCoach ? 'justify-start' : 'justify-end'}`}
                 >
-                  {isCoach && <CoachRobotAvatar size="sm" className="mt-1" />}
+                  {isCoach && (
+                    <div className="shrink-0 mt-0.5">
+                      {renderAgentLogo(msgAgentId, 'w-8 h-8')}
+                    </div>
+                  )}
 
-                  <div className={`max-w-[85%] sm:max-w-xl space-y-2`}>
+                  <div className="max-w-[85%] sm:max-w-xl space-y-2">
+                    {/* Header Label for Coach */}
+                    {isCoach && (
+                      <div className="flex items-center gap-2 ml-1">
+                        <span className="text-[11px] font-bold text-[#818CF8]">
+                          {msg.agentName || (msgAgentId === 'gemini' ? 'Gemini 3.8 Flash' : msgAgentId === 'claude' ? 'Claude 3.5 Sonnet' : 'GPT-4o')}
+                        </span>
+                        <span className="text-[10px] text-[#64748B] tabular-nums">
+                          {msg.timestamp}
+                        </span>
+                      </div>
+                    )}
+
                     {/* Message Bubble */}
                     <div
                       className={`p-3.5 sm:p-4 rounded-2xl text-xs sm:text-[13px] leading-relaxed ${
                         isCoach
-                          ? 'bg-[#151D2C] border border-white/8 text-[#F1F5F9]'
+                          ? 'bg-[#141D2A] border border-white/8 text-[#F1F5F9]'
                           : 'bg-[#6366F1] text-white font-medium ml-auto'
                       }`}
                     >
-                      <p>{msg.text}</p>
-                      <span className="text-[10px] text-[#64748B] block mt-1.5 text-right tabular-nums">
-                        {msg.timestamp}
-                      </span>
+                      <div className="whitespace-pre-line">{msg.text}</div>
+                      {!isCoach && (
+                        <span className="text-[10px] text-white/70 block mt-1.5 text-right tabular-nums">
+                          {msg.timestamp}
+                        </span>
+                      )}
                     </div>
 
                     {/* Actionable recommendation box (if attached) */}
                     {isCoach && msg.actionRecommendation && (
-                      <div className="p-3 rounded-xl bg-white/4 border border-white/8 flex items-center justify-between gap-3 animate-in fade-in duration-200">
+                      <div className="p-3 rounded-xl bg-[#090E17] border border-white/8 flex items-center justify-between gap-3 animate-in fade-in duration-200">
                         <div className="min-w-0">
                           <p className="text-xs font-bold text-white truncate">
                             {msg.actionRecommendation.title}
@@ -183,6 +445,7 @@ export const CoachChatWorkspace: React.FC<CoachChatWorkspaceProps> = ({
                         </div>
 
                         <button
+                          type="button"
                           onClick={() =>
                             handleRecommendationAction(
                               msg.id,
@@ -193,30 +456,31 @@ export const CoachChatWorkspace: React.FC<CoachChatWorkspaceProps> = ({
                           className={`h-7 px-3 rounded-lg text-xs font-semibold shrink-0 transition-all ${
                             isActionAdded
                               ? 'bg-[#10B981]/20 text-[#34D399] border border-[#10B981]/30 cursor-default'
-                              : 'bg-[#6366F1] hover:bg-[#4F46E5] text-white cursor-pointer'
+                              : 'bg-[#6366F1] hover:bg-[#4F46E5] text-white cursor-pointer shadow-sm'
                           }`}
                         >
                           {isActionAdded ? (
                             <span className="flex items-center gap-1">
-                              <Check className="w-3 h-3" /> Added ✓
+                              <Check className="w-3.5 h-3.5" /> Added
                             </span>
                           ) : (
-                            msg.actionRecommendation.actionLabel
+                            <span>{msg.actionRecommendation.actionLabel || 'Add to Tasks'}</span>
                           )}
                         </button>
                       </div>
                     )}
 
-                    {/* Follow-up Quick Suggestion Chips */}
+                    {/* Suggestion Chips */}
                     {isCoach && msg.suggestions && msg.suggestions.length > 0 && (
                       <div className="flex flex-wrap gap-1.5 pt-1">
-                        {msg.suggestions.map((sug, i) => (
+                        {msg.suggestions.map((s, idx) => (
                           <button
-                            key={i}
-                            onClick={() => onSendMessage(sug)}
-                            className="text-left text-[11px] text-[#818CF8] hover:text-white bg-white/4 hover:bg-white/8 border border-white/6 px-2.5 py-1 rounded-lg transition-colors cursor-pointer"
+                            key={idx}
+                            type="button"
+                            onClick={() => onSendMessage(s)}
+                            className="px-2.5 py-1 rounded-lg bg-white/4 hover:bg-white/8 border border-white/6 text-[11px] text-[#94A3B8] hover:text-white transition-colors"
                           >
-                            {sug}
+                            {s}
                           </button>
                         ))}
                       </div>
@@ -225,95 +489,92 @@ export const CoachChatWorkspace: React.FC<CoachChatWorkspaceProps> = ({
                 </div>
               );
             })}
+
+            {/* Thinking / Generating State */}
+            {isGenerating && (
+              <div className="flex gap-3 items-start animate-fadeIn">
+                <div className="shrink-0 mt-0.5">
+                  {renderAgentLogo(activeAgent.iconType, 'w-8 h-8')}
+                </div>
+                <div className="p-3.5 rounded-2xl bg-[#141D2A] border border-white/8 text-xs text-[#94A3B8] flex items-center gap-2">
+                  <Loader2 className="w-4 h-4 animate-spin text-[#818CF8]" />
+                  <span>{activeAgent.name} is thinking & analyzing schedule...</span>
+                </div>
+              </div>
+            )}
+
+            <div ref={messagesEndRef} />
           </div>
 
-          {/* Input Box Bar */}
-          <div className="p-3 sm:p-4 border-t border-white/6 bg-[#0B101A]">
-            <div className="flex items-center gap-2 bg-[#141C2B] border border-white/8 focus-within:border-[#6366F1] rounded-xl px-3 py-1.5 transition-all">
-              <button
-                className="text-[#64748B] hover:text-[#94A3B8] p-1 transition-colors"
-                title="Attach context note"
-              >
-                <Paperclip className="w-4 h-4" />
-              </button>
-
+          {/* Bottom Chat Input Bar */}
+          <div className="p-3 sm:p-4 bg-[#0C121D] border-t border-white/6">
+            <div className="flex items-center gap-2 rounded-xl bg-[#141D2A] border border-white/8 px-3 py-1.5 focus-within:border-[#6366F1] transition-colors">
               <input
                 type="text"
                 value={inputText}
                 onChange={(e) => setInputText(e.target.value)}
                 onKeyDown={handleKeyDown}
-                placeholder="Type your message..."
-                className="flex-1 bg-transparent border-none text-xs sm:text-sm text-white placeholder-[#64748B] focus:outline-none py-1.5"
+                placeholder={`Ask ${activeAgent.name} (${activeAgent.modelTier || 'AI Coach'})...`}
+                className="flex-1 bg-transparent text-xs sm:text-sm text-white placeholder-[#64748B] outline-none py-1.5"
               />
 
               <button
+                type="button"
                 onClick={handleSend}
-                disabled={!inputText.trim()}
-                className="w-8 h-8 rounded-lg bg-[#6366F1] hover:bg-[#4F46E5] disabled:opacity-40 disabled:hover:bg-[#6366F1] text-white flex items-center justify-center transition-all shrink-0 cursor-pointer"
+                disabled={!inputText.trim() || isGenerating}
+                className="w-8 h-8 rounded-lg bg-[#6366F1] hover:bg-[#4F46E5] disabled:opacity-40 disabled:hover:bg-[#6366F1] flex items-center justify-center text-white transition-all shadow-sm shrink-0"
               >
-                <Send className="w-3.5 h-3.5" />
+                {isGenerating ? (
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                ) : (
+                  <Send className="w-3.5 h-3.5" />
+                )}
               </button>
             </div>
-
-            <p className="text-[10px] text-[#64748B] text-center mt-2">
-              AI Coach may make mistakes. Always verify important information.
-            </p>
           </div>
         </div>
       )}
 
-      {/* Tab 2: Suggested Today Planner View */}
+      {/* Tab 2: Planner Tab */}
       {activeTab === 'planner' && (
         <div className="p-4 sm:p-6 space-y-4">
-          <div className="flex items-center justify-between pb-2 border-b border-white/6">
+          <div className="flex items-center justify-between">
             <div>
-              <h4 className="text-sm font-bold text-white">Suggested Today</h4>
-              <p className="text-xs text-[#94A3B8] mt-0.5">
-                Targeted recommendations aligned with your {selectedPack.name} routine.
+              <h4 className="text-sm font-bold text-white">Suggested Focus Sprints</h4>
+              <p className="text-xs text-[#94A3B8]">
+                Curated by {activeAgent.name} to maximize your streak XP
               </p>
             </div>
-            <span className="text-xs font-semibold text-[#818CF8]">
-              {suggestedTasks.filter((t) => t.isAdded).length} of {suggestedTasks.length} added
-            </span>
           </div>
 
-          <div className="flex flex-col gap-2.5">
-            {suggestedTasks.map((task) => (
+          <div className="space-y-2.5">
+            {suggestedTasks.map((t) => (
               <div
-                key={task.id}
-                className="p-3 sm:p-3.5 rounded-xl bg-[#141C2B] border border-white/6 flex items-center justify-between gap-3 group hover:border-white/12 transition-all"
+                key={t.id}
+                className="p-3 rounded-xl bg-[#141D2A] border border-white/6 flex items-center justify-between gap-3"
               >
-                <div className="flex items-center gap-3 min-w-0">
-                  <div className="w-12 text-center text-xs font-mono font-semibold text-[#818CF8] bg-white/4 py-1 rounded-md shrink-0">
-                    {task.time}
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-semibold text-white truncate">{t.title}</span>
+                    <span className="text-[10px] px-2 py-0.5 rounded bg-white/5 text-[#94A3B8]">
+                      {t.time}
+                    </span>
                   </div>
-                  <div className="min-w-0">
-                    <p className="text-xs sm:text-[13px] font-semibold text-white truncate">
-                      {task.title}
-                    </p>
-                    <p className="text-[11px] text-[#94A3B8] flex items-center gap-1.5 mt-0.5">
-                      <span>{task.category}</span>
-                      <span>•</span>
-                      <span>{task.durationMinutes} min</span>
-                    </p>
-                  </div>
+                  <p className="text-[11px] text-[#64748B] mt-0.5">
+                    {t.category} • {t.durationMinutes} mins
+                  </p>
                 </div>
 
                 <button
-                  onClick={() => handleToggleTaskAdd(task)}
-                  className={`h-7 px-3 rounded-lg text-xs font-semibold transition-all shrink-0 cursor-pointer ${
-                    task.isAdded
+                  type="button"
+                  onClick={() => handleToggleTaskAdd(t)}
+                  className={`h-7 px-3 rounded-lg text-xs font-semibold transition-all ${
+                    t.isAdded
                       ? 'bg-[#10B981]/20 text-[#34D399] border border-[#10B981]/30'
-                      : 'bg-[#6366F1] hover:bg-[#4F46E5] text-white'
+                      : 'bg-white/5 hover:bg-white/10 text-white'
                   }`}
                 >
-                  {task.isAdded ? (
-                    <span className="flex items-center gap-1">
-                      <Check className="w-3 h-3" /> Added ✓
-                    </span>
-                  ) : (
-                    'Add'
-                  )}
+                  {t.isAdded ? 'Added' : '+ Add'}
                 </button>
               </div>
             ))}
@@ -321,89 +582,47 @@ export const CoachChatWorkspace: React.FC<CoachChatWorkspaceProps> = ({
         </div>
       )}
 
-      {/* Tab 3: Coach Insights View */}
+      {/* Tab 3: Insights Tab */}
       {activeTab === 'insights' && (
-        <div className="p-4 sm:p-6 space-y-4">
-          <div className="pb-2 border-b border-white/6">
-            <h4 className="text-sm font-bold text-white">Data-Driven Patterns</h4>
-            <p className="text-xs text-[#94A3B8] mt-0.5">
-              Behavioral analytics derived from your completion cadence.
-            </p>
-          </div>
-
+        <div className="p-4 sm:p-6 space-y-3">
+          <h4 className="text-sm font-bold text-white">Coach Intelligence Insights</h4>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            {initialCoachInsights.map((ins) => (
+            {initialCoachInsights.map((insight) => (
               <div
-                key={ins.id}
-                className="p-4 rounded-xl bg-[#141C2B] border border-white/6 flex flex-col justify-between gap-2"
+                key={insight.id}
+                className="p-3.5 rounded-xl bg-[#141D2A] border border-white/6 space-y-1"
               >
-                <div>
-                  <span className="text-[11px] font-semibold text-[#818CF8] uppercase tracking-wider">
-                    {ins.title}
-                  </span>
-                  <p className="text-xl font-bold text-white mt-1">{ins.stat}</p>
-                </div>
-                <p className="text-xs text-[#94A3B8] leading-relaxed mt-1">
-                  {ins.description}
-                </p>
+                <span className="text-xs font-bold text-[#818CF8]">{insight.stat}</span>
+                <p className="text-xs font-semibold text-white">{insight.title}</p>
+                <p className="text-[11px] text-[#94A3B8] leading-relaxed">{insight.description}</p>
               </div>
             ))}
           </div>
         </div>
       )}
 
-      {/* Tab 4: Resources & Coach Pack Switcher */}
+      {/* Tab 4: Resources Tab */}
       {activeTab === 'resources' && (
         <div className="p-4 sm:p-6 space-y-4">
-          <div className="pb-2 border-b border-white/6">
-            <h4 className="text-sm font-bold text-white">Coach Packs & Rhythms</h4>
-            <p className="text-xs text-[#94A3B8] mt-0.5">
-              Switch your active focus archetype to update advice parameters.
-            </p>
+          <div className="flex items-center justify-between">
+            <h4 className="text-sm font-bold text-white">Active Coaching Blueprint</h4>
           </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            {initialCoachPacks.map((pack) => {
-              const isCurrent = pack.id === selectedPackId;
-              return (
-                <div
-                  key={pack.id}
-                  onClick={() => onSelectPackId(pack.id)}
-                  className={`p-4 rounded-xl border transition-all cursor-pointer flex flex-col justify-between gap-3 ${
-                    isCurrent
-                      ? 'bg-[#182035] border-[#6366F1] ring-1 ring-[#6366F1]'
-                      : 'bg-[#141C2B] border-white/6 hover:border-white/14'
-                  }`}
+          <div className="p-4 rounded-xl bg-[#141D2A] border border-white/6 space-y-2">
+            <div className="flex items-center gap-2">
+              <Sparkles className="w-4 h-4 text-[#818CF8]" />
+              <span className="text-xs font-bold text-white">{selectedPack.name}</span>
+            </div>
+            <p className="text-xs text-[#94A3B8] leading-relaxed">{selectedPack.description}</p>
+            <div className="flex flex-wrap gap-1.5 pt-2">
+              {selectedPack.focusAreas.map((area, i) => (
+                <span
+                  key={i}
+                  className="px-2 py-0.5 rounded bg-white/5 border border-white/6 text-[10px] text-[#94A3B8]"
                 >
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <span className="text-xl">{pack.icon}</span>
-                      <h5 className="text-sm font-bold text-white">{pack.name}</h5>
-                    </div>
-                    {isCurrent && (
-                      <span className="text-[10px] font-bold text-[#6366F1] bg-[#6366F1]/15 px-2 py-0.5 rounded-md">
-                        Active
-                      </span>
-                    )}
-                  </div>
-
-                  <p className="text-xs text-[#94A3B8] leading-relaxed">
-                    {pack.description}
-                  </p>
-
-                  <div className="flex flex-wrap gap-1 pt-1">
-                    {pack.focusAreas.map((area, idx) => (
-                      <span
-                        key={idx}
-                        className="text-[10px] text-white/80 bg-white/4 px-2 py-0.5 rounded"
-                      >
-                        • {area}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-              );
-            })}
+                  {area}
+                </span>
+              ))}
+            </div>
           </div>
         </div>
       )}

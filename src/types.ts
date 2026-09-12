@@ -92,6 +92,8 @@ export interface TaskItem {
   completed: boolean;
   viewCategory: 'today' | 'upcoming' | 'overdue' | 'someday';
   dueText: string;
+  dueDate?: string; // YYYY-MM-DD
+  clientDate?: string; // Client's today ISO
   dueTime?: string;
   labels: string[];
   priority: TaskPriority;
@@ -388,6 +390,8 @@ export interface CoachChatMessage {
   sender: 'coach' | 'user';
   text: string;
   timestamp: string;
+  agentId?: 'chatgpt' | 'claude' | 'gemini' | string;
+  agentName?: string;
   suggestions?: string[];
   actionRecommendation?: {
     title: string;
@@ -429,6 +433,17 @@ export interface AIIntegrationModel {
   description: string;
   tags: string[];
   iconType: 'chatgpt' | 'claude' | 'gemini';
+  accountEmail?: string;
+  connectedAt?: string;
+  modelTier?: string;
+  lastSyncedAt?: string;
+  latencyMs?: number;
+  syncStatus?: 'synced' | 'syncing' | 'error' | 'ready';
+  isEnvironmentKeyConfigured?: boolean;
+  verified?: boolean;
+  verifiedAt?: string;
+  authMethod?: 'google' | 'apple' | 'phone' | 'email' | 'apikey';
+  authProviderName?: string;
 }
 
 export interface CalendarIntegrationState {

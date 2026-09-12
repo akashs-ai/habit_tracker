@@ -1,9 +1,10 @@
 import React from 'react';
 import { Plus, Laptop, Utensils, Gamepad2, Dumbbell, BookOpen, Clock, Calendar as CalIcon } from 'lucide-react';
 import { CalendarEvent } from '../../types';
+import { formatReadableDate, getRelativeDayLabel, isToday } from '../../utils/dateUtils';
 
 interface SelectedDayPanelProps {
-  selectedDate: string; // "2025-03-11"
+  selectedDate: string; // "YYYY-MM-DD"
   events: CalendarEvent[];
   onSelectEvent: (event: CalendarEvent) => void;
   onAddEvent: () => void;
@@ -15,20 +16,17 @@ export const SelectedDayPanel: React.FC<SelectedDayPanelProps> = ({
   onSelectEvent,
   onAddEvent,
 }) => {
-  // Format selectedDate e.g. "Tue, 11 Mar 2025"
+  // Format selectedDate e.g. "Tue, 11 Mar 2026"
   const formattedDate = React.useMemo(() => {
-    try {
-      const parts = selectedDate.split('-');
-      const d = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
-      return d.toLocaleDateString('en-US', {
-        weekday: 'short',
-        day: 'numeric',
-        month: 'short',
-        year: 'numeric',
-      });
-    } catch {
-      return selectedDate;
-    }
+    return formatReadableDate(selectedDate);
+  }, [selectedDate]);
+
+  const relativeLabel = React.useMemo(() => {
+    return getRelativeDayLabel(selectedDate);
+  }, [selectedDate]);
+
+  const isCurrentDay = React.useMemo(() => {
+    return isToday(selectedDate);
   }, [selectedDate]);
 
   const getEventIcon = (category: string, title: string) => {
@@ -44,9 +42,20 @@ export const SelectedDayPanel: React.FC<SelectedDayPanelProps> = ({
   return (
     <div id="selected-day-panel" className="flex flex-col gap-2.5">
       {/* Date Header */}
-      <h3 className="text-xs sm:text-sm font-semibold text-[#F5F7FF] px-1">
-        {formattedDate}
-      </h3>
+      <div className="flex items-center justify-between px-1">
+        <h3 className="text-xs sm:text-sm font-semibold text-[#F5F7FF]">
+          {formattedDate}
+        </h3>
+        {isCurrentDay ? (
+          <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-[#6C63FF] text-white">
+            TODAY
+          </span>
+        ) : (
+          <span className="text-[10px] font-medium text-[#A6AEC0]">
+            {relativeLabel}
+          </span>
+        )}
+      </div>
 
       {/* Events List */}
       <div className="flex flex-col gap-2">

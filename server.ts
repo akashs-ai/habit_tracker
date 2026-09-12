@@ -1,0 +1,488 @@
+import express, { Request, Response } from 'express';
+import path from 'path';
+import { createServer as createViteServer } from 'vite';
+import { db } from './server/db';
+import { REWARD_TERMS_POLICY } from './server/terms';
+import { generateAIChatResponse } from './server/ai';
+
+async function startServer() {
+  const app = express();
+  const PORT = 3000;
+
+  app.use(express.json());
+
+  // --- API Routes ---
+
+  // Health Check
+  app.get('/api/health', (req: Request, res: Response) => {
+    res.json({ status: 'ok', time: new Date().toISOString() });
+  });
+
+  // 1. Full State Snapshot (Single Source of Truth)
+  app.get('/api/state', (req: Request, res: Response) => {
+    try {
+      const state = db.getState();
+      res.json({ success: true, data: state });
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  // 2. User & Progression
+  app.get('/api/user', (req: Request, res: Response) => {
+    try {
+      const state = db.getState();
+      res.json({ success: true, data: state.user });
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  // 3. Quests (Habits)
+  app.get('/api/quests', (req: Request, res: Response) => {
+    try {
+      const state = db.getState();
+      res.json({ success: true, data: state.quests });
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  app.post('/api/quests/toggle', (req: Request, res: Response) => {
+    try {
+      const { questId } = req.body;
+      if (!questId) {
+        return res.status(400).json({ success: false, error: 'questId is required.' });
+      }
+      const updated = db.toggleQuest(questId);
+      if (!updated) {
+        return res.status(404).json({ success: false, error: 'Quest not found.' });
+      }
+      res.json({ success: true, data: updated, state: db.getState() });
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  app.post('/api/quests', (req: Request, res: Response) => {
+    try {
+      const quest = db.addQuest(req.body);
+      res.status(201).json({ success: true, data: quest, state: db.getState() });
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  // 4. Tasks
+  app.get('/api/tasks', (req: Request, res: Response) => {
+    try {
+      const state = db.getState();
+      res.json({ success: true, data: state.tasks });
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  app.post('/api/tasks', (req: Request, res: Response) => {
+    try {
+      const { title } = req.body;
+      if (!title || !title.trim()) {
+        return res.status(400).json({ success: false, error: 'Task title is required.' });
+      }
+      const task = db.addTask(req.body);
+      res.status(201).json({ success: true, data: task, state: db.getState() });
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  app.put('/api/tasks/:id', (req: Request, res: Response) => {
+    try {
+      const updated = db.updateTask({ ...req.body, id: req.params.id });
+      if (!updated) {
+        return res.status(404).json({ success: false, error: 'Task not found.' });
+      }
+      res.json({ success: true, data: updated, state: db.getState() });
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  app.delete('/api/tasks/:id', (req: Request, res: Response) => {
+    try {
+      const ok = db.deleteTask(req.params.id);
+      if (!ok) {
+        return res.status(404).json({ success: false, error: 'Task not found.' });
+      }
+      res.json({ success: true, state: db.getState() });
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  app.post('/api/tasks/:id/toggle', (req: Request, res: Response) => {
+    try {
+      const updated = db.toggleTask(req.params.id);
+      if (!updated) {
+        return res.status(404).json({ success: false, error: 'Task not found.' });
+      }
+      res.json({ success: true, data: updated, state: db.getState() });
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  // 5. Calendar Events
+  app.get('/api/calendar/events', (req: Request, res: Response) => {
+    try {
+      const state = db.getState();
+      res.json({ success: true, data: state.calendarEvents });
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  app.post('/api/calendar/events', (req: Request, res: Response) => {
+    try {
+      const { title, date } = req.body;
+      if (!title || !date) {
+        return res.status(400).json({ success: false, error: 'Title and date are required.' });
+      }
+      const event = db.addCalendarEvent(req.body);
+      res.status(201).json({ success: true, data: event, state: db.getState() });
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  app.put('/api/calendar/events/:id', (req: Request, res: Response) => {
+    try {
+      const updated = db.updateCalendarEvent({ ...req.body, id: req.params.id });
+      if (!updated) {
+        return res.status(404).json({ success: false, error: 'Calendar event not found.' });
+      }
+      res.json({ success: true, data: updated, state: db.getState() });
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  app.delete('/api/calendar/events/:id', (req: Request, res: Response) => {
+    try {
+      const ok = db.deleteCalendarEvent(req.params.id);
+      if (!ok) {
+        return res.status(404).json({ success: false, error: 'Calendar event not found.' });
+      }
+      res.json({ success: true, state: db.getState() });
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  app.post('/api/calendar/events/:id/toggle', (req: Request, res: Response) => {
+    try {
+      const updated = db.toggleCalendarEvent(req.params.id);
+      if (!updated) {
+        return res.status(404).json({ success: false, error: 'Calendar event not found.' });
+      }
+      res.json({ success: true, data: updated, state: db.getState() });
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  // 6. Goals
+  app.get('/api/goals', (req: Request, res: Response) => {
+    try {
+      const state = db.getState();
+      res.json({ success: true, data: state.goals });
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  app.post('/api/goals', (req: Request, res: Response) => {
+    try {
+      const { title } = req.body;
+      if (!title || !title.trim()) {
+        return res.status(400).json({ success: false, error: 'Goal title is required.' });
+      }
+      const goal = db.addGoal(req.body);
+      res.status(201).json({ success: true, data: goal, state: db.getState() });
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  app.put('/api/goals/:id', (req: Request, res: Response) => {
+    try {
+      const updated = db.updateGoal({ ...req.body, id: req.params.id });
+      if (!updated) {
+        return res.status(404).json({ success: false, error: 'Goal not found.' });
+      }
+      res.json({ success: true, data: updated, state: db.getState() });
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  app.delete('/api/goals/:id', (req: Request, res: Response) => {
+    try {
+      const ok = db.deleteGoal(req.params.id);
+      if (!ok) {
+        return res.status(404).json({ success: false, error: 'Goal not found.' });
+      }
+      res.json({ success: true, state: db.getState() });
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  app.post('/api/goals/:id/subtask-toggle', (req: Request, res: Response) => {
+    try {
+      const { subtaskId } = req.body;
+      const updated = db.toggleGoalSubtask(req.params.id, subtaskId);
+      if (!updated) {
+        return res.status(404).json({ success: false, error: 'Goal or subtask not found.' });
+      }
+      res.json({ success: true, data: updated, state: db.getState() });
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  app.post('/api/goals/:id/milestone-toggle', (req: Request, res: Response) => {
+    try {
+      const { milestoneId } = req.body;
+      const updated = db.toggleGoalMilestone(req.params.id, milestoneId);
+      if (!updated) {
+        return res.status(404).json({ success: false, error: 'Goal or milestone not found.' });
+      }
+      res.json({ success: true, data: updated, state: db.getState() });
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  // 7. Rewards & Claims
+  app.get('/api/rewards', (req: Request, res: Response) => {
+    try {
+      const state = db.getState();
+      res.json({
+        success: true,
+        data: {
+          rewards: state.rewards,
+          badges: state.badges,
+          collection: state.collectionItems,
+          waysToEarn: state.waysToEarn,
+          claims: state.claims,
+          momentumPoints: state.user.momentumPoints,
+          pointsThisWeek: state.user.pointsThisWeek,
+        }
+      });
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  // Reward Claim Terms & Eligibility Policy
+  app.get('/api/rewards/terms', (req: Request, res: Response) => {
+    try {
+      res.json({
+        success: true,
+        data: REWARD_TERMS_POLICY,
+      });
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  // Claim / Unlock a Reward with authoritative server-side validation
+  app.post('/api/rewards/claim', (req: Request, res: Response) => {
+    try {
+      const { rewardId, termsAccepted, clientFingerprint } = req.body;
+      if (!rewardId) {
+        return res.status(400).json({ success: false, error: 'rewardId is required.' });
+      }
+
+      const result = db.claimReward(rewardId, termsAccepted === true, clientFingerprint);
+      if (!result.success) {
+        return res.status(400).json({ success: false, error: result.error });
+      }
+
+      res.status(201).json({
+        success: true,
+        data: {
+          reward: result.reward,
+          claim: result.claim,
+          momentumPoints: db.getState().user.momentumPoints,
+        },
+        state: db.getState(),
+      });
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  // Activate / Equip an owned reward
+  app.post('/api/rewards/activate', (req: Request, res: Response) => {
+    try {
+      const { rewardId } = req.body;
+      if (!rewardId) {
+        return res.status(400).json({ success: false, error: 'rewardId is required.' });
+      }
+
+      const result = db.activateReward(rewardId);
+      if (!result.success) {
+        return res.status(400).json({ success: false, error: result.error });
+      }
+
+      res.json({
+        success: true,
+        data: result.reward,
+        state: db.getState(),
+      });
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  // 8. Analytics
+  app.get('/api/analytics', (req: Request, res: Response) => {
+    try {
+      const timeRange = (req.query.timeRange as string) || '7d';
+      const analytics = db.getAnalytics(timeRange);
+      res.json({ success: true, data: analytics });
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  // 9. Notes
+  app.post('/api/notes', (req: Request, res: Response) => {
+    try {
+      const newNote = db.addNote(req.body);
+      res.status(201).json({ success: true, data: newNote, state: db.getState() });
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  app.delete('/api/notes/:id', (req: Request, res: Response) => {
+    try {
+      const ok = db.deleteNote(req.params.id);
+      if (!ok) {
+        return res.status(404).json({ success: false, error: 'Note not found.' });
+      }
+      res.json({ success: true, state: db.getState() });
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  // 10. AI Agents & Coaching Backend
+  app.get('/api/ai/agents', (req: Request, res: Response) => {
+    try {
+      const agents = db.getAIAgents();
+      res.json({ success: true, data: agents });
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  app.post('/api/ai/agents/connect', (req: Request, res: Response) => {
+    try {
+      const { agentId, accountEmail, apiKey, modelTier, loginMethod } = req.body;
+      if (!agentId) {
+        return res.status(400).json({ success: false, error: 'agentId is required.' });
+      }
+      const updatedAgent = db.connectAIAgent(agentId, {
+        accountEmail,
+        apiKey,
+        modelTier,
+        loginMethod,
+      });
+      res.json({ success: true, data: updatedAgent, agents: db.getAIAgents() });
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  app.post('/api/ai/agents/disconnect', (req: Request, res: Response) => {
+    try {
+      const { agentId } = req.body;
+      if (!agentId) {
+        return res.status(400).json({ success: false, error: 'agentId is required.' });
+      }
+      const updatedAgent = db.disconnectAIAgent(agentId);
+      res.json({ success: true, data: updatedAgent, agents: db.getAIAgents() });
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  app.post('/api/ai/agents/select', (req: Request, res: Response) => {
+    try {
+      const { agentId } = req.body;
+      if (!agentId) {
+        return res.status(400).json({ success: false, error: 'agentId is required.' });
+      }
+      const agents = db.selectAIAgent(agentId);
+      res.json({ success: true, data: agents });
+    } catch (err: any) {
+      res.status(400).json({ success: false, error: err.message });
+    }
+  });
+
+  app.post('/api/ai/agents/sync', (req: Request, res: Response) => {
+    try {
+      const syncResult = db.syncAIAgents();
+      res.json({ success: true, ...syncResult });
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  app.get('/api/ai/agents/sync', (req: Request, res: Response) => {
+    try {
+      const syncResult = db.syncAIAgents();
+      res.json({ success: true, ...syncResult });
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  app.post('/api/ai/chat', async (req: Request, res: Response) => {
+    try {
+      const { modelId, message, history } = req.body;
+      if (!modelId || !message) {
+        return res.status(400).json({ success: false, error: 'modelId and message are required.' });
+      }
+      const reply = await generateAIChatResponse({ modelId, message, history });
+      res.json({ success: true, data: reply });
+    } catch (err: any) {
+      res.status(400).json({ success: false, error: err.message });
+    }
+  });
+
+  // Vite middleware for development
+  if (process.env.NODE_ENV !== 'production') {
+    const vite = await createViteServer({
+      server: { middlewareMode: true },
+      appType: 'spa',
+    });
+    app.use(vite.middlewares);
+  } else {
+    const distPath = path.join(process.cwd(), 'dist');
+    app.use(express.static(distPath));
+    app.get('*', (req: Request, res: Response) => {
+      res.sendFile(path.join(distPath, 'index.html'));
+    });
+  }
+
+  app.listen(PORT, '0.0.0.0', () => {
+    console.log(`LifeRPG unified backend server running on http://0.0.0.0:${PORT}`);
+  });
+}
+
+startServer();

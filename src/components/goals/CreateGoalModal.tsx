@@ -28,16 +28,20 @@ export const CreateGoalModal: React.FC<CreateGoalModalProps> = ({
 }) => {
   const [activeStep, setActiveStep] = useState<'basic' | 'milestones' | 'tasks' | 'review'>('basic');
 
+  const now = new Date();
+  const currentYearEnd = `${now.getFullYear()}-12-31`;
+  const defaultMilestoneDate = new Date(now.getTime() + 30 * 86400000).toISOString().split('T')[0];
+
   // Form Fields
   const [title, setTitle] = useState('');
   const [category, setCategory] = useState<GoalCategory>('Career');
   const [description, setDescription] = useState('');
-  const [dueDate, setDueDate] = useState('2025-12-31');
+  const [dueDate, setDueDate] = useState(currentYearEnd);
   const [priority, setPriority] = useState<'high' | 'medium' | 'low'>('high');
 
   // Milestones & Tasks for next steps
   const [milestone1, setMilestone1] = useState('Complete DSA Basics');
-  const [milestoneDate1, setMilestoneDate1] = useState('2025-03-31');
+  const [milestoneDate1, setMilestoneDate1] = useState(defaultMilestoneDate);
   const [task1, setTask1] = useState('Complete fundamental modules');
   const [task2, setTask2] = useState('Build initial prototype');
 

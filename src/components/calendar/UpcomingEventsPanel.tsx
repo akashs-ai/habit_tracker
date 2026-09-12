@@ -1,6 +1,7 @@
 import React from 'react';
 import { ArrowRight, Laptop, Dumbbell, Film, Calendar as CalIcon } from 'lucide-react';
 import { CalendarEvent } from '../../types';
+import { formatUpcomingDateLabel } from '../../utils/dateUtils';
 
 interface UpcomingEventsPanelProps {
   events: CalendarEvent[];
@@ -19,17 +20,6 @@ export const UpcomingEventsPanel: React.FC<UpcomingEventsPanelProps> = ({
     if (t.includes('gym') || t.includes('workout')) return Dumbbell;
     if (t.includes('project') || t.includes('work')) return Laptop;
     return CalIcon;
-  };
-
-  const formatUpcomingDate = (dateStr: string, startTime?: string) => {
-    try {
-      const parts = dateStr.split('-');
-      const d = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
-      const datePart = d.toLocaleDateString('en-US', { weekday: 'short', day: 'numeric', month: 'short' });
-      return startTime ? `${datePart} • ${startTime}` : datePart;
-    } catch {
-      return dateStr;
-    }
   };
 
   // Take next 4-5 upcoming events
@@ -67,7 +57,7 @@ export const UpcomingEventsPanel: React.FC<UpcomingEventsPanelProps> = ({
                   {evt.title}
                 </span>
                 <span className="text-[10px] text-[#6F7789] truncate">
-                  {formatUpcomingDate(evt.date, evt.startTime)}
+                  {formatUpcomingDateLabel(evt.date, evt.startTime)}
                 </span>
               </div>
             </div>

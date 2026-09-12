@@ -16,6 +16,7 @@ import { TaskSubNav } from './TaskSubNav';
 import { TaskRow } from './TaskRow';
 import { TaskComposer } from './TaskComposer';
 import { TasksRightPanel } from './TasksRightPanel';
+import { getTodayDate, isToday, shiftDateDays, formatReadableDate, formatDateISO } from '../../utils/dateUtils';
 
 interface TasksPageProps {
   tasks: TaskItem[];
@@ -42,9 +43,34 @@ export const TasksPage: React.FC<TasksPageProps> = ({
   const [selectedLabel, setSelectedLabel] = useState<string | null>(null);
   const [selectedPriority, setSelectedPriority] = useState<TaskPriority | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedDate, setSelectedDate] = useState('Thu, 10 Mar 2025');
+  const [taskDate, setTaskDate] = useState<Date>(() => getTodayDate());
   const [showFilterDropdown, setShowFilterDropdown] = useState(false);
   const [isComposerOpen, setIsComposerOpen] = useState(false);
+
+  // Check if taskDate is today using unified dateUtils
+  const isSelectedDateToday = useMemo(() => {
+    return isToday(taskDate);
+  }, [taskDate]);
+
+  const selectedDateLabel = useMemo(() => {
+    const iso = formatDateISO(taskDate);
+    if (isSelectedDateToday) {
+      return `Today, ${formatReadableDate(iso)}`;
+    }
+    return formatReadableDate(iso);
+  }, [taskDate, isSelectedDateToday]);
+
+  const handlePrevDay = () => {
+    setTaskDate(prev => shiftDateDays(prev, -1));
+  };
+
+  const handleNextDay = () => {
+    setTaskDate(prev => shiftDateDays(prev, 1));
+  };
+
+  const handleResetToToday = () => {
+    setTaskDate(getTodayDate());
+  };
 
   // Compute View Counts
   const counts = useMemo(() => {
@@ -198,18 +224,28 @@ export const TasksPage: React.FC<TasksPageProps> = ({
             {/* Date Switcher */}
             <div className="flex items-center bg-white dark:bg-[#121214] border border-[#E2E8F0] dark:border-[#27272A] rounded-xl px-2 py-1 shadow-2xs text-xs font-medium text-[#0F172A] dark:text-[#F8FAFC]">
               <button 
-                onClick={() => setSelectedDate('Wed, 9 Mar 2025')}
-                className="p-1 hover:text-[#6366F1] rounded"
+                onClick={handlePrevDay}
+                className="p-1 hover:text-[#6366F1] rounded transition-colors"
+                title="Previous Day"
               >
                 <ChevronLeft className="w-3.5 h-3.5" />
               </button>
-              <span className="px-2">{selectedDate}</span>
+              <span className="px-2 font-medium">{selectedDateLabel}</span>
               <button 
-                onClick={() => setSelectedDate('Fri, 11 Mar 2025')}
-                className="p-1 hover:text-[#6366F1] rounded"
+                onClick={handleNextDay}
+                className="p-1 hover:text-[#6366F1] rounded transition-colors"
+                title="Next Day"
               >
                 <ChevronRight className="w-3.5 h-3.5" />
               </button>
+              {!isSelectedDateToday && (
+                <button
+                  onClick={handleResetToToday}
+                  className="ml-1 px-1.5 py-0.5 rounded text-[10px] font-semibold text-[#6366F1] bg-[#6366F1]/10 hover:bg-[#6366F1]/20 transition-colors"
+                >
+                  Today
+                </button>
+              )}
             </div>
 
             {/* Filter Trigger Button */}

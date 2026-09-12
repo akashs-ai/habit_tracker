@@ -6,14 +6,28 @@ import {
   Tag, 
   RotateCw, 
   Command, 
-  X 
+  X,
+  Check
 } from 'lucide-react';
 import { TaskItem, TaskPriority } from '../../types';
+import { getTodayISO, addDaysISO } from '../../utils/dateUtils';
 
 interface TaskComposerProps {
   onAddTask: (task: Omit<TaskItem, 'id'>) => void;
   defaultCategory?: 'today' | 'upcoming' | 'overdue' | 'someday';
 }
+
+const PRESET_TAGS = [
+  { name: 'Personal', color: '#6366F1' },
+  { name: 'Work', color: '#3B82F6' },
+  { name: 'Study', color: '#8B5CF6' },
+  { name: 'Health', color: '#10B981' },
+  { name: 'Workout', color: '#22C55E' },
+  { name: 'Projects', color: '#F59E0B' },
+  { name: 'Reading', color: '#06B6D4' },
+  { name: 'Finance', color: '#14B8A6' },
+  { name: 'Urgent', color: '#EF4444' },
+];
 
 export const TaskComposer: React.FC<TaskComposerProps> = ({
   onAddTask,
@@ -24,9 +38,12 @@ export const TaskComposer: React.FC<TaskComposerProps> = ({
   const [dueText, setDueText] = useState('Today');
   const [priority, setPriority] = useState<TaskPriority>('low');
   const [labels, setLabels] = useState<string[]>(['Personal']);
+  const [customTagInput, setCustomTagInput] = useState('');
+  
   const [showSlashMenu, setShowSlashMenu] = useState(false);
   const [showPriorityMenu, setShowPriorityMenu] = useState(false);
   const [showLabelMenu, setShowLabelMenu] = useState(false);
+  const [showDateMenu, setShowDateMenu] = useState(false);
 
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -64,16 +81,54 @@ export const TaskComposer: React.FC<TaskComposerProps> = ({
     inputRef.current?.focus();
   };
 
+  const toggleTag = (tagName: string) => {
+    setLabels((prev) => {
+      if (prev.includes(tagName)) {
+        const next = prev.filter((t) => t !== tagName);
+        return next.length > 0 ? next : ['Personal'];
+      } else {
+        return [...prev, tagName];
+      }
+    });
+  };
+
+  const handleAddCustomTag = () => {
+    const trimmed = customTagInput.trim();
+    if (!trimmed) return;
+    if (!labels.includes(trimmed)) {
+      setLabels((prev) => [...prev, trimmed]);
+    }
+    setCustomTagInput('');
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!title.trim()) return;
+
+    const localToday = getTodayISO();
+    let computedCategory = defaultCategory;
+    let computedDueDate = localToday;
+
+    const dueLower = dueText.toLowerCase();
+    if (dueLower.includes('tomorrow')) {
+      computedCategory = 'upcoming';
+      computedDueDate = addDaysISO(localToday, 1);
+    } else if (dueLower.includes('next week') || dueLower.includes('next')) {
+      computedCategory = 'upcoming';
+      computedDueDate = addDaysISO(localToday, 7);
+    } else if (dueLower.includes('someday')) {
+      computedCategory = 'someday';
+    }
 
     onAddTask({
       title: title.trim(),
       description: '',
       completed: false,
-      viewCategory: dueText.toLowerCase().includes('tomorrow') || dueText.toLowerCase().includes('next') ? 'upcoming' : defaultCategory,
+      viewCategory: computedCategory,
       dueText: dueText,
+      dueTime: '10:00 AM',
+      dueDate: computedDueDate,
+      clientDate: localToday,
       labels: labels.length > 0 ? labels : ['Personal'],
       priority: priority,
       xpReward: 15
@@ -84,12 +139,16 @@ export const TaskComposer: React.FC<TaskComposerProps> = ({
     setShowSlashMenu(false);
     setShowPriorityMenu(false);
     setShowLabelMenu(false);
+    setShowDateMenu(false);
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Escape') {
       setIsFocused(false);
       setShowSlashMenu(false);
+      setShowPriorityMenu(false);
+      setShowLabelMenu(false);
+      setShowDateMenu(false);
     }
   };
 
@@ -119,7 +178,7 @@ export const TaskComposer: React.FC<TaskComposerProps> = ({
         // Focused composer state
         <form
           onSubmit={handleSubmit}
-          className="bg-white dark:bg-[#121214] border-2 border-[#6366F1]/60 dark:border-[#6366F1]/50 rounded-2xl p-4 shadow-md transition-all animate-in fade-in zoom-in-98 duration-150"
+          className="bg-white dark:bg-[#121214] border-2 border-[#6366F1]/60 dark:border-[#6366F1]/50 rounded-2xl p-4 shadow-md transition-all animate-in fade-in zoom-in-98 duration-150 relative"
         >
           {/* Main Title Input */}
           <div className="relative">
@@ -136,7 +195,7 @@ export const TaskComposer: React.FC<TaskComposerProps> = ({
 
           {/* Quick Active Chips Preview */}
           <div className="flex flex-wrap items-center gap-2 mt-3 pt-2 border-t border-[#F1F5F9] dark:border-[#27272A]">
-            <span className="text-xs text-[#6366F1] bg-[#EEF2FF] dark:bg-[#1E1B4B] px-2 py-0.5 rounded-md font-medium">
+            <span className="text-xs text-[#6366F1] bg-[#EEF2FF] dark:bg-[#1E1B4B] px-2 py-0.5 rounded-md font-medium flex items-center gap-1">
               📅 {dueText}
             </span>
 
@@ -149,54 +208,221 @@ export const TaskComposer: React.FC<TaskComposerProps> = ({
             )}
 
             {labels.map((lbl) => (
-              <span key={lbl} className="text-xs bg-[#F1F5F9] dark:bg-[#27272A] text-[#475569] dark:text-[#CBD5E1] px-2 py-0.5 rounded-md">
+              <span key={lbl} className="inline-flex items-center gap-1 text-xs bg-[#F1F5F9] dark:bg-[#27272A] text-[#475569] dark:text-[#CBD5E1] px-2 py-0.5 rounded-md">
                 🏷️ {lbl}
+                <button
+                  type="button"
+                  onClick={() => toggleTag(lbl)}
+                  className="hover:text-[#EF4444] transition-colors ml-0.5"
+                  title="Remove tag"
+                >
+                  <X className="w-3 h-3" />
+                </button>
               </span>
             ))}
           </div>
 
           {/* Composer Footer Actions */}
           <div className="flex items-center justify-between gap-2 mt-3">
-            <div className="flex items-center gap-1 text-[#64748B] dark:text-[#94A3B8]">
-              {/* Date Quick Button */}
-              <button
-                type="button"
-                onClick={() => setDueText(dueText === 'Today' ? 'Tomorrow' : 'Today')}
-                className="p-1.5 rounded-lg hover:bg-[#F1F5F9] dark:hover:bg-[#27272A] hover:text-[#0F172A] dark:hover:text-white transition-colors"
-                title="Toggle Date"
-              >
-                <Calendar className="w-4 h-4" />
-              </button>
+            <div className="flex items-center gap-1 text-[#64748B] dark:text-[#94A3B8] relative">
+              {/* Date Quick Button & Popover */}
+              <div className="relative">
+                <button
+                  type="button"
+                  id="task-composer-date-btn"
+                  onClick={() => {
+                    setShowDateMenu(!showDateMenu);
+                    setShowLabelMenu(false);
+                    setShowPriorityMenu(false);
+                  }}
+                  className={`p-1.5 rounded-lg transition-colors ${
+                    showDateMenu 
+                      ? 'bg-[#6366F1]/15 text-[#6366F1]' 
+                      : 'hover:bg-[#F1F5F9] dark:hover:bg-[#27272A] hover:text-[#0F172A] dark:hover:text-white'
+                  }`}
+                  title="Select Due Date"
+                >
+                  <Calendar className="w-4 h-4" />
+                </button>
 
-              {/* Priority Flag Button */}
-              <button
-                type="button"
-                onClick={() => setPriority(priority === 'high' ? 'low' : priority === 'medium' ? 'high' : 'medium')}
-                className="p-1.5 rounded-lg hover:bg-[#F1F5F9] dark:hover:bg-[#27272A] hover:text-[#0F172A] dark:hover:text-white transition-colors"
-                title="Cycle Priority"
-              >
-                <Flag className="w-4 h-4" />
-              </button>
+                {showDateMenu && (
+                  <div className="absolute left-0 bottom-full mb-2 z-50 w-44 p-1.5 bg-white dark:bg-[#1E1E22] border border-[#E2E8F0] dark:border-[#2E2E32] rounded-xl shadow-lg flex flex-col gap-1 text-xs animate-in fade-in zoom-in-95 duration-100">
+                    <span className="px-2 py-1 text-[11px] font-semibold text-[#94A3B8] uppercase tracking-wider">Due Date</span>
+                    {[
+                      { label: 'Today', value: 'Today' },
+                      { label: 'Tomorrow', value: 'Tomorrow' },
+                      { label: 'Next week', value: 'Next week' },
+                      { label: 'Someday', value: 'Someday' },
+                    ].map((opt) => (
+                      <button
+                        key={opt.value}
+                        type="button"
+                        onClick={() => {
+                          setDueText(opt.value);
+                          setShowDateMenu(false);
+                        }}
+                        className={`px-2.5 py-1.5 rounded-lg text-left flex items-center justify-between transition-colors ${
+                          dueText === opt.value 
+                            ? 'bg-[#6366F1] text-white font-medium' 
+                            : 'hover:bg-[#F1F5F9] dark:hover:bg-[#2A2A30] text-[#334155] dark:text-[#E2E8F0]'
+                        }`}
+                      >
+                        <span>{opt.label}</span>
+                        {dueText === opt.value && <Check className="w-3.5 h-3.5" />}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
 
-              {/* Tag Button */}
-              <button
-                type="button"
-                onClick={() => {
-                  const lbl = window.prompt('Enter label (Study, Health, Personal, Projects, Workout):');
-                  if (lbl) setLabels([lbl]);
-                }}
-                className="p-1.5 rounded-lg hover:bg-[#F1F5F9] dark:hover:bg-[#27272A] hover:text-[#0F172A] dark:hover:text-white transition-colors"
-                title="Add Label"
-              >
-                <Tag className="w-4 h-4" />
-              </button>
+              {/* Priority Flag Button & Popover */}
+              <div className="relative">
+                <button
+                  type="button"
+                  id="task-composer-priority-btn"
+                  onClick={() => {
+                    setShowPriorityMenu(!showPriorityMenu);
+                    setShowLabelMenu(false);
+                    setShowDateMenu(false);
+                  }}
+                  className={`p-1.5 rounded-lg transition-colors ${
+                    showPriorityMenu 
+                      ? 'bg-[#6366F1]/15 text-[#6366F1]' 
+                      : 'hover:bg-[#F1F5F9] dark:hover:bg-[#27272A] hover:text-[#0F172A] dark:hover:text-white'
+                  }`}
+                  title="Set Priority"
+                >
+                  <Flag className="w-4 h-4" />
+                </button>
+
+                {showPriorityMenu && (
+                  <div className="absolute left-0 bottom-full mb-2 z-50 w-36 p-1.5 bg-white dark:bg-[#1E1E22] border border-[#E2E8F0] dark:border-[#2E2E32] rounded-xl shadow-lg flex flex-col gap-1 text-xs animate-in fade-in zoom-in-95 duration-100">
+                    <span className="px-2 py-1 text-[11px] font-semibold text-[#94A3B8] uppercase tracking-wider">Priority</span>
+                    {[
+                      { id: 'low', label: 'Low', color: 'text-[#64748B]' },
+                      { id: 'medium', label: 'Medium', color: 'text-[#D97706]' },
+                      { id: 'high', label: 'High', color: 'text-[#EF4444]' },
+                    ].map((p) => (
+                      <button
+                        key={p.id}
+                        type="button"
+                        onClick={() => {
+                          setPriority(p.id as TaskPriority);
+                          setShowPriorityMenu(false);
+                        }}
+                        className={`px-2.5 py-1.5 rounded-lg text-left flex items-center justify-between transition-colors ${
+                          priority === p.id 
+                            ? 'bg-[#6366F1] text-white font-medium' 
+                            : 'hover:bg-[#F1F5F9] dark:hover:bg-[#2A2A30] text-[#334155] dark:text-[#E2E8F0]'
+                        }`}
+                      >
+                        <span className="flex items-center gap-1.5">
+                          <Flag className="w-3.5 h-3.5" />
+                          {p.label}
+                        </span>
+                        {priority === p.id && <Check className="w-3.5 h-3.5" />}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Tag Button & Interactive Popover */}
+              <div className="relative">
+                <button
+                  type="button"
+                  id="task-composer-tag-btn"
+                  onClick={() => {
+                    setShowLabelMenu(!showLabelMenu);
+                    setShowPriorityMenu(false);
+                    setShowDateMenu(false);
+                  }}
+                  className={`p-1.5 rounded-lg transition-colors ${
+                    showLabelMenu 
+                      ? 'bg-[#6366F1]/15 text-[#6366F1]' 
+                      : 'hover:bg-[#F1F5F9] dark:hover:bg-[#27272A] hover:text-[#0F172A] dark:hover:text-white'
+                  }`}
+                  title="Select or Add Tags"
+                >
+                  <Tag className="w-4 h-4" />
+                </button>
+
+                {showLabelMenu && (
+                  <div 
+                    id="task-composer-tag-menu"
+                    className="absolute left-0 bottom-full mb-2 z-50 w-64 p-3 bg-white dark:bg-[#1E1E22] border border-[#E2E8F0] dark:border-[#2E2E32] rounded-xl shadow-xl flex flex-col gap-2.5 text-xs animate-in fade-in zoom-in-95 duration-100"
+                  >
+                    <div className="flex items-center justify-between border-b border-[#F1F5F9] dark:border-[#27272A] pb-2">
+                      <span className="font-semibold text-[#0F172A] dark:text-[#F8FAFC]">Select Tags</span>
+                      <button
+                        type="button"
+                        onClick={() => setShowLabelMenu(false)}
+                        className="text-[#94A3B8] hover:text-[#0F172A] dark:hover:text-white"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+
+                    {/* Tag Options Grid */}
+                    <div className="flex flex-wrap gap-1.5 max-h-40 overflow-y-auto py-1">
+                      {PRESET_TAGS.map((tag) => {
+                        const isSelected = labels.includes(tag.name);
+                        return (
+                          <button
+                            key={tag.name}
+                            type="button"
+                            onClick={() => toggleTag(tag.name)}
+                            className={`px-2.5 py-1 rounded-lg text-xs font-medium flex items-center gap-1.5 transition-all select-none ${
+                              isSelected
+                                ? 'bg-[#6366F1] text-white shadow-2xs'
+                                : 'bg-[#F1F5F9] dark:bg-[#27272A] text-[#475569] dark:text-[#CBD5E1] hover:bg-[#E2E8F0] dark:hover:bg-[#323238]'
+                            }`}
+                          >
+                            <span 
+                              className="w-2 h-2 rounded-full" 
+                              style={{ backgroundColor: isSelected ? '#FFFFFF' : tag.color }} 
+                            />
+                            {tag.name}
+                            {isSelected && <Check className="w-3 h-3" />}
+                          </button>
+                        );
+                      })}
+                    </div>
+
+                    {/* Custom Tag Input */}
+                    <div className="flex items-center gap-1.5 pt-2 border-t border-[#F1F5F9] dark:border-[#27272A]">
+                      <input
+                        type="text"
+                        value={customTagInput}
+                        onChange={(e) => setCustomTagInput(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            e.preventDefault();
+                            handleAddCustomTag();
+                          }
+                        }}
+                        placeholder="Add custom tag..."
+                        className="flex-1 px-2.5 py-1 text-xs rounded-lg border border-[#E2E8F0] dark:border-[#2E2E32] bg-transparent text-[#0F172A] dark:text-[#F8FAFC] placeholder:text-[#94A3B8] focus:outline-none focus:border-[#6366F1]"
+                      />
+                      <button
+                        type="button"
+                        onClick={handleAddCustomTag}
+                        disabled={!customTagInput.trim()}
+                        className="px-2.5 py-1 bg-[#6366F1] hover:bg-[#4F46E5] disabled:opacity-40 text-white rounded-lg font-medium transition-colors"
+                      >
+                        Add
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
 
               {/* Recurrence Button */}
               <button
                 type="button"
-                onClick={() => setDueText(dueText + ' (Daily)')}
+                onClick={() => setDueText(dueText.includes('(Daily)') ? dueText.replace(' (Daily)', '') : dueText + ' (Daily)')}
                 className="p-1.5 rounded-lg hover:bg-[#F1F5F9] dark:hover:bg-[#27272A] hover:text-[#0F172A] dark:hover:text-white transition-colors"
-                title="Repeat"
+                title="Toggle Daily Recurrence"
               >
                 <RotateCw className="w-4 h-4" />
               </button>
@@ -206,7 +432,12 @@ export const TaskComposer: React.FC<TaskComposerProps> = ({
             <div className="flex items-center gap-2">
               <button
                 type="button"
-                onClick={() => setIsFocused(false)}
+                onClick={() => {
+                  setIsFocused(false);
+                  setShowLabelMenu(false);
+                  setShowPriorityMenu(false);
+                  setShowDateMenu(false);
+                }}
                 className="px-3 py-1.5 text-xs font-medium text-[#64748B] hover:text-[#0F172A] dark:hover:text-white rounded-lg transition-colors"
               >
                 Cancel

@@ -1,27 +1,37 @@
 import React from 'react';
-import { ChevronLeft, ChevronRight, Plus, SlidersHorizontal } from 'lucide-react';
+import { Plus, SlidersHorizontal, Calendar as CalendarIcon } from 'lucide-react';
 import { CalendarViewType } from '../../types';
 
 interface CalendarHeaderProps {
   currentView: CalendarViewType;
   onChangeView: (view: CalendarViewType) => void;
-  currentMonthLabel: string; // "March 2025"
-  onPrevPeriod: () => void;
-  onNextPeriod: () => void;
-  onGoToToday: () => void;
+  currentMonthLabel?: string;
+  onPrevPeriod?: () => void;
+  onNextPeriod?: () => void;
+  onGoToToday?: () => void;
   onOpenAddEvent: () => void;
   onOpenViewOptions: () => void;
+  onConnectGoogleCalendar?: () => void;
+  isConnected?: boolean;
+  isConnecting?: boolean;
+  isSyncing?: boolean;
+  googleAccountName?: string | null;
+  onDisconnectGoogleCalendar?: () => void;
+  onSyncGoogleCalendar?: () => void;
 }
 
 export const CalendarHeader: React.FC<CalendarHeaderProps> = ({
   currentView,
   onChangeView,
-  currentMonthLabel,
-  onPrevPeriod,
-  onNextPeriod,
-  onGoToToday,
   onOpenAddEvent,
   onOpenViewOptions,
+  onConnectGoogleCalendar,
+  isConnected = false,
+  isConnecting = false,
+  isSyncing = false,
+  googleAccountName,
+  onDisconnectGoogleCalendar,
+  onSyncGoogleCalendar,
 }) => {
   const views: { id: CalendarViewType; label: string }[] = [
     { id: 'month', label: 'Month' },
@@ -57,7 +67,7 @@ export const CalendarHeader: React.FC<CalendarHeaderProps> = ({
         </button>
       </div>
 
-      {/* Controls Row: View Switcher, Date Navigation, and Filter */}
+      {/* Controls Row: View Switcher, Filter, and Connect with Google Calendar */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3.5 pt-1">
         {/* Left: View Switcher Tabs & Filter */}
         <div className="flex items-center gap-2">
@@ -92,40 +102,41 @@ export const CalendarHeader: React.FC<CalendarHeaderProps> = ({
           </button>
         </div>
 
-        {/* Right: Date Navigation Controls */}
+        {/* Right: Connect with Google Calendar Button */}
         <div className="flex items-center gap-2 self-start sm:self-auto">
-          <div className="flex items-center gap-1">
-            <button
-              id="date-nav-prev"
-              onClick={onPrevPeriod}
-              className="w-[38px] h-[38px] rounded-[8px] bg-[#151820] hover:bg-[#1A1D24] border border-white/8 flex items-center justify-center text-[#A6AEC0] hover:text-white transition-colors"
-              aria-label="Previous Period"
-            >
-              <ChevronLeft className="w-4 h-4" />
-            </button>
+          {isConnected ? (
+            <div className="flex items-center gap-1.5">
+              <button
+                id="btn-google-calendar-sync"
+                onClick={onSyncGoogleCalendar}
+                disabled={isSyncing}
+                className="h-[38px] px-3.5 rounded-[9px] bg-[#151820] hover:bg-[#1A1E27] border border-emerald-500/30 text-xs sm:text-sm font-medium text-emerald-400 flex items-center gap-2 transition-colors shrink-0 shadow-2xs"
+                title={googleAccountName ? `Connected to ${googleAccountName}` : 'Synced with Google Calendar'}
+              >
+                <span className={`w-2 h-2 rounded-full bg-emerald-400 ${isSyncing ? 'animate-ping' : ''}`} />
+                <span>{isSyncing ? 'Syncing...' : 'Google Synced'}</span>
+              </button>
 
+              <button
+                id="btn-google-calendar-disconnect"
+                onClick={onDisconnectGoogleCalendar}
+                className="h-[38px] px-2.5 rounded-[9px] bg-[#151820] hover:bg-[#1A1E27] border border-white/8 text-xs text-[#A6AEC0] hover:text-[#F5F7FF] transition-colors shrink-0"
+                title="Disconnect Google Account"
+              >
+                Disconnect
+              </button>
+            </div>
+          ) : (
             <button
-              id="date-nav-today"
-              onClick={onGoToToday}
-              className="h-[38px] px-3.5 rounded-[8px] bg-[#151820] hover:bg-[#1A1D24] border border-white/8 text-xs font-medium text-[#F5F7FF] transition-colors"
+              id="btn-connect-google-calendar"
+              onClick={onConnectGoogleCalendar}
+              disabled={isConnecting}
+              className="h-[38px] px-4 rounded-[9px] bg-white hover:bg-slate-100 active:bg-slate-200 text-[#0D0F12] text-xs sm:text-sm font-semibold shadow-sm flex items-center gap-2 transition-colors shrink-0"
             >
-              Today
+              <CalendarIcon className="w-4 h-4 text-[#0D0F12]" />
+              <span>{isConnecting ? 'Connecting...' : 'Connect with Google Calendar'}</span>
             </button>
-
-            <button
-              id="date-nav-next"
-              onClick={onNextPeriod}
-              className="w-[38px] h-[38px] rounded-[8px] bg-[#151820] hover:bg-[#1A1D24] border border-white/8 flex items-center justify-center text-[#A6AEC0] hover:text-white transition-colors"
-              aria-label="Next Period"
-            >
-              <ChevronRight className="w-4 h-4" />
-            </button>
-          </div>
-
-          {/* Month Label */}
-          <span className="text-base sm:text-lg font-semibold text-[#F5F7FF] pl-2 whitespace-nowrap">
-            {currentMonthLabel}
-          </span>
+          )}
         </div>
       </div>
     </div>

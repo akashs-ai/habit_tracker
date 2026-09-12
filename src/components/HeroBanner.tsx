@@ -1,6 +1,7 @@
 import React from 'react';
-import { Flame, Crown, BarChart3 } from 'lucide-react';
+import { Flame, Crown, BarChart3, Calendar as CalendarIcon } from 'lucide-react';
 import { UserProfile } from '../types';
+import { getCurrentTimeInfo, formatFullDayHeader, getLiveTodayISO } from '../utils/dateUtils';
 
 interface HeroBannerProps {
   user: UserProfile;
@@ -13,17 +14,26 @@ export const HeroBanner: React.FC<HeroBannerProps> = ({ user }) => {
   const progressRatio = Math.min(user.currentXp / user.nextLevelXp, 1);
   const strokeDashoffset = circumference - progressRatio * circumference;
 
+  const { greeting: timeGreeting } = getCurrentTimeInfo();
+  const liveDateString = formatFullDayHeader(getLiveTodayISO());
+
   return (
     <section id="hero-section" className="flex flex-col gap-5">
       {/* Title & Greeting */}
-      <div id="greeting-area" className="flex flex-col gap-1">
-        <h1 className="text-2xl sm:text-3xl lg:text-[32px] font-bold text-[#111827] dark:text-[#FAFAFA] tracking-tight flex items-center gap-2">
-          <span>Good morning, {user.name}!</span>
-          <span className="text-2xl sm:text-3xl animate-pulse">👋</span>
-        </h1>
-        <p className="text-sm sm:text-base text-[#6B7280] dark:text-[#A1A1AA] font-normal">
-          Consistent today, Extraordinary tomorrow.
-        </p>
+      <div id="greeting-area" className="flex flex-col sm:flex-row sm:items-end justify-between gap-3">
+        <div className="flex flex-col gap-1">
+          <h1 className="text-2xl sm:text-3xl lg:text-[32px] font-bold text-[#111827] dark:text-[#FAFAFA] tracking-tight flex items-center gap-2">
+            <span>{timeGreeting}, {user.name}!</span>
+            <span className="text-2xl sm:text-3xl animate-pulse">👋</span>
+          </h1>
+          <p className="text-sm sm:text-base text-[#6B7280] dark:text-[#A1A1AA] font-normal">
+            Consistent today, Extraordinary tomorrow.
+          </p>
+        </div>
+        <div className="flex items-center gap-2 px-3.5 py-1.5 rounded-xl bg-white dark:bg-[#18181B] border border-[#E7EAF0] dark:border-[#27272A] text-xs font-semibold text-[#374151] dark:text-[#E4E4E7] shadow-2xs self-start sm:self-auto">
+          <CalendarIcon className="w-3.5 h-3.5 text-[#7C6CFF]" />
+          <span>{liveDateString}</span>
+        </div>
       </div>
 
       {/* Hero Banner with Panorama & Embedded Bento Cards */}

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Search,
   Moon,
@@ -13,18 +13,25 @@ import { TryAskingGrid } from './TryAskingGrid';
 import { YourCoachCard } from './YourCoachCard';
 import { CoachLandscapeCard } from './CoachLandscapeCard';
 import { CoachChatWorkspace } from './CoachChatWorkspace';
+import { ConnectAgentModal } from '../aiintegration/AiIntegrationModals';
 import {
   initialCoachPrompts,
   initialChatMessages,
-  getCoachResponse
 } from '../../data/aiCoachMockData';
-import { CoachChatMessage, CoachPromptOption } from '../../types';
+import { CoachChatMessage, CoachPromptOption, AIIntegrationModel } from '../../types';
+import { api } from '../../services/api';
 
 interface AiCoachPageProps {
   isDark: boolean;
   setIsDark: (dark: boolean) => void;
   onToggleMobileMenu: () => void;
   onAddTaskToToday?: (taskTitle: string) => void;
+  onNavigate?: (tab: string) => void;
+  agents?: AIIntegrationModel[];
+  onSelectModelId?: (id: string) => void;
+  onSyncModels?: () => void;
+  isSyncingModels?: boolean;
+  lastSyncedTime?: string | null;
 }
 
 export const AiCoachPage: React.FC<AiCoachPageProps> = ({
@@ -32,13 +39,80 @@ export const AiCoachPage: React.FC<AiCoachPageProps> = ({
   setIsDark,
   onToggleMobileMenu,
   onAddTaskToToday,
+  onNavigate,
+  agents: propAgents,
+  onSelectModelId: propOnSelectModelId,
+  onSyncModels: propOnSyncModels,
+  isSyncingModels = false,
+  lastSyncedTime,
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [messages, setMessages] = useState<CoachChatMessage[]>(initialChatMessages);
   const [selectedPackId, setSelectedPackId] = useState('cse_student');
   const [activeDetailModal, setActiveDetailModal] = useState<string | null>(null);
 
-  const handleSendMessage = (userText: string) => {
+  // Multi-Agent State
+  const [localAgents, setLocalAgents] = useState<AIIntegrationModel[]>([]);
+  const agents = propAgents || localAgents;
+
+  const [selectedModelId, setSelectedModelId] = useState<string>('chatgpt');
+  const [connectingAgent, setConnectingAgent] = useState<AIIntegrationModel | null>(null);
+  const [isGenerating, setIsGenerating] = useState<boolean>(false);
+
+  useEffect(() => {
+    if (propAgents && propAgents.length > 0) {
+      const active = propAgents.find((a) => a.selected) || propAgents.find((a) => a.status === 'connected') || propAgents[0];
+      if (active) {
+        setSelectedModelId(active.id);
+      }
+      return;
+    }
+
+    let isMounted = true;
+    api.getAIAgents()
+      .then((loaded) => {
+        if (!isMounted) return;
+        setLocalAgents(loaded);
+        const active = loaded.find((a) => a.selected) || loaded.find((a) => a.status === 'connected') || loaded[0];
+        if (active) {
+          setSelectedModelId(active.id);
+        }
+      })
+      .catch((err) => {
+        console.error('Failed to load AI agents in Coach:', err);
+      });
+    return () => {
+      isMounted = false;
+    };
+  }, [propAgents]);
+
+  const handleSelectModelId = async (modelId: string) => {
+    setSelectedModelId(modelId);
+    if (propOnSelectModelId) {
+      propOnSelectModelId(modelId);
+      return;
+    }
+    try {
+      const updated = await api.selectAIAgent(modelId);
+      setLocalAgents(updated);
+    } catch (err) {
+      console.error('Failed to select AI agent:', err);
+    }
+  };
+
+  const handleConnectAgent = async (
+    agentId: string,
+    details: { accountEmail?: string; apiKey?: string; modelTier?: string; loginMethod?: string }
+  ) => {
+    const res = await api.connectAIAgent(agentId, details);
+    setLocalAgents(res.agents);
+    setSelectedModelId(agentId);
+    if (propOnSyncModels) {
+      propOnSyncModels();
+    }
+  };
+
+  const handleSendMessage = async (userText: string) => {
     const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
     const userMsg: CoachChatMessage = {
       id: `user-msg-${Date.now()}`,
@@ -48,12 +122,31 @@ export const AiCoachPage: React.FC<AiCoachPageProps> = ({
     };
 
     setMessages((prev) => [...prev, userMsg]);
+    setIsGenerating(true);
 
-    // Simulate realistic thoughtful AI coaching response
-    setTimeout(() => {
-      const coachReply = getCoachResponse(userText);
-      setMessages((prev) => [...prev, coachReply]);
-    }, 450);
+    try {
+      const reply = await api.sendAIChat({
+        modelId: selectedModelId,
+        message: userText,
+      });
+      setMessages((prev) => [...prev, reply]);
+    } catch (err: any) {
+      console.error('AI chat error:', err);
+      const activeAgentObj = agents.find((a) => a.id === selectedModelId);
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: `coach-fallback-${Date.now()}`,
+          sender: 'coach',
+          text: `⚠️ **${activeAgentObj?.name || 'Agent'} Note**: ${err.message || 'Unable to connect to model.'} Please check connection in AI Integration.`,
+          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          agentId: selectedModelId,
+          agentName: activeAgentObj?.name || 'LifeRPG AI Coach',
+        }
+      ]);
+    } finally {
+      setIsGenerating(false);
+    }
   };
 
   const handleSelectPrompt = (prompt: CoachPromptOption) => {
@@ -183,10 +276,19 @@ export const AiCoachPage: React.FC<AiCoachPageProps> = ({
             <div className="hidden lg:block">
               <CoachChatWorkspace
                 messages={messages}
+                agents={agents}
+                selectedModelId={selectedModelId}
+                onSelectModelId={handleSelectModelId}
+                onOpenConnectModal={(agent) => setConnectingAgent(agent)}
+                isGenerating={isGenerating}
                 onSendMessage={handleSendMessage}
                 onAddTaskToToday={onAddTaskToToday}
                 selectedPackId={selectedPackId}
                 onSelectPackId={setSelectedPackId}
+                onNavigateToIntegrations={() => onNavigate?.('ai-integration')}
+                onSyncModels={propOnSyncModels}
+                isSyncingModels={isSyncingModels}
+                lastSyncedTime={lastSyncedTime}
               />
             </div>
           </div>
@@ -201,14 +303,31 @@ export const AiCoachPage: React.FC<AiCoachPageProps> = ({
           <div className="lg:hidden col-span-1">
             <CoachChatWorkspace
               messages={messages}
+              agents={agents}
+              selectedModelId={selectedModelId}
+              onSelectModelId={handleSelectModelId}
+              onOpenConnectModal={(agent) => setConnectingAgent(agent)}
+              isGenerating={isGenerating}
               onSendMessage={handleSendMessage}
               onAddTaskToToday={onAddTaskToToday}
               selectedPackId={selectedPackId}
               onSelectPackId={setSelectedPackId}
+              onNavigateToIntegrations={() => onNavigate?.('ai-integration')}
+              onSyncModels={propOnSyncModels}
+              isSyncingModels={isSyncingModels}
+              lastSyncedTime={lastSyncedTime}
             />
           </div>
         </div>
       </main>
+
+      {/* Connect / Login to AI Agent Modal */}
+      <ConnectAgentModal
+        isOpen={connectingAgent !== null}
+        onClose={() => setConnectingAgent(null)}
+        model={connectingAgent}
+        onConnect={handleConnectAgent}
+      />
 
       {/* Detail Dialog Modal */}
       {activeDetailModal && (

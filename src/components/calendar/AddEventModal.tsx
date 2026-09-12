@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { X, Calendar as CalendarIcon, Clock, MapPin, Repeat, AlignLeft } from 'lucide-react';
 import { CalendarEvent, EventCategory } from '../../types';
 
+import { getLiveTodayISO } from '../../utils/dateUtils';
+
 interface AddEventModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -13,11 +15,12 @@ export const AddEventModal: React.FC<AddEventModalProps> = ({
   isOpen,
   onClose,
   onSave,
-  initialDate = '2025-03-11',
+  initialDate,
 }) => {
+  const defaultDate = initialDate || getLiveTodayISO();
   const [activeTab, setActiveTab] = useState<'Event' | 'Task' | 'Focus Block' | 'Reminder'>('Event');
   const [title, setTitle] = useState('');
-  const [date, setDate] = useState(initialDate);
+  const [date, setDate] = useState(defaultDate);
   const [startTime, setStartTime] = useState('10:00 AM');
   const [endTime, setEndTime] = useState('11:00 AM');
   const [allDay, setAllDay] = useState(false);

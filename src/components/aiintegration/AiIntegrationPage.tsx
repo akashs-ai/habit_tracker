@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Search,
   Bell,
@@ -20,21 +20,39 @@ import {
   CompareModelsModal,
   ManageConnectionModal,
   SecurityLearnMoreModal,
+  ConnectAgentModal,
 } from './AiIntegrationModals';
+import { api } from '../../services/api';
 
 interface AiIntegrationPageProps {
   isDark: boolean;
   setIsDark: React.Dispatch<React.SetStateAction<boolean>>;
   onToggleMobileMenu?: () => void;
+  models?: AIIntegrationModel[];
+  onSelectModel?: (id: string) => void;
+  onConnectSubmit?: (agentId: string, details: { accountEmail?: string; apiKey?: string; modelTier?: string; loginMethod?: string }) => Promise<void>;
+  onDisconnectModel?: (agentId: string) => Promise<void>;
+  onSyncModels?: () => void;
+  isSyncing?: boolean;
+  lastSyncedTime?: string | null;
 }
 
 export const AiIntegrationPage: React.FC<AiIntegrationPageProps> = ({
   isDark,
   setIsDark,
   onToggleMobileMenu,
+  models: propModels,
+  onSelectModel: propOnSelectModel,
+  onConnectSubmit: propOnConnectSubmit,
+  onDisconnectModel: propOnDisconnectModel,
+  onSyncModels: propOnSyncModels,
+  isSyncing = false,
+  lastSyncedTime,
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
-  const [models, setModels] = useState<AIIntegrationModel[]>(initialAIModels);
+  const [localModels, setLocalModels] = useState<AIIntegrationModel[]>(initialAIModels);
+  const models = propModels || localModels;
+
   const [calendarState, setCalendarState] = useState<CalendarIntegrationState>(
     initialCalendarIntegration
   );
@@ -46,26 +64,68 @@ export const AiIntegrationPage: React.FC<AiIntegrationPageProps> = ({
     | { type: 'calendar'; state: CalendarIntegrationState }
     | null
   >(null);
+  const [connectModalModel, setConnectModalModel] = useState<AIIntegrationModel | null>(null);
   const [isSecurityLearnMoreOpen, setIsSecurityLearnMoreOpen] = useState(false);
 
+  // Load from backend on mount if propModels not provided
+  useEffect(() => {
+    if (propModels) return;
+    let isMounted = true;
+    api.getAIAgents()
+      .then((loaded) => {
+        if (!isMounted) return;
+        setLocalModels(loaded);
+      })
+      .catch((err) => {
+        console.error('Failed to load AI agents:', err);
+      });
+    return () => {
+      isMounted = false;
+    };
+  }, [propModels]);
+
   // Handlers for Model Selection & Connection
-  const handleSelectModel = (modelId: string) => {
-    setModels((prev) =>
+  const handleSelectModel = async (modelId: string) => {
+    if (propOnSelectModel) {
+      propOnSelectModel(modelId);
+      return;
+    }
+    // Optimistic local
+    setLocalModels((prev) =>
       prev.map((m) => ({
         ...m,
         selected: m.id === modelId,
       }))
     );
+    try {
+      const updated = await api.selectAIAgent(modelId);
+      setLocalModels(updated);
+    } catch (err) {
+      console.error('Failed to select model on backend:', err);
+    }
   };
 
   const handleConnectModel = (modelId: string) => {
-    setModels((prev) =>
-      prev.map((m) =>
-        m.id === modelId
-          ? { ...m, status: 'connected', selected: true }
-          : { ...m, selected: false }
-      )
-    );
+    const targetModel = models.find((m) => m.id === modelId);
+    if (targetModel) {
+      setConnectModalModel(targetModel);
+    }
+  };
+
+  const handleConnectSubmit = async (
+    agentId: string,
+    details: { accountEmail?: string; apiKey?: string; modelTier?: string; loginMethod?: string }
+  ) => {
+    if (propOnConnectSubmit) {
+      await propOnConnectSubmit(agentId, details);
+      return;
+    }
+    try {
+      const res = await api.connectAIAgent(agentId, details);
+      setLocalModels(res.agents);
+    } catch (err) {
+      console.error('Failed to connect agent:', err);
+    }
   };
 
   const handleManageModel = (modelId: string) => {
@@ -79,25 +139,34 @@ export const AiIntegrationPage: React.FC<AiIntegrationPageProps> = ({
     setManageTarget({ type: 'calendar', state: calendarState });
   };
 
-  const handleDisconnectTarget = () => {
+  const handleDisconnectTarget = async () => {
     if (!manageTarget) return;
 
     if (manageTarget.type === 'model') {
       const targetId = manageTarget.model.id;
-      setModels((prev) => {
-        const updated = prev.map((m) =>
-          m.id === targetId ? { ...m, status: 'not_connected' as const, selected: false } : m
-        );
-        // If the disconnected model was selected, fallback to the first connected model or chatgpt
-        const hasSelected = updated.some((m) => m.selected);
-        if (!hasSelected) {
-          const firstConnected = updated.find((m) => m.status === 'connected');
-          if (firstConnected) {
-            firstConnected.selected = true;
+      if (propOnDisconnectModel) {
+        await propOnDisconnectModel(targetId);
+        return;
+      }
+      try {
+        const res = await api.disconnectAIAgent(targetId);
+        setLocalModels(res.agents);
+      } catch (err) {
+        console.error('Failed to disconnect agent:', err);
+        setLocalModels((prev) => {
+          const updated = prev.map((m) =>
+            m.id === targetId ? { ...m, status: 'not_connected' as const, selected: false } : m
+          );
+          const hasSelected = updated.some((m) => m.selected);
+          if (!hasSelected) {
+            const firstConnected = updated.find((m) => m.status === 'connected');
+            if (firstConnected) {
+              firstConnected.selected = true;
+            }
           }
-        }
-        return updated;
-      });
+          return updated;
+        });
+      }
     } else {
       setCalendarState((prev) => ({
         ...prev,
@@ -222,6 +291,9 @@ export const AiIntegrationPage: React.FC<AiIntegrationPageProps> = ({
           onConnectModel={handleConnectModel}
           onManageModel={handleManageModel}
           onOpenCompare={() => setIsCompareOpen(true)}
+          onSyncModels={propOnSyncModels}
+          isSyncing={isSyncing}
+          lastSyncedTime={lastSyncedTime}
         />
 
         {/* Section 2: Google Calendar + Value Card */}
@@ -257,6 +329,13 @@ export const AiIntegrationPage: React.FC<AiIntegrationPageProps> = ({
         onClose={() => setManageTarget(null)}
         target={manageTarget}
         onDisconnect={handleDisconnectTarget}
+      />
+
+      <ConnectAgentModal
+        isOpen={connectModalModel !== null}
+        onClose={() => setConnectModalModel(null)}
+        model={connectModalModel}
+        onConnect={handleConnectSubmit}
       />
 
       <SecurityLearnMoreModal

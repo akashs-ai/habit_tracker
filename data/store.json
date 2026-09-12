@@ -1,0 +1,1620 @@
+{
+  "user": {
+    "name": "Alex",
+    "level": 12,
+    "currentXp": 780,
+    "nextLevelXp": 1200,
+    "streakDays": 12,
+    "totalPoints": 842,
+    "questsDoneThisWeek": 5,
+    "momentumPoints": 3520,
+    "pointsThisWeek": 240,
+    "weeklyConsistency": 92
+  },
+  "quests": [
+    {
+      "id": "quest-1",
+      "title": "Solve 2 DSA problems",
+      "subtitle": "Sharpen your problem solving skills.",
+      "category": "focus",
+      "durationMinutes": 30,
+      "xpReward": 80,
+      "attribute": "Intellect",
+      "completed": false,
+      "isStarted": true
+    },
+    {
+      "id": "quest-2",
+      "title": "Go for a short walk",
+      "subtitle": "Clear your mind, boost your energy.",
+      "category": "health",
+      "durationMinutes": 20,
+      "xpReward": 30,
+      "attribute": "Strength",
+      "completed": false,
+      "isStarted": false
+    },
+    {
+      "id": "quest-3",
+      "title": "Read 20 pages",
+      "subtitle": "A wiser you, one page at a time.",
+      "category": "learning",
+      "durationMinutes": 15,
+      "xpReward": 40,
+      "attribute": "Knowledge",
+      "completed": false,
+      "isStarted": false
+    },
+    {
+      "id": "quest-4",
+      "title": "Meditate to relax",
+      "subtitle": "A calmer mind leads to a better you.",
+      "category": "personal",
+      "durationMinutes": 10,
+      "xpReward": 20,
+      "attribute": "Discipline",
+      "completed": false,
+      "isStarted": false
+    }
+  ],
+  "tasks": [
+    {
+      "id": "task-1",
+      "title": "Solve 2 DSA problems",
+      "description": "Solve medium level DSA problems on arrays and hashmaps.",
+      "completed": false,
+      "viewCategory": "today",
+      "dueText": "Today, 10:00 AM",
+      "labels": [
+        "Study",
+        "DSA"
+      ],
+      "priority": "high",
+      "xpReward": 20,
+      "subtasks": [
+        {
+          "id": "st-1",
+          "title": "Problem 1",
+          "completed": true
+        },
+        {
+          "id": "st-2",
+          "title": "Problem 2",
+          "completed": false
+        },
+        {
+          "id": "st-3",
+          "title": "Revise solution",
+          "completed": false
+        }
+      ],
+      "notes": "Remember to check edge cases and analyze space complexity.",
+      "attachments": [
+        {
+          "name": "DSA_Notes.pdf",
+          "size": "2.4 MB",
+          "type": "pdf"
+        },
+        {
+          "name": "Array_Questions.pdf",
+          "size": "1.2 MB",
+          "type": "pdf"
+        }
+      ]
+    },
+    {
+      "id": "task-2",
+      "title": "Go for a short walk",
+      "description": "Take a 20-minute break outside to get fresh air.",
+      "completed": false,
+      "viewCategory": "today",
+      "dueText": "Today, 6:00 PM",
+      "labels": [
+        "Health"
+      ],
+      "priority": "low",
+      "xpReward": 10
+    },
+    {
+      "id": "task-3",
+      "title": "Read 20 pages",
+      "description": "Continue reading Atomic Habits.",
+      "completed": false,
+      "viewCategory": "today",
+      "dueText": "Today, 9:00 PM",
+      "labels": [
+        "Study",
+        "Reading"
+      ],
+      "priority": "medium",
+      "xpReward": 15
+    },
+    {
+      "id": "task-4",
+      "title": "Meditate for 10 minutes",
+      "description": "Mindful breathing session.",
+      "completed": false,
+      "viewCategory": "today",
+      "dueText": "Today",
+      "labels": [
+        "Health"
+      ],
+      "priority": "low",
+      "xpReward": 10
+    },
+    {
+      "id": "task-5",
+      "title": "Design portfolio website",
+      "description": "Create responsive high-fidelity mocks in Figma.",
+      "completed": false,
+      "viewCategory": "upcoming",
+      "dueText": "Tomorrow",
+      "labels": [
+        "Projects"
+      ],
+      "priority": "low",
+      "xpReward": 25
+    },
+    {
+      "id": "task-6",
+      "title": "Plan next week",
+      "description": "Review sprints, schedule timeblocks.",
+      "completed": false,
+      "viewCategory": "upcoming",
+      "dueText": "Tomorrow",
+      "labels": [
+        "Personal"
+      ],
+      "priority": "low",
+      "xpReward": 15
+    },
+    {
+      "id": "task-7",
+      "title": "Grocery shopping",
+      "description": "Almond milk, eggs, bananas, oats.",
+      "completed": false,
+      "viewCategory": "today",
+      "dueText": "Today",
+      "labels": [
+        "Personal"
+      ],
+      "priority": "low",
+      "xpReward": 10
+    },
+    {
+      "id": "task-8",
+      "title": "Call home",
+      "description": "Catch up with parents in the evening.",
+      "completed": false,
+      "viewCategory": "upcoming",
+      "dueText": "Tomorrow",
+      "labels": [
+        "Personal"
+      ],
+      "priority": "low",
+      "xpReward": 10
+    },
+    {
+      "id": "task-9",
+      "title": "Submit quarterly expense report",
+      "description": "Attach receipts for software subscriptions.",
+      "completed": false,
+      "viewCategory": "overdue",
+      "dueText": "Yesterday, 5:00 PM",
+      "labels": [
+        "Projects"
+      ],
+      "priority": "high",
+      "xpReward": 15
+    },
+    {
+      "id": "task-10",
+      "title": "Dentist follow-up appointment",
+      "description": "Confirm routine cleaning appointment.",
+      "completed": false,
+      "viewCategory": "overdue",
+      "dueText": "2 days ago",
+      "labels": [
+        "Health"
+      ],
+      "priority": "medium",
+      "xpReward": 10
+    },
+    {
+      "id": "task-11",
+      "title": "Organize desk setup and cable management",
+      "completed": false,
+      "viewCategory": "someday",
+      "dueText": "Someday",
+      "labels": [
+        "Personal"
+      ],
+      "priority": "low",
+      "xpReward": 10
+    },
+    {
+      "id": "task-12",
+      "title": "Explore Rust async programming basics",
+      "completed": false,
+      "viewCategory": "someday",
+      "dueText": "Someday",
+      "labels": [
+        "Study"
+      ],
+      "priority": "low",
+      "xpReward": 20
+    },
+    {
+      "id": "task-13",
+      "title": "Backup external drive to cold storage",
+      "completed": false,
+      "viewCategory": "someday",
+      "dueText": "Someday",
+      "labels": [
+        "Personal"
+      ],
+      "priority": "low",
+      "xpReward": 15
+    },
+    {
+      "id": "task-14",
+      "title": "Research mechanical keyboard switches",
+      "completed": false,
+      "viewCategory": "someday",
+      "dueText": "Someday",
+      "labels": [
+        "Projects"
+      ],
+      "priority": "low",
+      "xpReward": 5
+    },
+    {
+      "id": "task-15",
+      "title": "Review pull request for auth refactor",
+      "completed": false,
+      "viewCategory": "upcoming",
+      "dueText": "Friday, 3:00 PM",
+      "labels": [
+        "Projects"
+      ],
+      "priority": "medium",
+      "xpReward": 20
+    },
+    {
+      "id": "task-16",
+      "title": "Full body strength workout",
+      "completed": false,
+      "viewCategory": "upcoming",
+      "dueText": "Saturday, 9:00 AM",
+      "labels": [
+        "Workout",
+        "Health"
+      ],
+      "priority": "medium",
+      "xpReward": 25
+    },
+    {
+      "id": "task-17",
+      "title": "Refactor state management in dashboard",
+      "completed": false,
+      "viewCategory": "upcoming",
+      "dueText": "Monday",
+      "labels": [
+        "Projects"
+      ],
+      "priority": "medium",
+      "xpReward": 25
+    },
+    {
+      "id": "task-18",
+      "title": "Schedule car oil change",
+      "completed": false,
+      "viewCategory": "upcoming",
+      "dueText": "Next week",
+      "labels": [
+        "Personal"
+      ],
+      "priority": "low",
+      "xpReward": 10
+    },
+    {
+      "id": "task-19",
+      "title": "Clean kitchen pantry and organize spices",
+      "completed": false,
+      "viewCategory": "someday",
+      "dueText": "Someday",
+      "labels": [
+        "Personal"
+      ],
+      "priority": "low",
+      "xpReward": 10
+    },
+    {
+      "id": "task-20",
+      "title": "Draft blog post on design tokens",
+      "completed": false,
+      "viewCategory": "someday",
+      "dueText": "Someday",
+      "labels": [
+        "Study",
+        "Projects"
+      ],
+      "priority": "low",
+      "xpReward": 20
+    },
+    {
+      "id": "task-21",
+      "title": "Setup GitHub Actions CI for unit tests",
+      "completed": false,
+      "viewCategory": "upcoming",
+      "dueText": "Next Wednesday",
+      "labels": [
+        "Projects"
+      ],
+      "priority": "medium",
+      "xpReward": 20
+    },
+    {
+      "id": "task-22",
+      "title": "Update LinkedIn bio and credentials",
+      "completed": false,
+      "viewCategory": "upcoming",
+      "dueText": "Next Friday",
+      "labels": [
+        "Personal"
+      ],
+      "priority": "low",
+      "xpReward": 10
+    },
+    {
+      "id": "task-23",
+      "title": "Plan vacation itinerary for summer",
+      "completed": false,
+      "viewCategory": "upcoming",
+      "dueText": "End of month",
+      "labels": [
+        "Personal"
+      ],
+      "priority": "low",
+      "xpReward": 15
+    },
+    {
+      "id": "task-24",
+      "title": "Morning stretch and mobility routine",
+      "completed": true,
+      "viewCategory": "today",
+      "dueText": "Today, 7:30 AM",
+      "labels": [
+        "Workout",
+        "Health"
+      ],
+      "priority": "low",
+      "xpReward": 10
+    },
+    {
+      "id": "task-25",
+      "title": "Review emails and clear inbox",
+      "completed": true,
+      "viewCategory": "today",
+      "dueText": "Today, 8:30 AM",
+      "labels": [
+        "Projects"
+      ],
+      "priority": "low",
+      "xpReward": 10
+    },
+    {
+      "id": "task-26",
+      "title": "Hydrate 1L water before noon",
+      "completed": true,
+      "viewCategory": "today",
+      "dueText": "Today, 11:30 AM",
+      "labels": [
+        "Health"
+      ],
+      "priority": "low",
+      "xpReward": 10
+    }
+  ],
+  "calendarEvents": [
+    {
+      "id": "evt-1",
+      "title": "Gym",
+      "date": "2025-02-24",
+      "startTime": "7:00 AM",
+      "endTime": "8:00 AM",
+      "category": "workout",
+      "color": "#22C55E",
+      "description": "Upper body resistance training session."
+    },
+    {
+      "id": "evt-2",
+      "title": "DSA Practice",
+      "date": "2025-02-25",
+      "startTime": "7:00 PM",
+      "endTime": "8:30 PM",
+      "category": "study",
+      "color": "#7C5CFF",
+      "description": "Binary search tree problems on LeetCode."
+    },
+    {
+      "id": "evt-3",
+      "title": "Project Work",
+      "date": "2025-02-27",
+      "startTime": "10:00 AM",
+      "endTime": "12:00 PM",
+      "category": "project",
+      "color": "#3B82F6",
+      "description": "Sprint planning and API design review."
+    },
+    {
+      "id": "evt-4",
+      "title": "Read Book",
+      "date": "2025-03-01",
+      "startTime": "9:00 AM",
+      "endTime": "10:00 AM",
+      "category": "personal",
+      "color": "#F59E0B",
+      "description": "Atomic Habits - Chapters 4 & 5."
+    },
+    {
+      "id": "evt-5",
+      "title": "Plan Week",
+      "date": "2025-03-02",
+      "startTime": "5:00 PM",
+      "endTime": "6:00 PM",
+      "category": "personal",
+      "color": "#F59E0B",
+      "description": "Weekly review, schedule priorities and goals."
+    },
+    {
+      "id": "evt-6",
+      "title": "College",
+      "date": "2025-03-05",
+      "startTime": "9:00 AM",
+      "endTime": "1:00 PM",
+      "category": "study",
+      "color": "#7C5CFF",
+      "description": "Computer Networks and Operating Systems lecture."
+    },
+    {
+      "id": "evt-7",
+      "title": "Video Edit",
+      "date": "2025-03-07",
+      "startTime": "3:00 PM",
+      "endTime": "5:00 PM",
+      "category": "entertainment",
+      "color": "#06B6D4",
+      "description": "Cut final b-roll footage and export."
+    },
+    {
+      "id": "evt-8",
+      "title": "Design UI",
+      "date": "2025-03-11",
+      "startTime": "10:00 AM",
+      "endTime": "12:00 PM",
+      "category": "project",
+      "color": "#7C5CFF",
+      "location": "Figma Workspace",
+      "description": "Work on the new dashboard design in Figma. Focus on calendar page.",
+      "priority": "high",
+      "subtasks": [
+        {
+          "id": "st-1",
+          "title": "Finalize layout",
+          "completed": true
+        },
+        {
+          "id": "st-2",
+          "title": "Add interactions",
+          "completed": false
+        },
+        {
+          "id": "st-3",
+          "title": "Review with reference",
+          "completed": false
+        }
+      ],
+      "attachments": [
+        {
+          "name": "Figma_Design.fig",
+          "size": "12.4 MB"
+        }
+      ]
+    },
+    {
+      "id": "evt-9",
+      "title": "Lunch with Friends",
+      "date": "2025-03-11",
+      "startTime": "1:00 PM",
+      "endTime": "2:00 PM",
+      "category": "social",
+      "color": "#F59E0B",
+      "location": "Cafeteria / Bistro",
+      "description": "Catch up over healthy lunch."
+    },
+    {
+      "id": "evt-10",
+      "title": "Free Fire (Custom)",
+      "date": "2025-03-11",
+      "startTime": "10:00 PM",
+      "endTime": "12:00 AM",
+      "category": "entertainment",
+      "color": "#EC4899",
+      "description": "Custom guild tournament room with squad."
+    },
+    {
+      "id": "evt-11",
+      "title": "Project Work",
+      "date": "2025-03-13",
+      "startTime": "10:00 AM",
+      "endTime": "12:00 PM",
+      "category": "project",
+      "color": "#3B82F6",
+      "description": "Implement responsive calendar components."
+    },
+    {
+      "id": "evt-12",
+      "title": "Meditate",
+      "date": "2025-03-13",
+      "startTime": "7:00 AM",
+      "endTime": "7:30 AM",
+      "category": "health",
+      "color": "#22C55E",
+      "description": "Mindfulness breathing exercise."
+    },
+    {
+      "id": "evt-13",
+      "title": "Gym",
+      "date": "2025-03-14",
+      "startTime": "7:00 AM",
+      "endTime": "8:00 AM",
+      "category": "workout",
+      "color": "#22C55E",
+      "description": "Leg day and mobility."
+    },
+    {
+      "id": "evt-14",
+      "title": "Movie Night",
+      "date": "2025-03-14",
+      "startTime": "8:00 PM",
+      "endTime": "11:00 PM",
+      "category": "entertainment",
+      "color": "#7C5CFF",
+      "description": "Interstellar rewatch."
+    },
+    {
+      "id": "evt-15",
+      "title": "Gym",
+      "date": "2025-03-17",
+      "startTime": "7:00 AM",
+      "endTime": "8:00 AM",
+      "category": "workout",
+      "color": "#22C55E",
+      "description": "Push day."
+    },
+    {
+      "id": "evt-16",
+      "title": "DSA Contest",
+      "date": "2025-03-18",
+      "startTime": "8:00 PM",
+      "endTime": "10:00 PM",
+      "category": "study",
+      "color": "#7C5CFF",
+      "description": "Weekly rated contest."
+    },
+    {
+      "id": "evt-17",
+      "title": "Project Deadline",
+      "date": "2025-03-21",
+      "startTime": "5:00 PM",
+      "endTime": "6:00 PM",
+      "allDay": false,
+      "category": "health",
+      "color": "#EF4444",
+      "description": "Final submission for Q1 milestones."
+    },
+    {
+      "id": "evt-18",
+      "title": "Family Time",
+      "date": "2025-03-23",
+      "startTime": "5:00 PM",
+      "endTime": "7:00 PM",
+      "category": "social",
+      "color": "#EC4899",
+      "description": "Sunday dinner and conversation."
+    },
+    {
+      "id": "evt-19",
+      "title": "Read Book",
+      "date": "2025-03-26",
+      "startTime": "9:00 PM",
+      "endTime": "10:00 PM",
+      "category": "personal",
+      "color": "#3B82F6",
+      "description": "Deep Work by Cal Newport."
+    },
+    {
+      "id": "evt-20",
+      "title": "Plan Next Month",
+      "date": "2025-03-28",
+      "startTime": "6:00 PM",
+      "endTime": "7:00 PM",
+      "category": "project",
+      "color": "#3B82F6",
+      "description": "Goals for April and budget audit."
+    },
+    {
+      "id": "evt-21",
+      "title": "Outing",
+      "date": "2025-03-29",
+      "startTime": "4:00 PM",
+      "endTime": "8:00 PM",
+      "category": "social",
+      "color": "#7C5CFF",
+      "description": "City walk and museum visit."
+    }
+  ],
+  "goals": [
+    {
+      "id": "goal-1",
+      "title": "Become a Software Engineer",
+      "category": "Career",
+      "description": "Build strong fundamentals, complete projects, and get a good job.",
+      "progress": 65,
+      "completedTasks": 12,
+      "totalTasks": 20,
+      "dueDate": "Dec 31, 2025",
+      "priority": "high",
+      "status": "active",
+      "color": "#6C63FF",
+      "icon": "code",
+      "collaborator": {
+        "name": "Alex",
+        "avatarUrl": "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop&q=80"
+      },
+      "subtasks": [
+        {
+          "id": "st-1",
+          "title": "Complete DSA (Arrays, Strings, LinkedList)",
+          "completed": true
+        },
+        {
+          "id": "st-2",
+          "title": "Build 3 real-world projects",
+          "completed": false
+        },
+        {
+          "id": "st-3",
+          "title": "Solve 500+ problems",
+          "completed": false
+        },
+        {
+          "id": "st-4",
+          "title": "Polish resume and portfolio",
+          "completed": false
+        }
+      ],
+      "milestones": [
+        {
+          "id": "m-1",
+          "title": "Complete DSA Basics",
+          "targetDate": "Mar 31, 2025",
+          "completed": true
+        },
+        {
+          "id": "m-2",
+          "title": "Build Fullstack Portfolio",
+          "targetDate": "Jun 30, 2025",
+          "completed": false
+        },
+        {
+          "id": "m-3",
+          "title": "Pass Mock Technical Interviews",
+          "targetDate": "Sep 30, 2025",
+          "completed": false
+        }
+      ],
+      "notes": "Focus on clean code, test-driven development, and mastering system design concepts.",
+      "updatedAt": "2025-03-10"
+    },
+    {
+      "id": "goal-2",
+      "title": "Get in Better Shape",
+      "category": "Health",
+      "description": "Be consistent with workout and maintain a healthy lifestyle.",
+      "progress": 40,
+      "completedTasks": 8,
+      "totalTasks": 20,
+      "dueDate": "Jun 30, 2025",
+      "priority": "high",
+      "status": "active",
+      "color": "#31C48D",
+      "icon": "heart",
+      "collaborator": {
+        "name": "Sarah",
+        "avatarUrl": "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=100&auto=format&fit=crop&q=80"
+      },
+      "subtasks": [
+        {
+          "id": "st-21",
+          "title": "Gym workout 4x per week",
+          "completed": true
+        },
+        {
+          "id": "st-22",
+          "title": "Track daily calorie & protein intake",
+          "completed": true
+        },
+        {
+          "id": "st-23",
+          "title": "Run 5km under 25 minutes",
+          "completed": false
+        }
+      ],
+      "milestones": [
+        {
+          "id": "m-21",
+          "title": "Bench press bodyweight",
+          "targetDate": "Apr 15, 2025",
+          "completed": true
+        },
+        {
+          "id": "m-22",
+          "title": "Complete 10k race",
+          "targetDate": "May 30, 2025",
+          "completed": false
+        }
+      ],
+      "notes": "Prioritize recovery, 8 hours of sleep, and proper hydration.",
+      "updatedAt": "2025-03-08"
+    },
+    {
+      "id": "goal-3",
+      "title": "Read 24 Books This Year",
+      "category": "Personal",
+      "description": "Read, learn and grow. Become a better thinker.",
+      "progress": 12,
+      "completedTasks": 3,
+      "totalTasks": 24,
+      "dueDate": "Dec 31, 2025",
+      "priority": "medium",
+      "status": "active",
+      "color": "#F59E0B",
+      "icon": "book",
+      "collaborator": {
+        "name": "David",
+        "avatarUrl": "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100&auto=format&fit=crop&q=80"
+      },
+      "subtasks": [
+        {
+          "id": "st-31",
+          "title": "Read Atomic Habits",
+          "completed": true
+        },
+        {
+          "id": "st-32",
+          "title": "Read Deep Work",
+          "completed": true
+        },
+        {
+          "id": "st-33",
+          "title": "Read Designing Data-Intensive Applications",
+          "completed": false
+        }
+      ],
+      "milestones": [
+        {
+          "id": "m-31",
+          "title": "6 Books read by Q1",
+          "targetDate": "Mar 31, 2025",
+          "completed": false
+        },
+        {
+          "id": "m-32",
+          "title": "12 Books read by Q2",
+          "targetDate": "Jun 30, 2025",
+          "completed": false
+        }
+      ],
+      "notes": "20 pages every morning before checking notifications.",
+      "updatedAt": "2025-03-05"
+    },
+    {
+      "id": "goal-4",
+      "title": "Build a Portfolio Website",
+      "category": "Projects",
+      "description": "Showcase my skills and projects.",
+      "progress": 30,
+      "completedTasks": 6,
+      "totalTasks": 15,
+      "dueDate": "Aug 31, 2025",
+      "priority": "medium",
+      "status": "active",
+      "color": "#4F8CFF",
+      "icon": "globe",
+      "subtasks": [
+        {
+          "id": "st-41",
+          "title": "Wireframe layouts in Figma",
+          "completed": true
+        },
+        {
+          "id": "st-42",
+          "title": "Setup Next.js & Tailwind CSS",
+          "completed": true
+        },
+        {
+          "id": "st-43",
+          "title": "Implement dynamic case study pages",
+          "completed": false
+        }
+      ],
+      "milestones": [
+        {
+          "id": "m-41",
+          "title": "Design system finalized",
+          "targetDate": "May 1, 2025",
+          "completed": false
+        },
+        {
+          "id": "m-42",
+          "title": "Live deployment with custom domain",
+          "targetDate": "Aug 1, 2025",
+          "completed": false
+        }
+      ],
+      "notes": "Include live interactive demo components and responsive previews.",
+      "updatedAt": "2025-03-02"
+    },
+    {
+      "id": "goal-5",
+      "title": "Improve Focus & Discipline",
+      "category": "Personal",
+      "description": "Reduce distractions and build deep work habits.",
+      "progress": 50,
+      "completedTasks": 5,
+      "totalTasks": 10,
+      "dueDate": "Jul 31, 2025",
+      "priority": "high",
+      "status": "active",
+      "color": "#06B6D4",
+      "icon": "target",
+      "subtasks": [
+        {
+          "id": "st-51",
+          "title": "Zero social media before 12 PM",
+          "completed": true
+        },
+        {
+          "id": "st-52",
+          "title": "Complete 3 Pomodoro blocks daily",
+          "completed": true
+        },
+        {
+          "id": "st-53",
+          "title": "Evening digital sunset at 10 PM",
+          "completed": false
+        }
+      ],
+      "milestones": [
+        {
+          "id": "m-51",
+          "title": "30-day streak of uninterrupted deep work",
+          "targetDate": "May 15, 2025",
+          "completed": false
+        }
+      ],
+      "notes": "Protect focus blocks aggressively. Use phone-free work sessions.",
+      "updatedAt": "2025-02-28"
+    },
+    {
+      "id": "goal-6",
+      "title": "Learn Advanced DSA",
+      "category": "Learning",
+      "description": "Strengthen problem solving and system design.",
+      "progress": 20,
+      "completedTasks": 4,
+      "totalTasks": 20,
+      "dueDate": "Oct 31, 2025",
+      "priority": "medium",
+      "status": "active",
+      "color": "#8B82FF",
+      "icon": "brain",
+      "subtasks": [
+        {
+          "id": "st-61",
+          "title": "Dynamic Programming patterns",
+          "completed": true
+        },
+        {
+          "id": "st-62",
+          "title": "Graph algorithms (BFS, DFS, Dijkstra)",
+          "completed": false
+        },
+        {
+          "id": "st-63",
+          "title": "Trie and Segment Trees",
+          "completed": false
+        }
+      ],
+      "milestones": [
+        {
+          "id": "m-61",
+          "title": "Solve 100 DP problems",
+          "targetDate": "Jun 15, 2025",
+          "completed": false
+        },
+        {
+          "id": "m-62",
+          "title": "Participate in 10 LeetCode contests",
+          "targetDate": "Sep 1, 2025",
+          "completed": false
+        }
+      ],
+      "notes": "Focus on intuition rather than memorization. Draw recursive call trees.",
+      "updatedAt": "2025-02-25"
+    },
+    {
+      "id": "goal-7",
+      "title": "Establish Morning Routine",
+      "category": "Health",
+      "description": "Wake up at 6:30 AM, hydrate, meditate 10m, and plan the day.",
+      "progress": 100,
+      "completedTasks": 10,
+      "totalTasks": 10,
+      "dueDate": "Feb 28, 2025",
+      "priority": "low",
+      "status": "completed",
+      "color": "#31C48D",
+      "icon": "heart",
+      "subtasks": [
+        {
+          "id": "st-71",
+          "title": "Drink 500ml water upon waking",
+          "completed": true
+        },
+        {
+          "id": "st-72",
+          "title": "10 min mindfulness meditation",
+          "completed": true
+        },
+        {
+          "id": "st-73",
+          "title": "Write top 3 priorities in journal",
+          "completed": true
+        }
+      ],
+      "milestones": [
+        {
+          "id": "m-71",
+          "title": "30 consecutive days streak",
+          "targetDate": "Feb 28, 2025",
+          "completed": true
+        }
+      ],
+      "notes": "Successfully integrated into daily identity!",
+      "updatedAt": "2025-02-28"
+    },
+    {
+      "id": "goal-8",
+      "title": "Learn Basic Spanish",
+      "category": "Learning",
+      "description": "Complete A1 conversational level and 500 vocabulary words.",
+      "progress": 15,
+      "completedTasks": 3,
+      "totalTasks": 20,
+      "dueDate": "Dec 15, 2024",
+      "priority": "low",
+      "status": "archived",
+      "color": "#F59E0B",
+      "icon": "book",
+      "subtasks": [
+        {
+          "id": "st-81",
+          "title": "Download Duolingo & complete basics",
+          "completed": true
+        }
+      ],
+      "milestones": [
+        {
+          "id": "m-81",
+          "title": "Learn 100 most common verbs",
+          "targetDate": "Nov 30, 2024",
+          "completed": false
+        }
+      ],
+      "notes": "Paused temporarily to focus on software engineering goals.",
+      "updatedAt": "2024-12-15"
+    }
+  ],
+  "rewards": [
+    {
+      "id": "reward-aurora-theme",
+      "name": "Aurora Theme",
+      "category": "themes",
+      "badgeTag": "Theme",
+      "description": "A clean and modern aesthetic to keep you focused.",
+      "cost": 800,
+      "status": "owned",
+      "previewType": "aurora-theme",
+      "accentColor": "#38BDF8",
+      "includes": [
+        "Calm dark interface with aurora atmospheric glow",
+        "Refined midnight typography and crisp borders",
+        "Seamless support across all productivity dashboards"
+      ]
+    },
+    {
+      "id": "reward-focus-icons",
+      "name": "Focus Icon Pack",
+      "category": "icons",
+      "badgeTag": "Icons",
+      "description": "Minimal icons for your habits, goals and tasks.",
+      "cost": 500,
+      "status": "available",
+      "previewType": "focus-icons",
+      "accentColor": "#818CF8",
+      "includes": [
+        "30+ handcrafted minimal SVG icons",
+        "Dual line weight and solid fill states",
+        "Custom category markers for tasks & habits"
+      ]
+    },
+    {
+      "id": "reward-30d-consistency",
+      "name": "30-Day Consistency",
+      "category": "badges",
+      "badgeTag": "Badge",
+      "description": "A special badge to celebrate your dedication.",
+      "cost": 1200,
+      "status": "available",
+      "previewType": "flame-badge",
+      "accentColor": "#F59E0B",
+      "includes": [
+        "Polished hexagonal flame profile badge",
+        "Special streak glow displayed on leaderboards",
+        "Permanent profile showcase recognition"
+      ]
+    },
+    {
+      "id": "reward-glass-frame",
+      "name": "Glass Profile Frame",
+      "category": "profile",
+      "badgeTag": "Profile",
+      "description": "A minimal glass frame for your profile.",
+      "cost": 700,
+      "status": "available",
+      "previewType": "glass-frame",
+      "accentColor": "#38BDF8",
+      "includes": [
+        "Frosted cyan-to-violet circular frame",
+        "Subtle ambient shimmer on profile avatar",
+        "Visible in friends lists, groups, and rankings"
+      ]
+    },
+    {
+      "id": "reward-completion-effect",
+      "name": "Completion Effect",
+      "category": "animations",
+      "badgeTag": "Animation",
+      "description": "Smooth and satisfying completion animation.",
+      "cost": 600,
+      "status": "available",
+      "previewType": "completion-effect",
+      "accentColor": "#6366F1",
+      "includes": [
+        "Restrained, tactile checkmark ripple physics",
+        "Audio-visual haptic resonance effect",
+        "Fully respects reduced-motion preferences"
+      ]
+    }
+  ],
+  "badges": [
+    {
+      "id": "badge-first-step",
+      "name": "First Step",
+      "description": "Complete your first habit to begin the journey.",
+      "requirement": "Complete 1 habit",
+      "status": "owned",
+      "progress": 1,
+      "maxProgress": 1,
+      "iconType": "first-step",
+      "color": "#34D399",
+      "earnedAt": "Oct 12, 2025",
+      "isProfileBadge": false
+    },
+    {
+      "id": "badge-7d-streak",
+      "name": "7-Day Streak",
+      "description": "Maintained unbroken consistency for a full week.",
+      "requirement": "Stay consistent for 7 days",
+      "status": "owned",
+      "progress": 7,
+      "maxProgress": 7,
+      "iconType": "7-day",
+      "color": "#F59E0B",
+      "earnedAt": "Nov 04, 2025",
+      "isProfileBadge": true
+    },
+    {
+      "id": "badge-30d-streak",
+      "name": "30-Day Streak",
+      "description": "Build an enduring habit foundation over 30 days.",
+      "requirement": "Stay consistent for 30 days",
+      "cost": 1200,
+      "status": "in_progress",
+      "progress": 21,
+      "maxProgress": 30,
+      "iconType": "30-day",
+      "color": "#818CF8"
+    },
+    {
+      "id": "badge-early-riser",
+      "name": "Early Riser",
+      "description": "Conquer morning routines before the day unfolds.",
+      "requirement": "Complete 30 morning tasks",
+      "cost": 800,
+      "status": "locked",
+      "progress": 18,
+      "maxProgress": 30,
+      "iconType": "early-riser",
+      "color": "#FBBF24"
+    },
+    {
+      "id": "badge-deep-work",
+      "name": "Deep Work",
+      "description": "Dedicate undivided focus without distraction.",
+      "requirement": "100 focused study sessions",
+      "cost": 1500,
+      "status": "locked",
+      "progress": 64,
+      "maxProgress": 100,
+      "iconType": "deep-work",
+      "color": "#38BDF8"
+    },
+    {
+      "id": "badge-goal-crusher",
+      "name": "Goal Crusher",
+      "description": "Cross the finish line on major life ambitions.",
+      "requirement": "Complete 5 goals",
+      "cost": 2000,
+      "status": "locked",
+      "progress": 3,
+      "maxProgress": 5,
+      "iconType": "goal-crusher",
+      "color": "#A855F7"
+    },
+    {
+      "id": "badge-liferpg",
+      "name": "LifeRPG Master",
+      "description": "A dedicated practitioner of deliberate self-growth.",
+      "requirement": "Reach Level 20",
+      "cost": 3000,
+      "status": "locked",
+      "progress": 12,
+      "maxProgress": 20,
+      "iconType": "liferpg",
+      "color": "#E2E8F0"
+    }
+  ],
+  "collectionItems": [
+    {
+      "id": "col-1789244362718",
+      "name": "Aurora Theme",
+      "type": "Theme",
+      "icon": "aurora-theme",
+      "active": true
+    },
+    {
+      "id": "c-1",
+      "name": "Aurora Theme",
+      "type": "Theme",
+      "icon": "theme",
+      "active": true
+    },
+    {
+      "id": "c-2",
+      "name": "Focus Icons",
+      "type": "Icon Pack",
+      "icon": "icons",
+      "active": true
+    },
+    {
+      "id": "c-3",
+      "name": "First Step",
+      "type": "Badge",
+      "icon": "badge",
+      "active": false
+    },
+    {
+      "id": "c-4",
+      "name": "7-Day Streak",
+      "type": "Badge",
+      "icon": "badge",
+      "active": true
+    },
+    {
+      "id": "c-5",
+      "name": "Default Frame",
+      "type": "Profile",
+      "icon": "profile",
+      "active": true
+    },
+    {
+      "id": "c-6",
+      "name": "Check Effect",
+      "type": "Animation",
+      "icon": "animation",
+      "active": true
+    }
+  ],
+  "waysToEarn": [
+    {
+      "id": "w-1",
+      "action": "Complete a daily habit",
+      "points": 10,
+      "icon": "habit"
+    },
+    {
+      "id": "w-2",
+      "action": "Complete all habits today",
+      "points": 25,
+      "icon": "habits-all"
+    },
+    {
+      "id": "w-3",
+      "action": "Complete a task",
+      "points": 5,
+      "icon": "task"
+    },
+    {
+      "id": "w-4",
+      "action": "Reach a goal milestone",
+      "points": 50,
+      "icon": "goal"
+    },
+    {
+      "id": "w-5",
+      "action": "7-day consistency",
+      "points": 100,
+      "icon": "streak-7"
+    },
+    {
+      "id": "w-6",
+      "action": "30-day consistency",
+      "points": 500,
+      "icon": "streak-30"
+    }
+  ],
+  "claims": [
+    {
+      "id": "CLM-2025-002",
+      "rewardId": "reward-aurora-theme",
+      "rewardName": "Aurora Theme",
+      "category": "themes",
+      "cost": 800,
+      "claimedAt": "2026-09-12T20:19:22.718Z",
+      "status": "verified",
+      "termsAccepted": true,
+      "termsVersion": "2025.1",
+      "transactionHash": "0xB6B7BF5D"
+    },
+    {
+      "id": "CLM-2025-001",
+      "rewardId": "reward-first-step",
+      "rewardName": "First Step Badge",
+      "category": "badges",
+      "cost": 0,
+      "claimedAt": "2025-02-28T10:00:00Z",
+      "status": "verified",
+      "termsAccepted": true,
+      "termsVersion": "2025.1",
+      "transactionHash": "0x7F2A...B90C"
+    }
+  ],
+  "notes": [
+    {
+      "id": "note-1",
+      "type": "yellow",
+      "title": "Keep going!",
+      "content": "Consistency compounds. ✨"
+    },
+    {
+      "id": "note-2",
+      "type": "purple",
+      "title": "Ideas",
+      "bullets": [
+        "Build portfolio website",
+        "Learn system design"
+      ]
+    },
+    {
+      "id": "note-3",
+      "type": "pink",
+      "title": "Reminder",
+      "content": "Progress > Perfection"
+    }
+  ],
+  "attributes": [
+    {
+      "id": "attr-1",
+      "name": "Intellect",
+      "level": 8,
+      "percentage": 72,
+      "color": "#7C6CFF",
+      "bgLight": "#EEECFF",
+      "iconName": "Sparkles"
+    },
+    {
+      "id": "attr-2",
+      "name": "Discipline",
+      "level": 12,
+      "percentage": 88,
+      "color": "#F97316",
+      "bgLight": "#FFF7ED",
+      "iconName": "Flame"
+    },
+    {
+      "id": "attr-3",
+      "name": "Strength",
+      "level": 6,
+      "percentage": 40,
+      "color": "#EA580C",
+      "bgLight": "#FFEDD5",
+      "iconName": "BicepsFlexed"
+    },
+    {
+      "id": "attr-4",
+      "name": "Knowledge",
+      "level": 10,
+      "percentage": 66,
+      "color": "#3B82F6",
+      "bgLight": "#EFF6FF",
+      "iconName": "BookOpen"
+    }
+  ],
+  "weeklyData": [
+    {
+      "day": "Monday",
+      "dayShort": "Mon",
+      "xp": 180,
+      "heightPercent": 45
+    },
+    {
+      "day": "Tuesday",
+      "dayShort": "Tue",
+      "xp": 260,
+      "heightPercent": 68
+    },
+    {
+      "day": "Wednesday",
+      "dayShort": "Wed",
+      "xp": 210,
+      "heightPercent": 54
+    },
+    {
+      "day": "Thursday",
+      "dayShort": "Thu",
+      "xp": 320,
+      "heightPercent": 92,
+      "isToday": true
+    },
+    {
+      "day": "Friday",
+      "dayShort": "Fri",
+      "xp": 190,
+      "heightPercent": 48
+    },
+    {
+      "day": "Saturday",
+      "dayShort": "Sat",
+      "xp": 140,
+      "heightPercent": 35
+    },
+    {
+      "day": "Sunday",
+      "dayShort": "Sun",
+      "xp": 220,
+      "heightPercent": 58
+    }
+  ],
+  "activityHistory": [
+    {
+      "date": "2026-08-29",
+      "habitsCompleted": 4,
+      "tasksCompleted": 3,
+      "xpEarned": 120,
+      "momentumPointsEarned": 45
+    },
+    {
+      "date": "2026-08-30",
+      "habitsCompleted": 4,
+      "tasksCompleted": 5,
+      "xpEarned": 160,
+      "momentumPointsEarned": 75
+    },
+    {
+      "date": "2026-08-31",
+      "habitsCompleted": 3,
+      "tasksCompleted": 3,
+      "xpEarned": 120,
+      "momentumPointsEarned": 45
+    },
+    {
+      "date": "2026-09-01",
+      "habitsCompleted": 4,
+      "tasksCompleted": 5,
+      "xpEarned": 160,
+      "momentumPointsEarned": 75
+    },
+    {
+      "date": "2026-09-02",
+      "habitsCompleted": 4,
+      "tasksCompleted": 3,
+      "xpEarned": 120,
+      "momentumPointsEarned": 45
+    },
+    {
+      "date": "2026-09-03",
+      "habitsCompleted": 3,
+      "tasksCompleted": 5,
+      "xpEarned": 160,
+      "momentumPointsEarned": 75
+    },
+    {
+      "date": "2026-09-04",
+      "habitsCompleted": 4,
+      "tasksCompleted": 3,
+      "xpEarned": 120,
+      "momentumPointsEarned": 45
+    },
+    {
+      "date": "2026-09-05",
+      "habitsCompleted": 4,
+      "tasksCompleted": 5,
+      "xpEarned": 160,
+      "momentumPointsEarned": 75
+    },
+    {
+      "date": "2026-09-06",
+      "habitsCompleted": 3,
+      "tasksCompleted": 3,
+      "xpEarned": 120,
+      "momentumPointsEarned": 45
+    },
+    {
+      "date": "2026-09-07",
+      "habitsCompleted": 4,
+      "tasksCompleted": 5,
+      "xpEarned": 160,
+      "momentumPointsEarned": 75
+    },
+    {
+      "date": "2026-09-08",
+      "habitsCompleted": 4,
+      "tasksCompleted": 3,
+      "xpEarned": 120,
+      "momentumPointsEarned": 45
+    },
+    {
+      "date": "2026-09-09",
+      "habitsCompleted": 3,
+      "tasksCompleted": 5,
+      "xpEarned": 160,
+      "momentumPointsEarned": 75
+    },
+    {
+      "date": "2026-09-10",
+      "habitsCompleted": 4,
+      "tasksCompleted": 3,
+      "xpEarned": 120,
+      "momentumPointsEarned": 45
+    },
+    {
+      "date": "2026-09-11",
+      "habitsCompleted": 4,
+      "tasksCompleted": 5,
+      "xpEarned": 160,
+      "momentumPointsEarned": 75
+    },
+    {
+      "date": "2026-09-12",
+      "habitsCompleted": 0,
+      "tasksCompleted": 0,
+      "xpEarned": 0,
+      "momentumPointsEarned": 0
+    }
+  ],
+  "termsPolicy": {
+    "version": "2025.1",
+    "lastUpdated": "March 11, 2025",
+    "title": "LifeRPG Reward Claim Terms & Eligibility Policy",
+    "summary": "This Policy establishes the authoritative rules, eligibility criteria, and conditions governing the unlocking and claiming of cosmetic and feature rewards within the LifeRPG platform.",
+    "sections": [
+      {
+        "id": "eligibility",
+        "title": "1. Reward Eligibility",
+        "content": "A user may claim and unlock a reward only when all prerequisite eligibility conditions specified in the Reward Catalog have been fully satisfied. Conditions may include minimum Level thresholds, active Habit Streak length, specific Badge completions, and sufficient available Momentum Points (MP).",
+        "bullets": [
+          "Users must possess the required balance of Momentum Points at the exact time of claim.",
+          "Prerequisite milestones (e.g. 7-day or 30-day consistency streaks) must be validated prior to unlocking.",
+          "The system reserves the right to withhold rewards if minimum criteria are not met."
+        ]
+      },
+      {
+        "id": "accurate-progress",
+        "title": "2. Accurate Progress & Authoritative Data",
+        "content": "Reward eligibility is determined exclusively using backend-verified application activity and progression records. Client-side, cached, or transient frontend values are non-authoritative and will be reconciled against the central server database during claim evaluation.",
+        "bullets": [
+          "Any discrepancies between local browser caches and the server will resolve in favor of the server record.",
+          "Offline actions must successfully sync and validate before contributing to claim eligibility."
+        ]
+      },
+      {
+        "id": "one-time-claims",
+        "title": "3. One-Time & Limited Claims",
+        "content": "Unless explicitly designated as a repeatable or consumable unlock, all rewards (including Themes, Icon Packs, Commemorative Badges, and Profile Frames) are single-claim items. The backend enforces unique transaction constraints to prevent duplicate claims.",
+        "bullets": [
+          "Once claimed and unlocked, an item is permanently bound to the user profile.",
+          "Attempting duplicate claims on already owned assets will be rejected by the server."
+        ]
+      },
+      {
+        "id": "availability",
+        "title": "4. Reward Availability & Catalog Changes",
+        "content": "Rewards, featured items, seasonal badges, and cosmetic themes are subject to availability, rotational scheduling, expiration, and capacity limits defined by LifeRPG. LifeRPG reserves the right to retire or rotate items with reasonable notice.",
+        "bullets": [
+          "Items marked limited-edition are available strictly while active in the catalog.",
+          "Owned rewards will remain accessible in the user inventory even if retired from the public catalog."
+        ]
+      },
+      {
+        "id": "verification",
+        "title": "5. Verification of Activity & Progress",
+        "content": "To safeguard the integrity of the progression economy, the application performs automated audits of the user’s logged habits, task completions, streaks, and milestone history before finalizing any reward issuance.",
+        "bullets": [
+          "Automated checks verify realistic time intervals between completed tasks and habits.",
+          "Claims made with suspicious or erratic activity patterns will undergo secondary validation."
+        ]
+      },
+      {
+        "id": "approval",
+        "title": "6. Claim Approval & Fulfillment",
+        "content": "Submitting a claim request transmits the transaction to the backend verification engine. While cosmetic themes and digital badges are typically unlocked instantaneously upon approval, high-tier or exclusive rewards may require asynchronous ledger processing.",
+        "bullets": [
+          "A unique Claim Transaction ID is generated for every successfully processed claim.",
+          "Deduction of Momentum Points occurs synchronously with asset provisioning."
+        ]
+      },
+      {
+        "id": "abuse-manipulation",
+        "title": "7. Abuse, Exploitation & Manipulation Prohibited",
+        "content": "LifeRPG operates on an honor system grounded in genuine personal development. Any attempt to artificially manipulate activity logs, tamper with API payloads, exploit software defects, deploy automated completion scripts, or execute race-condition claims is strictly prohibited.",
+        "bullets": [
+          "Violations will result in immediate revocation of claimed rewards and forfeited Momentum Points.",
+          "Persistent or egregious manipulation may lead to account suspension or permanent progression reset."
+        ]
+      },
+      {
+        "id": "modifications",
+        "title": "8. Modifications to Terms & Reward Costs",
+        "content": "LifeRPG reserves the right to modify point costs, eligibility criteria, and this policy periodically to maintain balanced gamification dynamics. Material changes will be communicated through the in-app announcement banner or notification drawer.",
+        "bullets": [
+          "Cost updates will not retroactively affect previously claimed items.",
+          "Continued use of the rewards system following policy revisions constitutes acceptance of the updated terms."
+        ]
+      },
+      {
+        "id": "final-status",
+        "title": "9. Authoritative Server Ledger & Final Claim Status",
+        "content": "The centralized LifeRPG database retains the conclusive, final record of all user balances, inventory holdings, active cosmetic themes, and claim histories. In any dispute regarding reward eligibility or ownership status, server ledger logs are decisive.",
+        "bullets": [
+          "All claims generate a cryptographically indexed record containing timestamp, user ID, and reward specification.",
+          "Users can review their active and claimed inventory at any time within the Rewards workspace."
+        ]
+      }
+    ]
+  },
+  "lastUpdated": "2026-09-12T20:19:22.718Z"
+}

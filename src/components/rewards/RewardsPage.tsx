@@ -38,28 +38,67 @@ import { BadgeProgressSection } from './BadgeProgressSection';
 import { RewardsBottomRow } from './RewardsBottomRow';
 import { RewardDetailModal } from './RewardDetailModal';
 import { BadgeDetailModal } from './BadgeDetailModal';
+import { RewardTermsModal } from './RewardTermsModal';
+import { ShieldCheck, FileText } from 'lucide-react';
+import { api } from '../../services/api';
 
 interface RewardsPageProps {
   isDark: boolean;
   setIsDark: (dark: boolean) => void;
   onToggleMobileMenu: () => void;
+  liveMomentumPoints?: number;
+  livePointsThisWeek?: number;
+  liveStreakDays?: number;
+  liveWeeklyConsistency?: number;
+  liveLevel?: number;
+  liveCurrentXP?: number;
+  liveMaxXP?: number;
+  liveRewards?: RewardItem[];
+  liveBadges?: RewardBadge[];
+  liveCollection?: CollectionItem[];
+  onClaimReward?: (rewardId: string, termsAccepted: boolean) => Promise<any>;
+  onActivateReward?: (rewardId: string) => Promise<any>;
 }
 
 export const RewardsPage: React.FC<RewardsPageProps> = ({
   isDark,
   setIsDark,
   onToggleMobileMenu,
+  liveMomentumPoints,
+  livePointsThisWeek,
+  liveStreakDays,
+  liveWeeklyConsistency,
+  liveLevel,
+  liveCurrentXP,
+  liveMaxXP,
+  liveRewards,
+  liveBadges,
+  liveCollection,
+  onClaimReward,
+  onActivateReward,
 }) => {
   // Global search input in top bar
   const [globalSearch, setGlobalSearch] = useState('');
 
-  // Rewards State
-  const [momentumPoints, setMomentumPoints] = useState(initialMomentumPoints);
-  const [pointsThisWeek, setPointsThisWeek] = useState(initialPointsThisWeek);
-  const [rewardsList, setRewardsList] = useState<RewardItem[]>(initialFeaturedRewards);
-  const [badgesList, setBadgesList] = useState<RewardBadge[]>(initialBadges);
+  // Rewards State (fallback to defaults if live not provided)
+  const momentumPoints = liveMomentumPoints !== undefined ? liveMomentumPoints : initialMomentumPoints;
+  const pointsThisWeek = livePointsThisWeek !== undefined ? livePointsThisWeek : initialPointsThisWeek;
+  const streakDays = liveStreakDays !== undefined ? liveStreakDays : initialStreakDays;
+  const weeklyConsistency = liveWeeklyConsistency !== undefined ? liveWeeklyConsistency : initialWeeklyConsistency;
+  const level = liveLevel !== undefined ? liveLevel : initialLevel;
+  const currentXP = liveCurrentXP !== undefined ? liveCurrentXP : initialXP;
+  const maxXP = liveMaxXP !== undefined ? liveMaxXP : initialMaxXP;
+
+  const [localRewardsList, setLocalRewardsList] = useState<RewardItem[]>(initialFeaturedRewards);
+  const rewardsList = liveRewards && liveRewards.length > 0 ? liveRewards : localRewardsList;
+
+  const [localBadgesList, setLocalBadgesList] = useState<RewardBadge[]>(initialBadges);
+  const badgesList = liveBadges && liveBadges.length > 0 ? liveBadges : localBadgesList;
+
   const [nextBadge, setNextBadge] = useState(initialNextBadge);
-  const [collectionItems, setCollectionItems] = useState<CollectionItem[]>(initialCollectionItems);
+  const [localCollection, setLocalCollection] = useState<CollectionItem[]>(initialCollectionItems);
+  const collectionItems = liveCollection && liveCollection.length > 0 ? liveCollection : localCollection;
+
   const [waysToEarn, setWaysToEarn] = useState<WaysToEarnItem[]>(initialWaysToEarn);
 
   // Filter States
@@ -69,6 +108,7 @@ export const RewardsPage: React.FC<RewardsPageProps> = ({
   // Modals
   const [selectedRewardForModal, setSelectedRewardForModal] = useState<RewardItem | null>(null);
   const [selectedBadgeForModal, setSelectedBadgeForModal] = useState<RewardBadge | null>(null);
+  const [isTermsModalOpen, setIsTermsModalOpen] = useState(false);
 
   // Toast Feedback State
   const [actionToast, setActionToast] = useState<string | null>(null);
@@ -89,10 +129,15 @@ export const RewardsPage: React.FC<RewardsPageProps> = ({
   }, [rewardsList, activeCategory, categorySearchQuery, globalSearch]);
 
   // Handlers
-  const handleUnlockReward = (reward: RewardItem) => {
+  const handleUnlockReward = async (reward: RewardItem, termsAccepted: boolean = true) => {
     if (reward.status === 'owned' || reward.status === 'active') {
       // Toggle active
       handleActivateReward(reward);
+      return;
+    }
+
+    if (!termsAccepted) {
+      showToast('You must agree to the Reward Claim Terms & Conditions.');
       return;
     }
 
@@ -101,48 +146,36 @@ export const RewardsPage: React.FC<RewardsPageProps> = ({
       return;
     }
 
-    // Deduct points
-    setMomentumPoints((prev) => prev - reward.cost);
-    setRewardsList((prev) =>
-      prev.map((item) =>
-        item.id === reward.id ? { ...item, status: 'owned' } : item
-      )
-    );
-
-    // Add to collection
-    const newColItem: CollectionItem = {
-      id: `col-${Date.now()}`,
-      name: reward.name,
-      type: reward.badgeTag as any,
-      icon: reward.badgeTag.toLowerCase(),
-      active: true,
-    };
-    setCollectionItems((prev) => [newColItem, ...prev]);
-
-    if (selectedRewardForModal?.id === reward.id) {
-      setSelectedRewardForModal((prev) => prev ? { ...prev, status: 'owned' } : null);
+    try {
+      if (onClaimReward) {
+        await onClaimReward(reward.id, termsAccepted);
+      } else {
+        await api.claimReward(reward.id, termsAccepted);
+      }
+      showToast(`🎉 Claim verified! Unlocked "${reward.name}" (-${reward.cost} MP)`);
+      setSelectedRewardForModal(null);
+    } catch (err: any) {
+      showToast(`Claim rejected: ${err.message || 'Validation failed'}`);
+      throw err;
     }
-
-    showToast(`Unlocked ${reward.name}! -${reward.cost} MP`);
   };
 
-  const handleActivateReward = (reward: RewardItem) => {
-    setRewardsList((prev) =>
-      prev.map((item) => {
-        if (item.category === reward.category) {
-          return {
-            ...item,
-            status: item.id === reward.id ? 'active' : item.status === 'active' ? 'owned' : item.status,
-          };
-        }
-        return item;
-      })
-    );
-    showToast(`${reward.name} is now active!`);
+  const handleActivateReward = async (reward: RewardItem) => {
+    try {
+      if (onActivateReward) {
+        await onActivateReward(reward.id);
+      } else {
+        await api.activateReward(reward.id);
+      }
+      showToast(`${reward.name} is now active!`);
+      setSelectedRewardForModal(null);
+    } catch (err: any) {
+      showToast(`Activation failed: ${err.message}`);
+    }
   };
 
   const handleToggleProfileBadge = (badge: RewardBadge) => {
-    setBadgesList((prev) =>
+    setLocalBadgesList((prev) =>
       prev.map((b) => ({
         ...b,
         isProfileBadge: b.id === badge.id ? !b.isProfileBadge : false,
@@ -157,7 +190,6 @@ export const RewardsPage: React.FC<RewardsPageProps> = ({
       showToast('Need 5,000 MP to unlock 30 Days of Premium!');
       return;
     }
-    setMomentumPoints((prev) => prev - 5000);
     showToast('🎉 Unlocked 30 Days of Premium! All features enabled.');
   };
 
@@ -207,8 +239,17 @@ export const RewardsPage: React.FC<RewardsPageProps> = ({
           </div>
         </div>
 
-        {/* Right Controls: Theme Toggle, Notifications, Avatar */}
+        {/* Right Controls: Claim Policy, Theme Toggle, Notifications, Avatar */}
         <div className="flex items-center gap-3">
+          <button 
+            onClick={() => setIsTermsModalOpen(true)}
+            className="h-9 px-3 rounded-xl bg-indigo-500/10 hover:bg-indigo-500/20 border border-indigo-500/30 text-indigo-300 text-xs font-semibold flex items-center gap-1.5 transition-all shadow-xs"
+            title="Reward Claim Policy & Terms"
+          >
+            <ShieldCheck className="w-4 h-4 text-[#818CF8]" />
+            <span className="hidden sm:inline">Claim Policy</span>
+          </button>
+
           <button 
             onClick={() => setIsDark(!isDark)}
             title="Toggle theme"
@@ -321,6 +362,16 @@ export const RewardsPage: React.FC<RewardsPageProps> = ({
         userPoints={momentumPoints}
         onUnlock={handleUnlockReward}
         onActivate={handleActivateReward}
+        onOpenTerms={() => setIsTermsModalOpen(true)}
+      />
+
+      <RewardTermsModal
+        isOpen={isTermsModalOpen}
+        onClose={() => setIsTermsModalOpen(false)}
+        onAccept={() => {
+          setIsTermsModalOpen(false);
+          showToast('Terms accepted');
+        }}
       />
 
       <BadgeDetailModal

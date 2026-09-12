@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Sidebar } from './components/Sidebar';
 import { Header } from './components/Header';
 import { HeroBanner } from './components/HeroBanner';
@@ -22,7 +22,25 @@ import {
 } from './data/mockData';
 import { initialCalendarEvents } from './data/calendarMockData';
 import { initialGoalsData } from './data/goalsMockData';
-import { Quest, QuestCategory, Goal, QuickNote, TaskItem, CalendarEvent, DetailedGoal } from './types';
+import { getLiveTodayISO, getTodayISO, addDaysISO, formatReadableDate } from './utils/dateUtils';
+import { 
+  initialFeaturedRewards, 
+  initialBadges, 
+  initialCollectionItems 
+} from './data/rewardsMockData';
+import { 
+  Quest, 
+  QuestCategory, 
+  Goal, 
+  QuickNote, 
+  TaskItem, 
+  CalendarEvent, 
+  DetailedGoal,
+  RewardItem,
+  RewardBadge,
+  CollectionItem,
+  AIIntegrationModel
+} from './types';
 import { Sparkles, X } from 'lucide-react';
 import { TasksPage } from './components/tasks/TasksPage';
 import { CalendarPage } from './components/calendar/CalendarPage';
@@ -33,33 +51,138 @@ import { AnalyticsPage } from './components/analytics/AnalyticsPage';
 import { AiCoachPage } from './components/aicoach/AiCoachPage';
 import { AiIntegrationPage } from './components/aiintegration/AiIntegrationPage';
 import { SettingsPage } from './components/settings/SettingsPage';
+import { api, BackendState } from './services/api';
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState('settings');
+  const [activeTab, setActiveTab] = useState('dashboard');
   const [isDark, setIsDark] = useState(true);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [activeQuestFilter, setActiveQuestFilter] = useState<QuestCategory>('all');
 
-  // Core Data States
+  // Core Synchronized Data States
   const [user, setUser] = useState(initialUserProfile);
   const [quests, setQuests] = useState<Quest[]>(initialQuests);
   const [tasks, setTasks] = useState<TaskItem[]>(initialTasks);
   const [calendarEvents, setCalendarEvents] = useState<CalendarEvent[]>(initialCalendarEvents);
   const [detailedGoals, setDetailedGoals] = useState<DetailedGoal[]>(initialGoalsData);
   const [attributes, setAttributes] = useState(initialAttributes);
-  const [weeklyData] = useState(weeklyProgressData);
+  const [weeklyData, setWeeklyData] = useState(weeklyProgressData);
   const [friends] = useState(leaderboardFriends);
-  const [goals, setGoals] = useState<Goal[]>(initialGoals);
   const [notes, setNotes] = useState<QuickNote[]>(initialNotes);
+  const [rewards, setRewards] = useState<RewardItem[]>(initialFeaturedRewards);
+  const [badges, setBadges] = useState<RewardBadge[]>(initialBadges);
+  const [collection, setCollection] = useState<CollectionItem[]>(initialCollectionItems);
 
   // Modals
   const [isAddQuestOpen, setIsAddQuestOpen] = useState(false);
   const [isAddGoalOpen, setIsAddGoalOpen] = useState(false);
   const [isAddNoteOpen, setIsAddNoteOpen] = useState(false);
 
+  // AI Agent Models Synchronized State
+  const [aiAgents, setAiAgents] = useState<AIIntegrationModel[]>([]);
+  const [isSyncingAI, setIsSyncingAI] = useState(false);
+  const [aiLastSyncedTime, setAiLastSyncedTime] = useState<string | null>(null);
+
   // XP Toast micro-feedback
   const [xpToast, setXpToast] = useState<{ show: boolean; xp: number; attribute: string } | null>(null);
+
+  // Reconcile complete authoritative backend state into React
+  const syncFromBackend = (data: BackendState) => {
+    if (!data) return;
+    if (data.user) setUser(data.user);
+    if (data.quests) setQuests(data.quests);
+    if (data.tasks) setTasks(data.tasks);
+    if (data.calendarEvents) setCalendarEvents(data.calendarEvents);
+    if (data.detailedGoals) setDetailedGoals(data.detailedGoals);
+    if (data.rewards) setRewards(data.rewards);
+    if (data.badges) setBadges(data.badges);
+    if (data.collection) setCollection(data.collection);
+    if (data.notes) setNotes(data.notes);
+    if (data.attributes) setAttributes(data.attributes);
+    if (data.weeklyData) setWeeklyData(data.weeklyData);
+    if (data.aiAgents) setAiAgents(data.aiAgents);
+  };
+
+  const handleSyncAIModels = async () => {
+    setIsSyncingAI(true);
+    try {
+      const res = await api.syncAIAgents();
+      setAiAgents(res.agents);
+      const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      setAiLastSyncedTime(timeStr);
+      return res;
+    } catch (err) {
+      console.error('Failed to sync AI models:', err);
+    } finally {
+      setIsSyncingAI(false);
+    }
+  };
+
+  const handleSelectAIModel = async (agentId: string) => {
+    setAiAgents((prev) =>
+      prev.map((a) => ({
+        ...a,
+        selected: a.id === agentId,
+      }))
+    );
+    try {
+      const updated = await api.selectAIAgent(agentId);
+      setAiAgents(updated);
+    } catch (err) {
+      console.error('Failed to select AI agent on backend:', err);
+    }
+  };
+
+  const handleConnectAISubmit = async (
+    agentId: string,
+    details: { accountEmail?: string; apiKey?: string; modelTier?: string; loginMethod?: string }
+  ) => {
+    try {
+      const res = await api.connectAIAgent(agentId, details);
+      setAiAgents(res.agents);
+    } catch (err) {
+      console.error('Failed to connect AI agent:', err);
+    }
+  };
+
+  const handleDisconnectAI = async (agentId: string) => {
+    try {
+      const res = await api.disconnectAIAgent(agentId);
+      setAiAgents(res.agents);
+    } catch (err) {
+      console.error('Failed to disconnect AI agent:', err);
+    }
+  };
+
+  // Initial load: fetch authoritative state from backend
+  useEffect(() => {
+    let isMounted = true;
+    const fetchState = async () => {
+      try {
+        const state = await api.getState();
+        if (isMounted && state) {
+          syncFromBackend(state);
+        }
+      } catch (err) {
+        console.warn('Backend not ready yet, using initialized local state:', err);
+      }
+
+      // Initial AI agents load
+      try {
+        const agents = await api.getAIAgents();
+        if (isMounted && agents && agents.length > 0) {
+          setAiAgents(agents);
+        }
+      } catch (err) {
+        console.warn('AI agents initial load fallback:', err);
+      }
+    };
+    fetchState();
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   // Synchronize dark mode class to html document
   useEffect(() => {
@@ -83,184 +206,330 @@ export default function App() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
 
-  // Handle Quest Complete / Toggle
-  const handleToggleQuestComplete = (questId: string) => {
-    setQuests((prevQuests) => {
-      const target = prevQuests.find((q) => q.id === questId);
-      if (!target) return prevQuests;
+  // Synchronize Home GoalsSection directly from detailedGoals
+  const homeGoals: Goal[] = useMemo(() => {
+    return detailedGoals.map((dg) => {
+      let category: Goal['category'] = 'education';
+      let iconType: Goal['iconType'] = 'target';
+      const catLower = dg.category.toLowerCase();
+      if (catLower.includes('career')) {
+        category = 'career';
+        iconType = 'target';
+      } else if (catLower.includes('health')) {
+        category = 'health';
+        iconType = 'dumbbell';
+      } else if (catLower.includes('education') || catLower.includes('learn')) {
+        category = 'education';
+        iconType = 'book';
+      }
+      return {
+        id: dg.id,
+        title: dg.title,
+        progressPercent: dg.progress,
+        completedUnits: dg.completedTasks,
+        totalUnits: Math.max(1, dg.totalTasks),
+        unitLabel: dg.category === 'Career' ? 'problems' : dg.category === 'Health' ? 'workouts' : 'milestones',
+        category,
+        iconType,
+        color: dg.color || '#6366F1',
+      };
+    });
+  }, [detailedGoals]);
 
-      const isNowCompleted = !target.completed;
-      const xpChange = isNowCompleted ? target.xpReward : -target.xpReward;
+  // Handle Quest Complete / Toggle (Home)
+  const handleToggleQuestComplete = async (questId: string) => {
+    // 1. Optimistic update
+    const target = quests.find((q) => q.id === questId);
+    if (!target) return;
+    const isNowCompleted = !target.completed;
+    const xpChange = isNowCompleted ? target.xpReward : -target.xpReward;
 
-      // Update User Progress
-      setUser((prevUser) => {
-        let newXp = prevUser.currentXp + xpChange;
-        let newLevel = prevUser.level;
-        let nextLevelXp = prevUser.nextLevelXp;
+    setQuests((prev) =>
+      prev.map((q) => (q.id === questId ? { ...q, completed: isNowCompleted } : q))
+    );
 
-        if (newXp >= nextLevelXp) {
-          newLevel += 1;
-          newXp = newXp - nextLevelXp;
-          nextLevelXp += 200;
-        } else if (newXp < 0) {
-          newXp = 0;
-        }
+    setUser((prevUser) => {
+      let newXp = prevUser.currentXp + xpChange;
+      let newLevel = prevUser.level;
+      let nextLevelXp = prevUser.nextLevelXp;
 
-        return {
-          ...prevUser,
-          currentXp: newXp,
-          level: newLevel,
-          nextLevelXp,
-          totalPoints: Math.max(0, prevUser.totalPoints + xpChange),
-          questsDoneThisWeek: isNowCompleted
-            ? prevUser.questsDoneThisWeek + 1
-            : Math.max(0, prevUser.questsDoneThisWeek - 1),
-        };
-      });
-
-      // Update corresponding attribute percentage
-      if (isNowCompleted) {
-        setAttributes((prevAttrs) =>
-          prevAttrs.map((attr) => {
-            if (attr.name === target.attribute) {
-              return {
-                ...attr,
-                percentage: Math.min(100, attr.percentage + 2),
-              };
-            }
-            return attr;
-          })
-        );
-
-        // Show subtle XP micro-reward notification
-        setXpToast({
-          show: true,
-          xp: target.xpReward,
-          attribute: target.attribute,
-        });
-
-        setTimeout(() => {
-          setXpToast(null);
-        }, 2400);
+      if (newXp >= nextLevelXp) {
+        newLevel += 1;
+        newXp = newXp - nextLevelXp;
+        nextLevelXp += 200;
+      } else if (newXp < 0) {
+        newXp = 0;
       }
 
-      return prevQuests.map((q) =>
-        q.id === questId ? { ...q, completed: isNowCompleted } : q
-      );
+      return {
+        ...prevUser,
+        currentXp: newXp,
+        level: newLevel,
+        nextLevelXp,
+        totalPoints: Math.max(0, prevUser.totalPoints + xpChange),
+        questsDoneThisWeek: isNowCompleted
+          ? prevUser.questsDoneThisWeek + 1
+          : Math.max(0, prevUser.questsDoneThisWeek - 1),
+      };
     });
+
+    if (isNowCompleted) {
+      setXpToast({
+        show: true,
+        xp: target.xpReward,
+        attribute: target.attribute,
+      });
+      setTimeout(() => setXpToast(null), 2400);
+    }
+
+    // 2. Authoritative backend transaction
+    try {
+      const res = await api.toggleQuest(questId);
+      if (res.state) syncFromBackend(res.state);
+    } catch (err) {
+      console.error('Quest toggle backend error:', err);
+    }
   };
 
   // Add new quest handler
-  const handleAddQuest = (newQuestData: Omit<Quest, 'id' | 'completed'>) => {
-    const newQuest: Quest = {
+  const handleAddQuest = async (newQuestData: Omit<Quest, 'id' | 'completed'>) => {
+    const optimisticQuest: Quest = {
       id: `quest-${Date.now()}`,
       ...newQuestData,
       completed: false,
     };
-    setQuests((prev) => [newQuest, ...prev]);
+    setQuests((prev) => [optimisticQuest, ...prev]);
+
+    try {
+      const res = await api.addQuest(newQuestData);
+      if (res.state) syncFromBackend(res.state);
+    } catch (err) {
+      console.error('Add quest error:', err);
+    }
   };
 
-  // Add new goal handler
-  const handleAddGoal = (newGoal: Goal) => {
-    setGoals((prev) => [newGoal, ...prev]);
+  // Add new goal handler (Home modal)
+  const handleAddGoal = async (newGoal: Goal) => {
+    const detailedGoalData: Omit<DetailedGoal, 'id'> = {
+      title: newGoal.title,
+      category: (newGoal.category.charAt(0).toUpperCase() + newGoal.category.slice(1)) as any,
+      description: `Target: complete ${newGoal.totalUnits} ${newGoal.unitLabel} with consistency.`,
+      progress: newGoal.progressPercent || 0,
+      completedTasks: newGoal.completedUnits || 0,
+      totalTasks: newGoal.totalUnits || 5,
+      dueDate: formatReadableDate(addDaysISO(getLiveTodayISO(), 30)),
+      priority: 'medium',
+      status: 'active',
+      color: newGoal.color || '#6366F1',
+      icon: newGoal.iconType === 'dumbbell' ? 'heart' : newGoal.iconType === 'book' ? 'book' : 'target',
+      milestones: [
+        { id: `m-${Date.now()}-1`, title: `Kickoff & preparation for ${newGoal.title}`, targetDate: 'In 2 weeks', completed: false },
+        { id: `m-${Date.now()}-2`, title: `Completion milestone for ${newGoal.title}`, targetDate: 'In 1 month', completed: false },
+      ],
+      subtasks: [],
+    };
+    await handleAddDetailedGoal(detailedGoalData);
   };
 
   // Add new note handler
-  const handleAddNote = (newNote: QuickNote) => {
+  const handleAddNote = async (newNote: QuickNote) => {
     setNotes((prev) => [newNote, ...prev]);
+    try {
+      const res = await api.addNote(newNote);
+      if (res.state) syncFromBackend(res.state);
+    } catch (err) {
+      console.error('Add note error:', err);
+    }
   };
 
   // Task Handlers for TasksPage
-  const handleToggleTaskComplete = (taskId: string) => {
-    setTasks((prevTasks) => {
-      const target = prevTasks.find((t) => t.id === taskId);
-      if (!target) return prevTasks;
-      const isNowCompleted = !target.completed;
-      const xpReward = target.xpReward || 15;
-      const xpChange = isNowCompleted ? xpReward : -xpReward;
+  const handleToggleTaskComplete = async (taskId: string) => {
+    const target = tasks.find((t) => t.id === taskId);
+    if (!target) return;
+    const isNowCompleted = !target.completed;
+    const xpReward = target.xpReward || 15;
+    const xpChange = isNowCompleted ? xpReward : -xpReward;
 
-      // Optimistic XP update
-      setUser((prevUser) => ({
-        ...prevUser,
-        currentXp: Math.max(0, prevUser.currentXp + xpChange),
-        totalPoints: Math.max(0, prevUser.totalPoints + xpChange),
-      }));
+    // Optimistic UI updates
+    setTasks((prev) =>
+      prev.map((t) => (t.id === taskId ? { ...t, completed: isNowCompleted } : t))
+    );
 
-      // If completing, trigger XP toast micro-feedback
-      if (isNowCompleted) {
-        setXpToast({
-          show: true,
-          xp: xpReward,
-          attribute: target.labels[0] || 'Discipline',
-        });
-        setTimeout(() => {
-          setXpToast(null);
-        }, 2400);
-      }
+    setUser((prevUser) => ({
+      ...prevUser,
+      currentXp: Math.max(0, prevUser.currentXp + xpChange),
+      totalPoints: Math.max(0, prevUser.totalPoints + xpChange),
+    }));
 
-      return prevTasks.map((t) =>
-        t.id === taskId ? { ...t, completed: isNowCompleted } : t
-      );
-    });
+    if (isNowCompleted) {
+      setXpToast({
+        show: true,
+        xp: xpReward,
+        attribute: target.labels[0] || 'Discipline',
+      });
+      setTimeout(() => setXpToast(null), 2400);
+    }
+
+    // Authoritative backend sync (cross-syncs tasks, quests, calendar & goals)
+    try {
+      const res = await api.toggleTask(taskId);
+      if (res.state) syncFromBackend(res.state);
+    } catch (err) {
+      console.error('Task toggle backend error:', err);
+    }
   };
 
-  const handleAddTask = (newTaskData: Omit<TaskItem, 'id'>) => {
-    const newTask: TaskItem = {
-      id: `task-${Date.now()}`,
+  const handleAddTask = async (newTaskData: Omit<TaskItem, 'id'>) => {
+    const localToday = getTodayISO();
+    const taskWithClientDate: Omit<TaskItem, 'id'> = {
       ...newTaskData,
+      clientDate: newTaskData.clientDate || localToday,
+      dueDate: newTaskData.dueDate || (newTaskData.dueText?.toLowerCase().includes('tomorrow')
+        ? addDaysISO(localToday, 1)
+        : newTaskData.dueText?.toLowerCase().includes('next week')
+        ? addDaysISO(localToday, 7)
+        : localToday),
     };
-    setTasks((prev) => [newTask, ...prev]);
+
+    const optimisticTask: TaskItem = {
+      id: `task-${Date.now()}`,
+      ...taskWithClientDate,
+    };
+    setTasks((prev) => [optimisticTask, ...prev]);
+
+    try {
+      const res = await api.addTask(taskWithClientDate);
+      if (res.state) syncFromBackend(res.state);
+    } catch (err) {
+      console.error('Add task error:', err);
+    }
   };
 
-  const handleUpdateTask = (updatedTask: TaskItem) => {
+  const handleUpdateTask = async (updatedTask: TaskItem) => {
     setTasks((prev) => prev.map((t) => (t.id === updatedTask.id ? updatedTask : t)));
+    try {
+      const res = await api.updateTask(updatedTask);
+      if (res.state) syncFromBackend(res.state);
+    } catch (err) {
+      console.error('Update task error:', err);
+    }
   };
 
-  const handleDeleteTask = (taskId: string) => {
+  const handleDeleteTask = async (taskId: string) => {
     setTasks((prev) => prev.filter((t) => t.id !== taskId));
+    try {
+      const res = await api.deleteTask(taskId);
+      if (res.state) syncFromBackend(res.state);
+    } catch (err) {
+      console.error('Delete task error:', err);
+    }
   };
 
   // Calendar Handlers
-  const handleAddCalendarEvent = (newEventData: Omit<CalendarEvent, 'id'>) => {
-    const newEvent: CalendarEvent = {
+  const handleAddCalendarEvent = async (newEventData: Omit<CalendarEvent, 'id'> & { id?: string }) => {
+    const eventId = newEventData.id || `evt-${Date.now()}`;
+    const optimisticEvent: CalendarEvent = {
       ...newEventData,
-      id: `evt-${Date.now()}`,
+      id: eventId,
     };
-    setCalendarEvents((prev) => [newEvent, ...prev]);
+    setCalendarEvents((prev) => {
+      if (prev.some(e => e.id === eventId || (e.title === newEventData.title && e.date === newEventData.date && e.startTime === newEventData.startTime))) {
+        return prev;
+      }
+      return [optimisticEvent, ...prev];
+    });
+
+    try {
+      const res = await api.addCalendarEvent(newEventData);
+      if (res.state) syncFromBackend(res.state);
+    } catch (err) {
+      console.error('Add calendar event error:', err);
+    }
   };
 
-  const handleUpdateCalendarEvent = (updatedEvent: CalendarEvent) => {
+  const handleUpdateCalendarEvent = async (updatedEvent: CalendarEvent) => {
     setCalendarEvents((prev) =>
       prev.map((e) => (e.id === updatedEvent.id ? updatedEvent : e))
     );
+    try {
+      const res = await api.updateCalendarEvent(updatedEvent);
+      if (res.state) syncFromBackend(res.state);
+    } catch (err) {
+      console.error('Update calendar event error:', err);
+    }
   };
 
-  const handleDeleteCalendarEvent = (eventId: string) => {
+  const handleDeleteCalendarEvent = async (eventId: string) => {
     setCalendarEvents((prev) => prev.filter((e) => e.id !== eventId));
+    try {
+      const res = await api.deleteCalendarEvent(eventId);
+      if (res.state) syncFromBackend(res.state);
+    } catch (err) {
+      console.error('Delete calendar event error:', err);
+    }
   };
 
   // Detailed Goals Handlers
-  const handleAddDetailedGoal = (newGoalData: Omit<DetailedGoal, 'id'>) => {
-    const newGoal: DetailedGoal = {
+  const handleAddDetailedGoal = async (newGoalData: Omit<DetailedGoal, 'id'>) => {
+    const optimisticGoal: DetailedGoal = {
       ...newGoalData,
       id: `goal-${Date.now()}`,
-      updatedAt: new Date().toISOString().split('T')[0],
+      updatedAt: getLiveTodayISO(),
     };
-    setDetailedGoals((prev) => [newGoal, ...prev]);
+    setDetailedGoals((prev) => [optimisticGoal, ...prev]);
 
-    // Micro toast
-    setXpToast({ show: true, xp: 50, attribute: newGoal.category });
+    setXpToast({ show: true, xp: 50, attribute: newGoalData.category });
     setTimeout(() => setXpToast(null), 3000);
+
+    try {
+      const res = await api.addGoal(newGoalData);
+      if (res.state) syncFromBackend(res.state);
+    } catch (err) {
+      console.error('Add goal error:', err);
+    }
   };
 
-  const handleUpdateDetailedGoal = (updatedGoal: DetailedGoal) => {
+  const handleUpdateDetailedGoal = async (updatedGoal: DetailedGoal) => {
     setDetailedGoals((prev) =>
-      prev.map((g) => (g.id === updatedGoal.id ? { ...updatedGoal, updatedAt: new Date().toISOString().split('T')[0] } : g))
+      prev.map((g) =>
+        g.id === updatedGoal.id
+          ? { ...updatedGoal, updatedAt: getLiveTodayISO() }
+          : g
+      )
     );
+    try {
+      const res = await api.updateGoal(updatedGoal);
+      if (res.state) syncFromBackend(res.state);
+    } catch (err) {
+      console.error('Update goal error:', err);
+    }
   };
 
-  const handleDeleteDetailedGoal = (goalId: string) => {
+  const handleDeleteDetailedGoal = async (goalId: string) => {
     setDetailedGoals((prev) => prev.filter((g) => g.id !== goalId));
+    try {
+      const res = await api.deleteGoal(goalId);
+      if (res.state) syncFromBackend(res.state);
+    } catch (err) {
+      console.error('Delete goal error:', err);
+    }
+  };
+
+  // Rewards Claim & Activate Handlers
+  const handleClaimReward = async (rewardId: string, termsAccepted: boolean) => {
+    const res = await api.claimReward(rewardId, termsAccepted);
+    if (res.state) {
+      syncFromBackend(res.state);
+    }
+    return res;
+  };
+
+  const handleActivateReward = async (rewardId: string) => {
+    const res = await api.activateReward(rewardId);
+    if (res.state) {
+      syncFromBackend(res.state);
+    }
+    return res;
   };
 
   return (
@@ -321,15 +590,27 @@ export default function App() {
           isDark={isDark}
           setIsDark={setIsDark}
           onToggleMobileMenu={() => setIsMobileMenuOpen(true)}
+          models={aiAgents}
+          onSelectModel={handleSelectAIModel}
+          onConnectSubmit={handleConnectAISubmit}
+          onDisconnectModel={handleDisconnectAI}
+          onSyncModels={handleSyncAIModels}
+          isSyncing={isSyncingAI}
+          lastSyncedTime={aiLastSyncedTime}
         />
       ) : activeTab === 'ai-coach' ? (
         <AiCoachPage
           isDark={isDark}
           setIsDark={setIsDark}
           onToggleMobileMenu={() => setIsMobileMenuOpen(true)}
+          onNavigate={(tab) => setActiveTab(tab)}
+          agents={aiAgents}
+          onSelectModelId={handleSelectAIModel}
+          onSyncModels={handleSyncAIModels}
+          isSyncingModels={isSyncingAI}
+          lastSyncedTime={aiLastSyncedTime}
           onAddTaskToToday={(taskTitle) => {
-            const newTask: TaskItem = {
-              id: `task-${Date.now()}`,
+            handleAddTask({
               title: taskTitle,
               completed: false,
               viewCategory: 'today',
@@ -339,8 +620,7 @@ export default function App() {
               priority: 'high',
               xpReward: 35,
               subtasks: []
-            };
-            setTasks(prev => [newTask, ...prev]);
+            });
           }}
         />
       ) : activeTab === 'analytics' ? (
@@ -348,12 +628,28 @@ export default function App() {
           isDark={isDark}
           setIsDark={setIsDark}
           onToggleMobileMenu={() => setIsMobileMenuOpen(true)}
+          liveUser={user}
+          liveTasks={tasks}
+          liveQuests={quests}
+          liveGoals={detailedGoals}
         />
       ) : activeTab === 'rewards' ? (
         <RewardsPage
           isDark={isDark}
           setIsDark={setIsDark}
           onToggleMobileMenu={() => setIsMobileMenuOpen(true)}
+          liveMomentumPoints={(user as any).momentumPoints ?? 4320}
+          livePointsThisWeek={(user as any).pointsThisWeek ?? 240}
+          liveStreakDays={(user as any).streakDays ?? user.streakDays}
+          liveWeeklyConsistency={(user as any).weeklyConsistency ?? 92}
+          liveLevel={user.level}
+          liveCurrentXP={user.currentXp}
+          liveMaxXP={user.nextLevelXp}
+          liveRewards={rewards}
+          liveBadges={badges}
+          liveCollection={collection}
+          onClaimReward={handleClaimReward}
+          onActivateReward={handleActivateReward}
         />
       ) : activeTab === 'friends' ? (
         <FriendsPage
@@ -427,9 +723,9 @@ export default function App() {
                   friends={friends}
                 />
 
-                {/* 4. Goals Section */}
+                {/* 4. Goals Section - Live synchronized with detailedGoals */}
                 <GoalsSection
-                  goals={goals}
+                  goals={homeGoals}
                   onAddGoal={() => setIsAddGoalOpen(true)}
                 />
               </div>
