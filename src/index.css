@@ -3,6 +3,19 @@
 @custom-variant dark (&:where(.dark, .dark *));
 
 :root {
+  /* Global Color & Surface CSS Variables - Light Mode Default */
+  --bg-app: #F8FAFC;
+  --bg-main: #FFFFFF;
+  --bg-card: #FFFFFF;
+  --bg-card-subtle: #F1F5F9;
+  --bg-card-hover: #F8FAFC;
+  --bg-input: #F1F5F9;
+  --text-primary: #0F172A;
+  --text-secondary: #475569;
+  --text-muted: #64748B;
+  --border-color: #E2E8F0;
+  --border-subtle: #F1F5F9;
+
   /* Default Global Accent Variables */
   --primary-accent: #6C63FF;
   --accent-color: #6C63FF;
@@ -13,6 +26,41 @@
 
   /* Density variables */
   --density-scale: 1;
+}
+
+/* Explicit Light Mode definitions */
+:root:not(.dark),
+.light,
+[data-theme="light"] {
+  --bg-app: #F8FAFC;
+  --bg-main: #FFFFFF;
+  --bg-card: #FFFFFF;
+  --bg-card-subtle: #F1F5F9;
+  --bg-card-hover: #F8FAFC;
+  --bg-input: #F1F5F9;
+  --text-primary: #0F172A;
+  --text-secondary: #475569;
+  --text-muted: #64748B;
+  --border-color: #E2E8F0;
+  --border-subtle: #F1F5F9;
+  color-scheme: light;
+}
+
+/* Dark Mode definitions */
+.dark,
+[data-theme="dark"] {
+  --bg-app: #0B0E14;
+  --bg-main: #0B0E14;
+  --bg-card: #11161D;
+  --bg-card-subtle: #161B22;
+  --bg-card-hover: #1A212D;
+  --bg-input: #12161E;
+  --text-primary: #F8FAFC;
+  --text-secondary: #9AA3B5;
+  --text-muted: #687185;
+  --border-color: rgba(255, 255, 255, 0.08);
+  --border-subtle: rgba(255, 255, 255, 0.04);
+  color-scheme: dark;
 }
 
 @layer base {

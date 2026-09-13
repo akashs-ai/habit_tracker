@@ -11,6 +11,7 @@ import {
   Cpu,
   Sun, 
   Moon, 
+  Monitor,
   Settings, 
   ChevronRight,
   Sparkles
@@ -22,6 +23,8 @@ interface SidebarProps {
   setActiveTab: (tab: string) => void;
   isDark: boolean;
   setIsDark: (dark: boolean) => void;
+  themeMode?: 'light' | 'dark' | 'system';
+  onSetThemeMode?: (mode: 'light' | 'dark' | 'system') => void;
   userLevel: number;
   currentUser?: AuthUser | null;
   momentumPoints?: number;
@@ -32,6 +35,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
   setActiveTab,
   isDark,
   setIsDark,
+  themeMode,
+  onSetThemeMode,
   userLevel,
   currentUser,
   momentumPoints = 4320,
@@ -151,15 +156,18 @@ export const Sidebar: React.FC<SidebarProps> = ({
           </div>
         </div>
 
-        {/* Light / Dark Mode Toggle */}
-        <div id="theme-toggle-container" className="bg-[#F3F4F6] dark:bg-[#18181B] p-1 rounded-xl flex items-center justify-between text-xs font-medium">
+        {/* Light / Dark / System Mode Toggle */}
+        <div id="theme-toggle-container" className="bg-[#F3F4F6] dark:bg-[#18181B] p-1 rounded-xl flex items-center justify-between text-xs font-medium gap-1">
           <button
             id="theme-btn-light"
-            onClick={() => setIsDark(false)}
-            className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-lg transition-all ${
-              !isDark
-                ? 'bg-white text-[#111827] shadow-xs'
-                : 'text-[#6B7280] dark:text-[#9CA3AF] hover:text-[#111827]'
+            onClick={() => {
+              if (onSetThemeMode) onSetThemeMode('light');
+              else setIsDark(false);
+            }}
+            className={`flex-1 flex items-center justify-center gap-1 py-1.5 rounded-lg transition-all ${
+              (themeMode ? themeMode === 'light' : !isDark)
+                ? 'bg-white text-[#111827] shadow-xs font-semibold'
+                : 'text-[#6B7280] dark:text-[#9CA3AF] hover:text-[#111827] dark:hover:text-white'
             }`}
           >
             <Sun className="w-3.5 h-3.5" />
@@ -167,15 +175,37 @@ export const Sidebar: React.FC<SidebarProps> = ({
           </button>
           <button
             id="theme-btn-dark"
-            onClick={() => setIsDark(true)}
-            className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-lg transition-all ${
-              isDark
-                ? 'bg-[#27272A] text-white shadow-xs'
-                : 'text-[#6B7280] hover:text-[#111827]'
+            onClick={() => {
+              if (onSetThemeMode) onSetThemeMode('dark');
+              else setIsDark(true);
+            }}
+            className={`flex-1 flex items-center justify-center gap-1 py-1.5 rounded-lg transition-all ${
+              (themeMode ? themeMode === 'dark' : isDark)
+                ? 'bg-[#27272A] text-white shadow-xs font-semibold'
+                : 'text-[#6B7280] dark:text-[#9CA3AF] hover:text-[#111827] dark:hover:text-white'
             }`}
           >
             <Moon className="w-3.5 h-3.5" />
             <span>Dark</span>
+          </button>
+          <button
+            id="theme-btn-system"
+            onClick={() => {
+              if (onSetThemeMode) {
+                onSetThemeMode('system');
+              } else {
+                const sysDark = typeof window !== 'undefined' && window.matchMedia('(prefers-color-scheme: dark)').matches;
+                setIsDark(sysDark);
+              }
+            }}
+            className={`flex-1 flex items-center justify-center gap-1 py-1.5 rounded-lg transition-all ${
+              themeMode === 'system'
+                ? 'bg-white dark:bg-[#27272A] text-[#111827] dark:text-white shadow-xs font-semibold'
+                : 'text-[#6B7280] dark:text-[#9CA3AF] hover:text-[#111827] dark:hover:text-white'
+            }`}
+          >
+            <Monitor className="w-3.5 h-3.5" />
+            <span>System</span>
           </button>
         </div>
 
@@ -187,7 +217,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         >
           <div className="flex items-center gap-2.5 min-w-0">
             <img 
-              src={currentUser?.avatarUrl || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop&q=80"} 
+              src={currentUser?.avatarUrl || (typeof window !== 'undefined' ? localStorage.getItem('liferpg_user_avatar') : null) || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop&q=80"} 
               alt={currentUser?.fullName || "Avatar"} 
               referrerPolicy="no-referrer"
               className="w-8 h-8 rounded-full object-cover ring-2 ring-[#7C6CFF]/20 shrink-0" 

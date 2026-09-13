@@ -12,7 +12,7 @@ import {
   initialAIModels,
   initialCalendarIntegration,
 } from '../../data/aiIntegrationMockData';
-import { AIIntegrationModel, CalendarIntegrationState } from '../../types';
+import { AIIntegrationModel, CalendarIntegrationState, CalendarPermissionLevel } from '../../types';
 import { AIModelsSection } from './AIModelsSection';
 import { CalendarSection } from './CalendarSection';
 import { PermissionsSection } from './PermissionsSection';
@@ -69,18 +69,29 @@ export const AiIntegrationPage: React.FC<AiIntegrationPageProps> = ({
   const [connectModalModel, setConnectModalModel] = useState<AIIntegrationModel | null>(null);
   const [isSecurityLearnMoreOpen, setIsSecurityLearnMoreOpen] = useState(false);
 
-  // Load from backend on mount if propModels not provided
+  // Load AI agents and calendar integration from backend on mount
   useEffect(() => {
-    if (propModels) return;
     let isMounted = true;
-    api.getAIAgents()
-      .then((loaded) => {
-        if (!isMounted) return;
-        setLocalModels(loaded);
+    if (!propModels) {
+      api.getAIAgents()
+        .then((loaded) => {
+          if (!isMounted) return;
+          setLocalModels(loaded);
+        })
+        .catch((err) => {
+          console.error('Failed to load AI agents:', err);
+        });
+    }
+
+    api.getCalendarIntegration()
+      .then((cal) => {
+        if (!isMounted || !cal) return;
+        setCalendarState(cal);
       })
       .catch((err) => {
-        console.error('Failed to load AI agents:', err);
+        console.error('Failed to load calendar integration:', err);
       });
+
     return () => {
       isMounted = false;
     };
@@ -178,18 +189,29 @@ export const AiIntegrationPage: React.FC<AiIntegrationPageProps> = ({
     }
   };
 
-  const handlePermissionChange = (perm: 'read_only' | 'no_access') => {
+  const handlePermissionChange = async (perm: CalendarPermissionLevel) => {
     setCalendarState((prev) => ({
       ...prev,
       permission: perm,
     }));
+    try {
+      await api.updateCalendarIntegration({ permission: perm });
+    } catch (err) {
+      console.error('Failed to sync calendar permission:', err);
+    }
   };
 
-  const handleToggleUseInCoach = () => {
+  const handleToggleUseInCoach = async () => {
+    const nextVal = !calendarState.useInCoach;
     setCalendarState((prev) => ({
       ...prev,
-      useInCoach: !prev.useInCoach,
+      useInCoach: nextVal,
     }));
+    try {
+      await api.updateCalendarIntegration({ useInCoach: nextVal });
+    } catch (err) {
+      console.error('Failed to sync calendar useInCoach:', err);
+    }
   };
 
   return (

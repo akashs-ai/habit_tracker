@@ -41,24 +41,24 @@ export const MiniCalendar: React.FC<MiniCalendarProps> = ({
   return (
     <div 
       id="mini-calendar-widget"
-      className="bg-[#111318] border border-white/8 rounded-xl p-4 shadow-xs"
+      className="bg-white dark:bg-[#111318] border border-slate-200 dark:border-white/8 rounded-xl p-4 shadow-xs transition-colors"
     >
       {/* Mini Calendar Header */}
       <div className="flex items-center justify-between mb-3 px-1">
-        <span className="text-xs sm:text-sm font-semibold text-[#F5F7FF]">
+        <span className="text-xs sm:text-sm font-semibold text-slate-900 dark:text-[#F5F7FF]">
           {currentMonth}
         </span>
         <div className="flex items-center gap-1">
           <button
             onClick={onPrevMonth}
-            className="p-1 rounded text-[#A6AEC0] hover:text-white hover:bg-white/5 transition-colors"
+            className="p-1 rounded text-slate-500 dark:text-[#A6AEC0] hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-white/5 transition-colors cursor-pointer"
             title="Previous Month"
           >
             <ChevronLeft className="w-3.5 h-3.5" />
           </button>
           <button
             onClick={onNextMonth}
-            className="p-1 rounded text-[#A6AEC0] hover:text-white hover:bg-white/5 transition-colors"
+            className="p-1 rounded text-slate-500 dark:text-[#A6AEC0] hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-white/5 transition-colors cursor-pointer"
             title="Next Month"
           >
             <ChevronRight className="w-3.5 h-3.5" />
@@ -69,7 +69,7 @@ export const MiniCalendar: React.FC<MiniCalendarProps> = ({
       {/* Weekday Headers */}
       <div className="grid grid-cols-7 gap-1 text-center mb-1">
         {daysOfWeek.map((day, idx) => (
-          <span key={idx} className="text-[11px] font-medium text-[#6F7789]">
+          <span key={idx} className="text-[11px] font-medium text-slate-400 dark:text-[#6F7789]">
             {day}
           </span>
         ))}
@@ -84,14 +84,14 @@ export const MiniCalendar: React.FC<MiniCalendarProps> = ({
             <button
               key={idx}
               onClick={() => onSelectDate(item.date)}
-              className={`w-7 h-7 mx-auto rounded-full flex flex-col items-center justify-center text-[11px] transition-all relative ${
+              className={`w-7 h-7 mx-auto rounded-full flex flex-col items-center justify-center text-[11px] transition-all relative cursor-pointer ${
                 isToday
                   ? 'bg-[#6C63FF] text-white font-bold ring-2 ring-[#6C63FF]/30'
                   : isSelected
                   ? 'border border-[#6C63FF] text-[#6C63FF] font-medium bg-[#6C63FF]/15'
                   : !item.isCurrentMonth
-                  ? 'text-[#4F5665]'
-                  : 'text-[#F5F7FF] hover:bg-white/5'
+                  ? 'text-slate-300 dark:text-[#4F5665]'
+                  : 'text-slate-800 dark:text-[#F5F7FF] hover:bg-slate-100 dark:hover:bg-white/5'
               }`}
             >
               <span>{item.day}</span>

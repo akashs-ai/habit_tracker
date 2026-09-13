@@ -21,10 +21,10 @@ export const GoalsOverviewCard: React.FC<GoalsOverviewCardProps> = ({
   return (
     <div
       id="goals-overview-banner"
-      className="relative overflow-hidden bg-[#141821] border border-white/8 rounded-[16px] p-5 sm:p-6 shadow-[0_4px_24px_rgba(0,0,0,0.22)]"
+      className="relative overflow-hidden bg-white dark:bg-[#141821] border border-slate-200 dark:border-white/8 rounded-[16px] p-5 sm:p-6 shadow-sm dark:shadow-[0_4px_24px_rgba(0,0,0,0.22)] transition-colors"
     >
       {/* Decorative panoramic mountain background in right portion (desktop/tablet) */}
-      <div className="absolute right-0 top-0 bottom-0 w-full sm:w-1/2 lg:w-5/12 pointer-events-none opacity-45 lg:opacity-75 overflow-hidden">
+      <div className="absolute right-0 top-0 bottom-0 w-full sm:w-1/2 lg:w-5/12 pointer-events-none opacity-30 dark:opacity-75 overflow-hidden">
         <svg
           viewBox="0 0 500 200"
           preserveAspectRatio="none"
@@ -72,7 +72,7 @@ export const GoalsOverviewCard: React.FC<GoalsOverviewCardProps> = ({
       {/* Content Layer */}
       <div className="relative z-10 flex flex-col justify-between h-full">
         {/* Quote Row (desktop & tablet) */}
-        <p className="text-xs sm:text-sm font-medium text-[#A5AEC2] italic tracking-wide mb-4">
+        <p className="text-xs sm:text-sm font-medium text-slate-600 dark:text-[#A5AEC2] italic tracking-wide mb-4">
           “ A better you is a collection of better days. ”
         </p>
 
@@ -80,30 +80,30 @@ export const GoalsOverviewCard: React.FC<GoalsOverviewCardProps> = ({
         <div className="flex flex-wrap items-center gap-6 sm:gap-10 lg:gap-14">
           {/* Total Goals */}
           <div className="flex flex-col">
-            <span className="text-2xl sm:text-3xl font-bold text-[#F7F8FC] tabular-nums tracking-tight">
+            <span className="text-2xl sm:text-3xl font-bold text-slate-900 dark:text-[#F7F8FC] tabular-nums tracking-tight">
               {totalGoals}
             </span>
-            <span className="text-xs font-medium text-[#697388] mt-0.5">
+            <span className="text-xs font-medium text-slate-500 dark:text-[#697388] mt-0.5">
               Total Goals
             </span>
           </div>
 
           {/* Active */}
           <div className="flex flex-col">
-            <span className="text-2xl sm:text-3xl font-bold text-[#F7F8FC] tabular-nums tracking-tight">
+            <span className="text-2xl sm:text-3xl font-bold text-slate-900 dark:text-[#F7F8FC] tabular-nums tracking-tight">
               {activeGoals}
             </span>
-            <span className="text-xs font-medium text-[#697388] mt-0.5">
+            <span className="text-xs font-medium text-slate-500 dark:text-[#697388] mt-0.5">
               Active
             </span>
           </div>
 
           {/* Completed */}
           <div className="flex flex-col">
-            <span className="text-2xl sm:text-3xl font-bold text-[#F7F8FC] tabular-nums tracking-tight">
+            <span className="text-2xl sm:text-3xl font-bold text-slate-900 dark:text-[#F7F8FC] tabular-nums tracking-tight">
               {completedGoals}
             </span>
-            <span className="text-xs font-medium text-[#697388] mt-0.5">
+            <span className="text-xs font-medium text-slate-500 dark:text-[#697388] mt-0.5">
               Completed
             </span>
           </div>
@@ -111,10 +111,10 @@ export const GoalsOverviewCard: React.FC<GoalsOverviewCardProps> = ({
           {/* Overall Progress with Circular Progress Ring */}
           <div className="flex items-center gap-3">
             <div className="flex flex-col">
-              <span className="text-2xl sm:text-3xl font-bold text-[#F7F8FC] tabular-nums tracking-tight">
+              <span className="text-2xl sm:text-3xl font-bold text-slate-900 dark:text-[#F7F8FC] tabular-nums tracking-tight">
                 {overallProgress}%
               </span>
-              <span className="text-xs font-medium text-[#697388] mt-0.5">
+              <span className="text-xs font-medium text-slate-500 dark:text-[#697388] mt-0.5">
                 Overall Progress
               </span>
             </div>
@@ -126,7 +126,7 @@ export const GoalsOverviewCard: React.FC<GoalsOverviewCardProps> = ({
                   cx="30"
                   cy="30"
                   r={radius}
-                  className="stroke-white/10"
+                  className="stroke-slate-200 dark:stroke-white/10"
                   strokeWidth="5"
                   fill="transparent"
                 />

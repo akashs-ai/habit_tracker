@@ -20,7 +20,11 @@ import {
   RefreshCw,
   ShieldCheck,
   ShieldAlert,
-  KeyRound
+  KeyRound,
+  Trash2,
+  AlertTriangle,
+  ArrowRight,
+  Shield
 } from 'lucide-react';
 import { CoachRobotAvatar } from './CoachRobotAvatar';
 import {
@@ -77,6 +81,13 @@ export const CoachChatWorkspace: React.FC<CoachChatWorkspaceProps> = ({
   const [inputText, setInputText] = useState('');
   const [suggestedTasks, setSuggestedTasks] = useState<SuggestedTask[]>(initialSuggestedTasks);
   const [addedRecommendationIds, setAddedRecommendationIds] = useState<Record<string, boolean>>({});
+  const [pendingConfirmAction, setPendingConfirmAction] = useState<{
+    title: string;
+    description: string;
+    actionText: string;
+    destructive?: boolean;
+    onConfirm: () => void;
+  } | null>(null);
 
   const dropdownRef = useRef<HTMLDivElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -119,6 +130,25 @@ export const CoachChatWorkspace: React.FC<CoachChatWorkspaceProps> = ({
 
   const handleSend = () => {
     if (!inputText.trim() || isGenerating) return;
+    const lower = inputText.toLowerCase();
+    const isDestructive = 
+      (lower.includes('delete') || lower.includes('remove') || lower.includes('cancel')) &&
+      (lower.includes('event') || lower.includes('workout') || lower.includes('calendar') || lower.includes('meeting') || lower.includes('session'));
+
+    if (isDestructive) {
+      setPendingConfirmAction({
+        title: 'Confirm Calendar Event Deletion',
+        description: `You are requesting a destructive calendar modification: "${inputText.trim()}". This will permanently delete the event from your Google Calendar and LifeRPG schedule.`,
+        actionText: 'Confirm & Delete Event',
+        destructive: true,
+        onConfirm: () => {
+          onSendMessage(inputText.trim());
+          setInputText('');
+        },
+      });
+      return;
+    }
+
     onSendMessage(inputText.trim());
     setInputText('');
   };
@@ -137,6 +167,25 @@ export const CoachChatWorkspace: React.FC<CoachChatWorkspaceProps> = ({
     if (!task.isAdded) {
       onAddTaskToToday?.(task.title);
     }
+  };
+
+  const handleSuggestionClick = (s: string) => {
+    const lower = s.toLowerCase();
+    const isDestructive =
+      (lower.includes('delete') || lower.includes('remove') || lower.includes('cancel')) &&
+      (lower.includes('event') || lower.includes('workout') || lower.includes('calendar') || lower.includes('meeting') || lower.includes('session'));
+
+    if (isDestructive) {
+      setPendingConfirmAction({
+        title: 'Confirm Calendar Event Deletion',
+        description: `You are requesting: "${s}". This will permanently delete the event from your Google Calendar.`,
+        actionText: 'Confirm & Delete Event',
+        destructive: true,
+        onConfirm: () => onSendMessage(s),
+      });
+      return;
+    }
+    onSendMessage(s);
   };
 
   const handleRecommendationAction = (msgId: string, title: string) => {
@@ -519,6 +568,82 @@ export const CoachChatWorkspace: React.FC<CoachChatWorkspaceProps> = ({
                       )}
                     </div>
 
+                    {/* Calendar Action Result Banner */}
+                    {isCoach && msg.calendarAction && (
+                      <div
+                        className={`p-3 rounded-xl border text-xs flex flex-col gap-2 animate-in fade-in duration-200 ${
+                          msg.calendarAction.action === 'created'
+                            ? 'bg-emerald-950/40 border-emerald-500/30 text-emerald-100'
+                            : msg.calendarAction.action === 'rescheduled'
+                            ? 'bg-indigo-950/40 border-indigo-500/30 text-indigo-100'
+                            : msg.calendarAction.action === 'deleted'
+                            ? 'bg-rose-950/40 border-rose-500/30 text-rose-100'
+                            : 'bg-amber-950/40 border-amber-500/30 text-amber-100'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between gap-3">
+                          <div className="flex items-center gap-2.5 min-w-0">
+                            <div
+                              className={`p-2 rounded-lg shrink-0 ${
+                                msg.calendarAction.action === 'created'
+                                  ? 'bg-emerald-500/20 text-emerald-400'
+                                  : msg.calendarAction.action === 'rescheduled'
+                                  ? 'bg-indigo-500/20 text-indigo-400'
+                                  : msg.calendarAction.action === 'deleted'
+                                  ? 'bg-rose-500/20 text-rose-400'
+                                  : 'bg-amber-500/20 text-amber-400'
+                              }`}
+                            >
+                              {msg.calendarAction.action === 'permission_denied' ? (
+                                <Lock className="w-4 h-4" />
+                              ) : msg.calendarAction.action === 'deleted' ? (
+                                <Trash2 className="w-4 h-4" />
+                              ) : (
+                                <Calendar className="w-4 h-4" />
+                              )}
+                            </div>
+                            <div className="min-w-0">
+                              <p className="font-semibold text-xs tracking-tight">
+                                {msg.calendarAction.action === 'created' && 'Calendar Event Created & Synced'}
+                                {msg.calendarAction.action === 'rescheduled' && 'Calendar Event Rescheduled'}
+                                {msg.calendarAction.action === 'deleted' && 'Calendar Event Removed'}
+                                {msg.calendarAction.action === 'permission_denied' && 'Calendar Action Blocked (Read Only)'}
+                              </p>
+                              {msg.calendarAction.eventTitle && (
+                                <p className="text-[11px] opacity-80 truncate mt-0.5">
+                                  <strong>{msg.calendarAction.eventTitle}</strong>
+                                  {msg.calendarAction.date ? ` · ${msg.calendarAction.date}` : ''}
+                                  {msg.calendarAction.time ? ` at ${msg.calendarAction.time}` : ''}
+                                </p>
+                              )}
+                              {msg.calendarAction.details && (
+                                <p className="text-[10px] opacity-75 mt-0.5 truncate">
+                                  {msg.calendarAction.details}
+                                </p>
+                              )}
+                            </div>
+                          </div>
+
+                          {msg.calendarAction.action === 'permission_denied' ? (
+                            onNavigateToIntegrations && (
+                              <button
+                                type="button"
+                                onClick={onNavigateToIntegrations}
+                                className="px-2.5 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-400 text-black font-semibold text-[11px] shrink-0 transition-colors shadow-sm cursor-pointer flex items-center gap-1"
+                              >
+                                <span>Switch to Read & Edit</span>
+                                <ArrowRight className="w-3 h-3" />
+                              </button>
+                            )
+                          ) : (
+                            <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 shrink-0">
+                              Read & Edit Active
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    )}
+
                     {/* Actionable recommendation box (if attached) */}
                     {isCoach && msg.actionRecommendation && (
                       <div className="p-3 rounded-xl bg-[#090E17] border border-white/8 flex items-center justify-between gap-3 animate-in fade-in duration-200">
@@ -564,7 +689,7 @@ export const CoachChatWorkspace: React.FC<CoachChatWorkspaceProps> = ({
                           <button
                             key={idx}
                             type="button"
-                            onClick={() => onSendMessage(s)}
+                            onClick={() => handleSuggestionClick(s)}
                             className="px-2.5 py-1 rounded-lg bg-white/4 hover:bg-white/8 border border-white/6 text-[11px] text-[#94A3B8] hover:text-white transition-colors"
                           >
                             {s}
@@ -749,6 +874,65 @@ export const CoachChatWorkspace: React.FC<CoachChatWorkspaceProps> = ({
                   {area}
                 </span>
               ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Explicit User Confirmation Dialog for Destructive / Mutation Calendar Operations */}
+      {pendingConfirmAction && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-[#101725] border border-white/10 rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4">
+            <div className="flex items-center gap-3">
+              <div
+                className={`p-3 rounded-xl ${
+                  pendingConfirmAction.destructive
+                    ? 'bg-rose-500/20 text-rose-400'
+                    : 'bg-amber-500/20 text-amber-400'
+                }`}
+              >
+                {pendingConfirmAction.destructive ? (
+                  <Trash2 className="w-6 h-6" />
+                ) : (
+                  <AlertTriangle className="w-6 h-6" />
+                )}
+              </div>
+              <div>
+                <h3 className="text-base font-bold text-white">
+                  {pendingConfirmAction.title}
+                </h3>
+                <p className="text-xs text-[#94A3B8]">
+                  Action Confirmation
+                </p>
+              </div>
+            </div>
+
+            <div className="p-3.5 rounded-xl bg-white/[0.03] border border-white/6 text-xs text-[#CBD5E1] leading-relaxed">
+              {pendingConfirmAction.description}
+            </div>
+
+            <div className="flex items-center justify-end gap-2.5 pt-2">
+              <button
+                type="button"
+                onClick={() => setPendingConfirmAction(null)}
+                className="px-4 py-2 rounded-xl text-xs font-semibold text-[#94A3B8] hover:text-white hover:bg-white/5 transition-colors cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  pendingConfirmAction.onConfirm();
+                  setPendingConfirmAction(null);
+                }}
+                className={`px-4 py-2 rounded-xl text-xs font-semibold text-white shadow-md transition-all cursor-pointer ${
+                  pendingConfirmAction.destructive
+                    ? 'bg-rose-600 hover:bg-rose-500 shadow-rose-600/20'
+                    : 'bg-[#6366F1] hover:bg-[#4F46E5] shadow-indigo-600/20'
+                }`}
+              >
+                {pendingConfirmAction.actionText || 'Confirm & Execute'}
+              </button>
             </div>
           </div>
         </div>

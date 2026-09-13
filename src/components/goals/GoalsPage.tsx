@@ -187,16 +187,16 @@ export const GoalsPage: React.FC<GoalsPageProps> = ({
 
           {/* Search Input */}
           <div className="relative w-full max-w-sm sm:max-w-md">
-            <Search className="w-4 h-4 text-[#697388] absolute left-3.5 top-1/2 -translate-y-1/2" />
+            <Search className="w-4 h-4 text-slate-400 dark:text-[#697388] absolute left-3.5 top-1/2 -translate-y-1/2" />
             <input
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Search goals, or type / for commands..."
-              className="w-full h-10 pl-9 pr-14 bg-[#141821] border border-white/8 rounded-xl text-xs sm:text-sm text-[#F7F8FC] placeholder:text-[#697388] focus:outline-none focus:ring-1 focus:ring-[#6C63FF] focus:border-[#6C63FF] transition-all"
+              className="w-full h-10 pl-9 pr-14 bg-slate-100 dark:bg-[#141821] border border-slate-200 dark:border-white/8 rounded-xl text-xs sm:text-sm text-slate-900 dark:text-[#F7F8FC] placeholder:text-slate-400 dark:placeholder:text-[#697388] focus:outline-none focus:ring-1 focus:ring-[#6C63FF] focus:border-[#6C63FF] transition-all"
             />
             <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-0.5 pointer-events-none">
-              <kbd className="px-1.5 py-0.5 text-[10px] font-medium text-[#A5AEC2] bg-[#0E1118] border border-white/10 rounded shadow-2xs">
+              <kbd className="px-1.5 py-0.5 text-[10px] font-medium text-slate-500 dark:text-[#A5AEC2] bg-slate-200 dark:bg-[#0E1118] border border-slate-300 dark:border-white/10 rounded shadow-2xs">
                 ⌘ K
               </kbd>
             </div>
@@ -207,7 +207,7 @@ export const GoalsPage: React.FC<GoalsPageProps> = ({
         <div className="flex items-center gap-2 sm:gap-3.5 pl-3">
           <button
             onClick={() => setIsDark(!isDark)}
-            className="p-2 rounded-xl text-[#A5AEC2] hover:text-white hover:bg-white/5 transition-colors"
+            className="p-2 rounded-xl text-slate-500 dark:text-[#A5AEC2] hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-white/5 transition-colors cursor-pointer"
             aria-label="Toggle theme"
           >
             {isDark ? (
@@ -218,11 +218,11 @@ export const GoalsPage: React.FC<GoalsPageProps> = ({
           </button>
 
           <button
-            className="relative p-2 rounded-xl text-[#A5AEC2] hover:text-white hover:bg-white/5 transition-colors"
+            className="relative p-2 rounded-xl text-slate-500 dark:text-[#A5AEC2] hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-white/5 transition-colors cursor-pointer"
             aria-label="Notifications"
           >
             <Bell className="w-4 h-4" />
-            <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-[#FF5C67] rounded-full ring-2 ring-[#0E1118]" />
+            <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-[#FF5C67] rounded-full ring-2 ring-white dark:ring-[#0E1118]" />
           </button>
 
           <div className="w-8 h-8 rounded-full bg-[#6C63FF] text-white flex items-center justify-center font-bold text-sm shadow-2xs">
@@ -252,7 +252,7 @@ export const GoalsPage: React.FC<GoalsPageProps> = ({
         {/* Your Goals Section Header with Sort & Search controls */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-2">
           <div className="flex items-center gap-2">
-            <h2 className="text-base sm:text-lg font-semibold text-[#F7F8FC]">
+            <h2 className="text-base sm:text-lg font-semibold text-slate-900 dark:text-[#F7F8FC]">
               Your Goals
             </h2>
             {activeCategoryFilter && (
@@ -260,7 +260,7 @@ export const GoalsPage: React.FC<GoalsPageProps> = ({
                 <span>{activeCategoryFilter}</span>
                 <button
                   onClick={() => setActiveCategoryFilter(null)}
-                  className="hover:text-white"
+                  className="hover:text-white cursor-pointer"
                 >
                   ×
                 </button>
@@ -274,14 +274,14 @@ export const GoalsPage: React.FC<GoalsPageProps> = ({
               <button
                 id="goals-sort-dropdown-trigger"
                 onClick={() => setShowSortMenu(!showSortMenu)}
-                className="h-9 px-3 bg-[#141821] hover:bg-[#181D27] border border-white/8 rounded-xl text-xs font-medium text-[#A5AEC2] hover:text-[#F7F8FC] flex items-center gap-1.5 transition-colors"
+                className="h-9 px-3 bg-white dark:bg-[#141821] hover:bg-slate-50 dark:hover:bg-[#181D27] border border-slate-200 dark:border-white/8 rounded-xl text-xs font-medium text-slate-700 dark:text-[#A5AEC2] hover:text-slate-900 dark:hover:text-[#F7F8FC] flex items-center gap-1.5 transition-colors cursor-pointer"
               >
                 <span>Sort: {sortOption.charAt(0).toUpperCase() + sortOption.slice(1)}</span>
                 <ChevronDown className="w-3.5 h-3.5" />
               </button>
 
               {showSortMenu && (
-                <div className="absolute right-0 top-10 w-44 bg-[#181D27] border border-white/12 rounded-xl shadow-2xl py-1.5 z-30 animate-in fade-in zoom-in-95 duration-100">
+                <div className="absolute right-0 top-10 w-44 bg-white dark:bg-[#181D27] border border-slate-200 dark:border-white/12 rounded-xl shadow-xl py-1.5 z-30 animate-in fade-in zoom-in-95 duration-100">
                   {[
                     { id: 'priority', label: 'Priority' },
                     { id: 'progress', label: 'Progress' },
@@ -295,10 +295,10 @@ export const GoalsPage: React.FC<GoalsPageProps> = ({
                         setSortOption(opt.id as GoalSortOption);
                         setShowSortMenu(false);
                       }}
-                      className={`w-full text-left px-3 py-1.5 text-xs flex items-center justify-between transition-colors ${
+                      className={`w-full text-left px-3 py-1.5 text-xs flex items-center justify-between transition-colors cursor-pointer ${
                         sortOption === opt.id
-                          ? 'bg-[#6C63FF]/20 text-[#8B82FF] font-semibold'
-                          : 'text-[#A5AEC2] hover:text-white hover:bg-white/5'
+                          ? 'bg-[#6C63FF]/15 text-[#6C63FF] dark:text-[#8B82FF] font-semibold'
+                          : 'text-slate-700 dark:text-[#A5AEC2] hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-white/5'
                       }`}
                     >
                       <span>{opt.label}</span>
@@ -310,13 +310,13 @@ export const GoalsPage: React.FC<GoalsPageProps> = ({
 
             {/* Quick Search Field inside section */}
             <div className="relative">
-              <Search className="w-3.5 h-3.5 text-[#697388] absolute left-3 top-1/2 -translate-y-1/2" />
+              <Search className="w-3.5 h-3.5 text-slate-400 dark:text-[#697388] absolute left-3 top-1/2 -translate-y-1/2" />
               <input
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="Search goals..."
-                className="h-9 pl-8 pr-3 bg-[#141821] border border-white/8 rounded-xl text-xs text-[#F7F8FC] placeholder:text-[#697388] focus:outline-none focus:border-[#6C63FF] w-36 sm:w-44 transition-all"
+                className="h-9 pl-8 pr-3 bg-white dark:bg-[#141821] border border-slate-200 dark:border-white/8 rounded-xl text-xs text-slate-900 dark:text-[#F7F8FC] placeholder:text-slate-400 dark:placeholder:text-[#697388] focus:outline-none focus:border-[#6C63FF] w-36 sm:w-44 transition-all"
               />
             </div>
           </div>
@@ -339,16 +339,16 @@ export const GoalsPage: React.FC<GoalsPageProps> = ({
             ))}
           </div>
         ) : (
-          <div className="py-16 text-center bg-[#141821] border border-white/8 rounded-2xl p-6">
-            <h3 className="text-sm font-semibold text-[#F7F8FC]">No goals found</h3>
-            <p className="text-xs text-[#697388] mt-1 max-w-sm mx-auto">
+          <div className="py-16 text-center bg-white dark:bg-[#141821] border border-slate-200 dark:border-white/8 rounded-2xl p-6 shadow-sm">
+            <h3 className="text-sm font-semibold text-slate-900 dark:text-[#F7F8FC]">No goals found</h3>
+            <p className="text-xs text-slate-500 dark:text-[#697388] mt-1 max-w-sm mx-auto">
               {searchQuery
                 ? `No goals matched your search query "${searchQuery}".`
                 : 'Turn something important into a clear, actionable goal.'}
             </p>
             <button
               onClick={() => setIsCreateModalOpen(true)}
-              className="mt-4 px-4 py-2 bg-[#6C63FF] hover:bg-[#7B73FF] text-white text-xs font-semibold rounded-xl transition-colors inline-flex items-center gap-1.5"
+              className="mt-4 px-4 py-2 bg-[#6C63FF] hover:bg-[#7B73FF] text-white text-xs font-semibold rounded-xl transition-colors inline-flex items-center gap-1.5 cursor-pointer"
             >
               <Plus className="w-3.5 h-3.5" />
               <span>Create your first goal</span>

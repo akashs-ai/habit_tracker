@@ -33,22 +33,22 @@ export const InsightsCard: React.FC<InsightsCardProps> = ({ insights, onSeeAll }
   return (
     <div 
       id="analytics-insights-card"
-      className="p-4 sm:p-5 rounded-xl bg-[#0F1723] border border-white/7 flex flex-col justify-between"
+      className="p-4 sm:p-5 rounded-xl bg-white dark:bg-[#0F1723] border border-slate-200 dark:border-white/7 shadow-xs flex flex-col justify-between"
     >
       {/* Header */}
-      <div className="flex items-center justify-between pb-3 border-b border-white/5">
+      <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-white/5">
         <div>
-          <h2 className="text-sm sm:text-base font-bold text-white tracking-tight">
+          <h2 className="text-sm sm:text-base font-bold text-slate-900 dark:text-white tracking-tight">
             Insights
           </h2>
-          <p className="text-xs text-[#94A3B8] mt-0.5">
+          <p className="text-xs text-slate-500 dark:text-[#94A3B8] mt-0.5">
             AI-powered insights based on your data.
           </p>
         </div>
 
         <button
           onClick={onSeeAll}
-          className="text-xs text-[#818CF8] hover:text-[#A5B4FC] font-medium flex items-center gap-1 transition-colors cursor-pointer group"
+          className="text-xs text-indigo-600 dark:text-[#818CF8] hover:text-indigo-700 dark:hover:text-[#A5B4FC] font-medium flex items-center gap-1 transition-colors cursor-pointer group"
         >
           <span>See All</span>
           <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-0.5 transition-transform" />
@@ -60,7 +60,7 @@ export const InsightsCard: React.FC<InsightsCardProps> = ({ insights, onSeeAll }
         {insights.slice(0, 3).map((insight) => (
           <div
             key={insight.id}
-            className="p-3.5 rounded-xl bg-[#141C2B] border border-white/6 hover:border-white/10 transition-all duration-200 flex flex-col justify-between gap-3 group"
+            className="p-3.5 rounded-xl bg-slate-50 dark:bg-[#141C2B] border border-slate-200/80 dark:border-white/6 hover:border-slate-300 dark:hover:border-white/10 transition-all duration-200 flex flex-col justify-between gap-3 group"
           >
             <div className="flex items-center justify-between">
               <div
@@ -73,10 +73,10 @@ export const InsightsCard: React.FC<InsightsCardProps> = ({ insights, onSeeAll }
             </div>
 
             <div>
-              <p className="text-xs sm:text-[13px] font-semibold text-white group-hover:text-[#A5B4FC] transition-colors leading-snug">
+              <p className="text-xs sm:text-[13px] font-semibold text-slate-900 dark:text-white group-hover:text-indigo-600 dark:group-hover:text-[#A5B4FC] transition-colors leading-snug">
                 {insight.headline}
               </p>
-              <p className="text-[11px] text-[#94A3B8] mt-1.5 leading-relaxed">
+              <p className="text-[11px] text-slate-600 dark:text-[#94A3B8] mt-1.5 leading-relaxed">
                 {insight.subtext}
               </p>
             </div>

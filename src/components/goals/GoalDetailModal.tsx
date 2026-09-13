@@ -128,16 +128,16 @@ export const GoalDetailModal: React.FC<GoalDetailModalProps> = ({
     >
       <div
         id="goal-detail-modal-card"
-        className="w-full max-w-[640px] bg-[#141821] text-[#F7F8FC] border border-white/10 rounded-[16px] shadow-[0_24px_70px_rgba(0,0,0,0.5)] overflow-hidden animate-in zoom-in-95 duration-150 p-5 sm:p-6"
+        className="w-full max-w-[640px] bg-white dark:bg-[#141821] text-slate-900 dark:text-[#F7F8FC] border border-slate-200 dark:border-white/10 rounded-[16px] shadow-2xl overflow-hidden animate-in zoom-in-95 duration-150 p-5 sm:p-6"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Top Header Row */}
-        <div className="flex items-center justify-between pb-4 border-b border-white/8">
+        <div className="flex items-center justify-between pb-4 border-b border-slate-200 dark:border-white/8">
           <div className="flex items-center gap-3 min-w-0">
             {/* Back Button */}
             <button
               onClick={onClose}
-              className="p-1.5 rounded-lg text-[#697388] hover:text-[#F7F8FC] hover:bg-white/5 transition-colors"
+              className="p-1.5 rounded-lg text-slate-400 dark:text-[#697388] hover:text-slate-900 dark:hover:text-[#F7F8FC] hover:bg-slate-100 dark:hover:bg-white/5 transition-colors cursor-pointer"
               aria-label="Back"
             >
               <ArrowLeft className="w-4 h-4" />
@@ -153,7 +153,7 @@ export const GoalDetailModal: React.FC<GoalDetailModalProps> = ({
 
             {/* Title & Category */}
             <div className="flex flex-col min-w-0">
-              <h3 className="text-base font-semibold text-[#F7F8FC] truncate">
+              <h3 className="text-base font-semibold text-slate-900 dark:text-[#F7F8FC] truncate">
                 {goal.title}
               </h3>
               <span
@@ -166,10 +166,10 @@ export const GoalDetailModal: React.FC<GoalDetailModalProps> = ({
           </div>
 
           {/* Right Action Icons */}
-          <div className="flex items-center gap-1 text-[#697388]">
+          <div className="flex items-center gap-1 text-slate-400 dark:text-[#697388]">
             <button
               onClick={() => setIsEditingNotes(!isEditingNotes)}
-              className="flex items-center gap-1 px-2.5 py-1 rounded-lg hover:bg-white/5 hover:text-white transition-colors text-xs font-medium"
+              className="flex items-center gap-1 px-2.5 py-1 rounded-lg hover:bg-slate-100 dark:hover:bg-white/5 hover:text-slate-900 dark:hover:text-white transition-colors text-xs font-medium cursor-pointer"
             >
               <Edit2 className="w-3.5 h-3.5" />
               <span>Edit</span>
@@ -178,20 +178,20 @@ export const GoalDetailModal: React.FC<GoalDetailModalProps> = ({
             <div className="relative">
               <button
                 onClick={() => setShowMoreMenu(!showMoreMenu)}
-                className="p-1.5 rounded-lg hover:bg-white/5 hover:text-white transition-colors"
+                className="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-white/5 hover:text-slate-900 dark:hover:text-white transition-colors cursor-pointer"
                 aria-label="More"
               >
                 <MoreHorizontal className="w-4 h-4" />
               </button>
 
               {showMoreMenu && (
-                <div className="absolute right-0 top-8 w-36 bg-[#181D27] border border-white/10 rounded-xl shadow-2xl py-1 z-30 animate-in fade-in duration-100">
+                <div className="absolute right-0 top-8 w-36 bg-white dark:bg-[#181D27] border border-slate-200 dark:border-white/10 rounded-xl shadow-xl py-1 z-30 animate-in fade-in duration-100">
                   <button
                     onClick={() => {
                       onDeleteGoal(goal.id);
                       onClose();
                     }}
-                    className="w-full text-left px-3 py-1.5 text-xs text-[#FF5C67] hover:bg-[#FF5C67]/10 flex items-center gap-2"
+                    className="w-full text-left px-3 py-1.5 text-xs text-[#FF5C67] hover:bg-[#FF5C67]/10 flex items-center gap-2 cursor-pointer"
                   >
                     <Trash2 className="w-3.5 h-3.5" />
                     <span>Delete goal</span>
@@ -202,7 +202,7 @@ export const GoalDetailModal: React.FC<GoalDetailModalProps> = ({
 
             <button
               onClick={onClose}
-              className="p-1.5 rounded-lg hover:bg-white/5 hover:text-white transition-colors"
+              className="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-white/5 hover:text-slate-900 dark:hover:text-white transition-colors cursor-pointer"
               aria-label="Close"
             >
               <X className="w-4 h-4" />
@@ -211,15 +211,15 @@ export const GoalDetailModal: React.FC<GoalDetailModalProps> = ({
         </div>
 
         {/* Navigation Tabs */}
-        <div className="flex items-center gap-2 mt-4 pb-2 border-b border-white/6 overflow-x-auto no-scrollbar">
+        <div className="flex items-center gap-2 mt-4 pb-2 border-b border-slate-200 dark:border-white/6 overflow-x-auto no-scrollbar">
           {(['overview', 'tasks', 'milestones', 'notes'] as const).map((tab) => (
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
-              className={`px-3 py-1.5 rounded-lg text-xs font-semibold capitalize transition-all ${
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold capitalize transition-all cursor-pointer ${
                 activeTab === tab
                   ? 'bg-[#6C63FF] text-white'
-                  : 'text-[#697388] hover:text-[#A5AEC2] hover:bg-white/5'
+                  : 'text-slate-500 dark:text-[#697388] hover:text-slate-900 dark:hover:text-[#A5AEC2] hover:bg-slate-100 dark:hover:bg-white/5'
               }`}
             >
               {tab}
@@ -231,7 +231,7 @@ export const GoalDetailModal: React.FC<GoalDetailModalProps> = ({
         {activeTab === 'overview' && (
           <div className="mt-5 flex flex-col gap-5">
             {/* Metrics Row: Gauge + Stats */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 bg-[#0E1118] p-4 rounded-xl border border-white/6 items-center">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 bg-slate-50 dark:bg-[#0E1118] p-4 rounded-xl border border-slate-200 dark:border-white/6 items-center">
               {/* Circular Gauge */}
               <div className="flex items-center gap-3">
                 <div className="relative w-14 h-14 flex items-center justify-center shrink-0">
@@ -240,7 +240,7 @@ export const GoalDetailModal: React.FC<GoalDetailModalProps> = ({
                       cx="35"
                       cy="35"
                       r={radius}
-                      className="stroke-white/10"
+                      className="stroke-slate-200 dark:stroke-white/10"
                       strokeWidth="5"
                       fill="transparent"
                     />
@@ -256,7 +256,7 @@ export const GoalDetailModal: React.FC<GoalDetailModalProps> = ({
                       fill="transparent"
                     />
                   </svg>
-                  <span className="absolute text-xs font-bold text-[#F7F8FC]">
+                  <span className="absolute text-xs font-bold text-slate-900 dark:text-[#F7F8FC]">
                     {goal.progress}%
                   </span>
                 </div>
@@ -264,18 +264,18 @@ export const GoalDetailModal: React.FC<GoalDetailModalProps> = ({
 
               {/* Tasks completed */}
               <div className="flex flex-col">
-                <span className="text-base font-bold text-[#F7F8FC] tabular-nums">
+                <span className="text-base font-bold text-slate-900 dark:text-[#F7F8FC] tabular-nums">
                   {goal.completedTasks}/{goal.totalTasks}
                 </span>
-                <span className="text-[11px] text-[#697388]">Tasks completed</span>
+                <span className="text-[11px] text-slate-500 dark:text-[#697388]">Tasks completed</span>
               </div>
 
               {/* Target date */}
               <div className="flex flex-col">
-                <span className="text-xs font-semibold text-[#F7F8FC]">
+                <span className="text-xs font-semibold text-slate-900 dark:text-[#F7F8FC]">
                   {goal.dueDate}
                 </span>
-                <span className="text-[11px] text-[#697388]">Target date</span>
+                <span className="text-[11px] text-slate-500 dark:text-[#697388]">Target date</span>
               </div>
 
               {/* Priority */}
@@ -284,20 +284,20 @@ export const GoalDetailModal: React.FC<GoalDetailModalProps> = ({
                   <Flag className="w-3 h-3 fill-current" />
                   <span>{goal.priority.toUpperCase()}</span>
                 </span>
-                <span className="text-[11px] text-[#697388]">Priority</span>
+                <span className="text-[11px] text-slate-500 dark:text-[#697388]">Priority</span>
               </div>
             </div>
 
             {/* Description */}
             {goal.description && (
-              <div className="bg-[#0E1118] p-3.5 rounded-xl border border-white/6 text-xs text-[#A5AEC2] leading-relaxed">
+              <div className="bg-slate-50 dark:bg-[#0E1118] p-3.5 rounded-xl border border-slate-200 dark:border-white/6 text-xs text-slate-600 dark:text-[#A5AEC2] leading-relaxed">
                 {goal.description}
               </div>
             )}
 
             {/* Subgoals Checklist */}
             <div>
-              <h4 className="text-xs font-semibold text-[#A5AEC2] uppercase tracking-wider mb-2">
+              <h4 className="text-xs font-semibold text-slate-500 dark:text-[#A5AEC2] uppercase tracking-wider mb-2">
                 Subgoals
               </h4>
 
@@ -306,18 +306,18 @@ export const GoalDetailModal: React.FC<GoalDetailModalProps> = ({
                   <div
                     key={st.id}
                     onClick={() => handleToggleSubgoal(st.id)}
-                    className="flex items-center gap-3 p-2.5 rounded-lg hover:bg-white/5 cursor-pointer transition-colors text-xs text-[#F7F8FC]"
+                    className="flex items-center gap-3 p-2.5 rounded-lg hover:bg-slate-100 dark:hover:bg-white/5 cursor-pointer transition-colors text-xs text-slate-900 dark:text-[#F7F8FC]"
                   >
                     <div
                       className={`w-4 h-4 rounded border flex items-center justify-center transition-colors ${
                         st.completed
                           ? 'bg-[#6C63FF] border-[#6C63FF] text-white'
-                          : 'border-white/20 hover:border-[#6C63FF]'
+                          : 'border-slate-300 dark:border-white/20 hover:border-[#6C63FF]'
                       }`}
                     >
                       {st.completed && <Check className="w-3 h-3 stroke-[3]" />}
                     </div>
-                    <span className={st.completed ? 'line-through text-[#697388]' : ''}>
+                    <span className={st.completed ? 'line-through text-slate-400 dark:text-[#697388]' : ''}>
                       {st.title}
                     </span>
                   </div>
@@ -331,18 +331,18 @@ export const GoalDetailModal: React.FC<GoalDetailModalProps> = ({
                       onChange={(e) => setNewSubgoalTitle(e.target.value)}
                       placeholder="Add subtask title..."
                       autoFocus
-                      className="flex-1 text-xs px-3 py-1.5 rounded-lg border border-white/12 bg-[#0E1118] text-[#F7F8FC] focus:outline-none focus:border-[#6C63FF]"
+                      className="flex-1 text-xs px-3 py-1.5 rounded-lg border border-slate-200 dark:border-white/12 bg-slate-100 dark:bg-[#0E1118] text-slate-900 dark:text-[#F7F8FC] focus:outline-none focus:border-[#6C63FF]"
                     />
                     <button
                       type="submit"
-                      className="px-3 py-1.5 text-xs bg-[#6C63FF] text-white rounded-lg hover:bg-[#7B73FF]"
+                      className="px-3 py-1.5 text-xs bg-[#6C63FF] text-white rounded-lg hover:bg-[#7B73FF] cursor-pointer"
                     >
                       Add
                     </button>
                     <button
                       type="button"
                       onClick={() => setIsAddingSubgoal(false)}
-                      className="px-2 text-xs text-[#697388] hover:text-white"
+                      className="px-2 text-xs text-slate-400 dark:text-[#697388] hover:text-slate-900 dark:hover:text-white cursor-pointer"
                     >
                       Cancel
                     </button>
@@ -350,7 +350,7 @@ export const GoalDetailModal: React.FC<GoalDetailModalProps> = ({
                 ) : (
                   <button
                     onClick={() => setIsAddingSubgoal(true)}
-                    className="flex items-center gap-1.5 text-xs text-[#6C63FF] hover:text-[#8B82FF] font-medium w-fit mt-1 pl-1"
+                    className="flex items-center gap-1.5 text-xs text-[#6C63FF] hover:text-[#8B82FF] font-medium w-fit mt-1 pl-1 cursor-pointer"
                   >
                     <Plus className="w-3.5 h-3.5" />
                     <span>Add subgoal</span>
@@ -364,24 +364,24 @@ export const GoalDetailModal: React.FC<GoalDetailModalProps> = ({
         {/* Tab 2: Tasks */}
         {activeTab === 'tasks' && (
           <div className="mt-5 flex flex-col gap-3">
-            <p className="text-xs text-[#697388]">
+            <p className="text-xs text-slate-500 dark:text-[#697388]">
               Track execution tasks contributing directly to this overarching goal.
             </p>
             <div className="flex flex-col gap-2">
               {goal.subtasks?.map((st) => (
                 <div
                   key={st.id}
-                  className="flex items-center justify-between p-3 bg-[#0E1118] rounded-xl border border-white/6 text-xs text-[#F7F8FC]"
+                  className="flex items-center justify-between p-3 bg-slate-50 dark:bg-[#0E1118] rounded-xl border border-slate-200 dark:border-white/6 text-xs text-slate-900 dark:text-[#F7F8FC]"
                 >
-                  <span className={st.completed ? 'line-through text-[#697388]' : ''}>
+                  <span className={st.completed ? 'line-through text-slate-400 dark:text-[#697388]' : ''}>
                     {st.title}
                   </span>
                   <button
                     onClick={() => handleToggleSubgoal(st.id)}
-                    className={`px-2 py-1 rounded text-[11px] font-semibold ${
+                    className={`px-2 py-1 rounded text-[11px] font-semibold cursor-pointer ${
                       st.completed
                         ? 'bg-[#31C48D]/20 text-[#31C48D]'
-                        : 'bg-white/5 text-[#A5AEC2] hover:bg-[#6C63FF] hover:text-white'
+                        : 'bg-slate-200 dark:bg-white/5 text-slate-700 dark:text-[#A5AEC2] hover:bg-[#6C63FF] hover:text-white'
                     }`}
                   >
                     {st.completed ? 'Done' : 'Mark Complete'}
@@ -395,22 +395,22 @@ export const GoalDetailModal: React.FC<GoalDetailModalProps> = ({
         {/* Tab 3: Milestones */}
         {activeTab === 'milestones' && (
           <div className="mt-5 flex flex-col gap-3">
-            <h4 className="text-xs font-semibold text-[#A5AEC2] uppercase tracking-wider mb-1">
+            <h4 className="text-xs font-semibold text-slate-500 dark:text-[#A5AEC2] uppercase tracking-wider mb-1">
               Key Checkpoints
             </h4>
             <div className="flex flex-col gap-2">
               {goal.milestones?.map((m) => (
                 <div
                   key={m.id}
-                  className="flex items-center justify-between p-3 bg-[#0E1118] rounded-xl border border-white/6 text-xs text-[#F7F8FC]"
+                  className="flex items-center justify-between p-3 bg-slate-50 dark:bg-[#0E1118] rounded-xl border border-slate-200 dark:border-white/6 text-xs text-slate-900 dark:text-[#F7F8FC]"
                 >
                   <div>
-                    <div className="font-semibold text-[#F7F8FC]">{m.title}</div>
-                    <div className="text-[11px] text-[#697388] mt-0.5">Target: {m.targetDate}</div>
+                    <div className="font-semibold text-slate-900 dark:text-[#F7F8FC]">{m.title}</div>
+                    <div className="text-[11px] text-slate-500 dark:text-[#697388] mt-0.5">Target: {m.targetDate}</div>
                   </div>
                   <span
                     className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${
-                      m.completed ? 'bg-[#31C48D]/20 text-[#31C48D]' : 'bg-white/10 text-[#697388]'
+                      m.completed ? 'bg-[#31C48D]/20 text-[#31C48D]' : 'bg-slate-200 dark:bg-white/10 text-slate-600 dark:text-[#697388]'
                     }`}
                   >
                     {m.completed ? 'Completed' : 'Pending'}
@@ -424,7 +424,7 @@ export const GoalDetailModal: React.FC<GoalDetailModalProps> = ({
         {/* Tab 4: Notes */}
         {activeTab === 'notes' && (
           <div className="mt-5 flex flex-col gap-3">
-            <h4 className="text-xs font-semibold text-[#A5AEC2] uppercase tracking-wider">
+            <h4 className="text-xs font-semibold text-slate-500 dark:text-[#A5AEC2] uppercase tracking-wider">
               Strategic Notes & Reflections
             </h4>
             <textarea
@@ -432,11 +432,11 @@ export const GoalDetailModal: React.FC<GoalDetailModalProps> = ({
               onChange={(e) => setNotesContent(e.target.value)}
               placeholder="Jot down notes, insights, roadblocks, or next steps..."
               rows={5}
-              className="w-full p-3.5 bg-[#0E1118] border border-white/10 rounded-xl text-xs text-[#F7F8FC] focus:outline-none focus:border-[#6C63FF] resize-none leading-relaxed"
+              className="w-full p-3.5 bg-slate-50 dark:bg-[#0E1118] border border-slate-200 dark:border-white/10 rounded-xl text-xs text-slate-900 dark:text-[#F7F8FC] focus:outline-none focus:border-[#6C63FF] resize-none leading-relaxed"
             />
             <button
               onClick={handleSaveNotes}
-              className="self-end px-4 py-1.5 rounded-lg bg-[#6C63FF] hover:bg-[#7B73FF] text-white text-xs font-semibold transition-colors"
+              className="self-end px-4 py-1.5 rounded-lg bg-[#6C63FF] hover:bg-[#7B73FF] text-white text-xs font-semibold transition-colors cursor-pointer"
             >
               Save Notes
             </button>

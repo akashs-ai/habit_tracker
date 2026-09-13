@@ -45,11 +45,11 @@ export const CalendarWeekView: React.FC<CalendarWeekViewProps> = ({
   return (
     <div 
       id="calendar-week-grid-container"
-      className="w-full bg-[#0F1217] border border-white/8 rounded-xl overflow-x-auto shadow-sm"
+      className="w-full bg-white dark:bg-[#0F1217] border border-slate-200 dark:border-white/8 rounded-xl overflow-x-auto shadow-sm transition-colors"
     >
       {/* Header with week days */}
-      <div className="grid grid-cols-8 border-b border-white/8 bg-[#111318] min-w-[760px] sticky top-0 z-10">
-        <div className="p-3 text-xs font-semibold text-[#6F7789] text-center border-r border-white/8 flex items-center justify-center">
+      <div className="grid grid-cols-8 border-b border-slate-200 dark:border-white/8 bg-slate-50 dark:bg-[#111318] min-w-[760px] sticky top-0 z-10">
+        <div className="p-3 text-xs font-semibold text-slate-500 dark:text-[#6F7789] text-center border-r border-slate-200 dark:border-white/8 flex items-center justify-center">
           Time
         </div>
         {weekDays.map((wd) => {
@@ -58,16 +58,16 @@ export const CalendarWeekView: React.FC<CalendarWeekViewProps> = ({
             <div
               key={wd.date}
               onClick={() => onSelectDate(wd.date)}
-              className={`p-2.5 text-center cursor-pointer transition-colors border-r border-white/8 last:border-r-0 ${
+              className={`p-2.5 text-center cursor-pointer transition-colors border-r border-slate-200 dark:border-white/8 last:border-r-0 ${
                 isSelected 
                   ? 'bg-[#6C63FF]/15' 
                   : wd.isToday 
-                  ? 'bg-white/[0.03]' 
-                  : 'hover:bg-white/[0.02]'
+                  ? 'bg-indigo-50/60 dark:bg-white/[0.03]' 
+                  : 'hover:bg-slate-100/60 dark:hover:bg-white/[0.02]'
               }`}
             >
               <div className={`text-[11px] font-semibold uppercase tracking-wider ${
-                wd.isToday ? 'text-[#6C63FF]' : 'text-[#6F7789]'
+                wd.isToday ? 'text-[#6C63FF]' : 'text-slate-500 dark:text-[#6F7789]'
               }`}>
                 {wd.name}
               </div>
@@ -76,8 +76,8 @@ export const CalendarWeekView: React.FC<CalendarWeekViewProps> = ({
                   wd.isToday
                     ? 'bg-[#6C63FF] text-white font-bold ring-2 ring-[#6C63FF]/30'
                     : isSelected
-                    ? 'bg-white/10 text-[#6C63FF] font-bold'
-                    : 'text-[#F5F7FF] font-medium'
+                    ? 'bg-slate-200 dark:bg-white/10 text-[#6C63FF] font-bold'
+                    : 'text-slate-800 dark:text-[#F5F7FF] font-medium'
                 }`}
               >
                 {wd.day}
@@ -88,7 +88,7 @@ export const CalendarWeekView: React.FC<CalendarWeekViewProps> = ({
       </div>
 
       {/* Week Body Grid */}
-      <div className="divide-y divide-white/8 min-w-[760px] relative">
+      <div className="divide-y divide-slate-200 dark:divide-white/8 min-w-[760px] relative">
         {hours.map((hour) => {
           const [hNumStr, hPeriod] = hour.split(' ');
           let h24 = parseInt(hNumStr, 10);
@@ -99,7 +99,7 @@ export const CalendarWeekView: React.FC<CalendarWeekViewProps> = ({
           return (
             <div key={hour} className="grid grid-cols-8 min-h-[58px] relative group">
               {/* Hour label */}
-              <div className="p-2 text-[11px] font-medium text-[#6F7789] text-center border-r border-white/8 bg-[#0D0F13]/50 flex items-center justify-center">
+              <div className="p-2 text-[11px] font-medium text-slate-500 dark:text-[#6F7789] text-center border-r border-slate-200 dark:border-white/8 bg-slate-50/80 dark:bg-[#0D0F13]/50 flex items-center justify-center">
                 {hour}
               </div>
 
@@ -112,7 +112,7 @@ export const CalendarWeekView: React.FC<CalendarWeekViewProps> = ({
                   <div
                     key={wd.date}
                     onClick={() => onAddEventOnDate(wd.date)}
-                    className={`border-r border-white/8 last:border-r-0 p-1.5 hover:bg-white/[0.03] transition-colors relative cursor-pointer ${
+                    className={`border-r border-slate-200 dark:border-white/8 last:border-r-0 p-1.5 hover:bg-slate-50 dark:hover:bg-white/[0.03] transition-colors relative cursor-pointer ${
                       wd.date === selectedDate ? 'bg-[#6C63FF]/5' : ''
                     }`}
                   >
@@ -135,11 +135,11 @@ export const CalendarWeekView: React.FC<CalendarWeekViewProps> = ({
                             e.stopPropagation();
                             onSelectEvent(evt);
                           }}
-                          className="p-1.5 rounded-md text-[10px] font-medium bg-[#151820] hover:bg-[#1A1D24] border border-white/10 text-[#F5F7FF] cursor-pointer shadow-xs transition-all relative overflow-hidden"
+                          className="p-1.5 rounded-md text-[10px] font-medium bg-slate-100 dark:bg-[#151820] hover:bg-slate-200 dark:hover:bg-[#1A1D24] border border-slate-200 dark:border-white/10 text-slate-800 dark:text-[#F5F7FF] cursor-pointer shadow-xs transition-all relative overflow-hidden"
                           style={{ borderLeftWidth: '3.5px', borderLeftColor: evt.color }}
                         >
-                          <div className="font-semibold truncate text-[#F5F7FF]">{evt.title}</div>
-                          <div className="text-[9px] text-[#A6AEC0] flex items-center gap-1 mt-0.5">
+                          <div className="font-semibold truncate text-slate-800 dark:text-[#F5F7FF]">{evt.title}</div>
+                          <div className="text-[9px] text-slate-500 dark:text-[#A6AEC0] flex items-center gap-1 mt-0.5">
                             <span>{evt.startTime}</span>
                             {evt.endTime && <span>– {evt.endTime}</span>}
                           </div>

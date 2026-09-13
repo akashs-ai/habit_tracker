@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   Shield,
   MessageSquare,
@@ -6,13 +6,17 @@ import {
   Lock,
   ArrowRight,
   Check,
+  CalendarCheck2,
+  Eye,
+  Slash
 } from 'lucide-react';
 import { GoogleCalendarTile } from './ModelLogos';
+import { CalendarPermissionLevel } from '../../types';
 
 interface PermissionsSectionProps {
-  permission: 'read_only' | 'no_access';
+  permission: CalendarPermissionLevel;
   useInCoach: boolean;
-  onPermissionChange: (perm: 'read_only' | 'no_access') => void;
+  onPermissionChange: (perm: CalendarPermissionLevel) => void;
   onToggleUseInCoach: () => void;
   onManageAllPermissions: () => void;
   onLearnMore: () => void;
@@ -27,6 +31,48 @@ export const PermissionsSection: React.FC<PermissionsSectionProps> = ({
   onLearnMore,
 }) => {
   const [dropdownOpen, setDropdownOpen] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  // Close dropdown on outside click
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setDropdownOpen(false);
+      }
+    }
+    if (dropdownOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [dropdownOpen]);
+
+  const permissionOptions: Array<{
+    id: CalendarPermissionLevel;
+    label: string;
+    description: string;
+    icon: typeof Eye;
+  }> = [
+    {
+      id: 'read_edit',
+      label: 'Read & edit',
+      description: 'Read events and actively manage or create schedule updates',
+      icon: CalendarCheck2,
+    },
+    {
+      id: 'read_only',
+      label: 'Read only',
+      description: 'Read events and schedule context',
+      icon: Eye,
+    },
+    {
+      id: 'no_access',
+      label: 'No access',
+      description: 'Calendar integration disabled',
+      icon: Slash,
+    },
+  ];
+
+  const currentOption = permissionOptions.find((opt) => opt.id === permission) || permissionOptions[0];
 
   return (
     <section className="bg-[#101722] border border-white/[0.08] rounded-2xl p-6 md:p-7 shadow-sm">
@@ -41,7 +87,7 @@ export const PermissionsSection: React.FC<PermissionsSectionProps> = ({
               Permissions
             </h2>
             <p className="text-xs md:text-sm text-[#94A3B8]">
-              Control what your AI Coach can access from your connected tools.
+              Control what your AI Coach can access and modify from your connected tools.
             </p>
           </div>
         </div>
@@ -60,61 +106,79 @@ export const PermissionsSection: React.FC<PermissionsSectionProps> = ({
         {/* Row 1: Google Calendar Permission */}
         <div className="p-4 md:p-5 rounded-xl bg-[#141D2A] border border-white/[0.06] flex items-center justify-between gap-4">
           <div className="flex items-center gap-3.5 min-w-0">
-            <GoogleCalendarTile className="w-10 h-10" />
+            <GoogleCalendarTile className="w-10 h-10 shrink-0" />
             <div className="min-w-0">
-              <h3 className="text-sm font-semibold text-[#F5F7FB] truncate">
-                Google Calendar
-              </h3>
+              <div className="flex items-center gap-2">
+                <h3 className="text-sm font-semibold text-[#F5F7FB] truncate">
+                  Google Calendar
+                </h3>
+                {permission === 'read_edit' && (
+                  <span className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-[#5B5CE2]/20 text-[#A5B4FC] border border-[#5B5CE2]/30">
+                    Write Active
+                  </span>
+                )}
+              </div>
               <p className="text-xs text-[#94A3B8] truncate">
-                Read events and schedule
+                {permission === 'read_edit'
+                  ? 'Read events and actively manage or create schedule updates'
+                  : permission === 'read_only'
+                  ? 'Read events and schedule context'
+                  : 'Calendar integration disabled'}
               </p>
             </div>
           </div>
 
           {/* Custom Dropdown */}
-          <div className="relative shrink-0">
+          <div className="relative shrink-0" ref={dropdownRef}>
             <button
               type="button"
+              id="google-calendar-permission-btn"
               onClick={() => setDropdownOpen(!dropdownOpen)}
               className="px-3.5 py-2 rounded-lg bg-[#1F2B3E] hover:bg-[#27354A] border border-white/10 text-xs md:text-sm font-medium text-[#F5F7FB] flex items-center gap-2 transition-colors focus:outline-none focus:ring-2 focus:ring-[#5B5CE2]"
             >
-              <span>{permission === 'read_only' ? 'Read only' : 'No access'}</span>
+              <span>{currentOption.label}</span>
               <ChevronDown className={`w-3.5 h-3.5 text-[#94A3B8] transition-transform duration-150 ${dropdownOpen ? 'rotate-180' : ''}`} />
             </button>
 
             {dropdownOpen && (
-              <>
-                <div
-                  className="fixed inset-0 z-20"
-                  onClick={() => setDropdownOpen(false)}
-                />
-                <div className="absolute right-0 mt-1.5 w-36 rounded-xl bg-[#141D2A] border border-white/10 shadow-xl py-1.5 z-30 text-xs">
-                  <button
-                    onClick={() => {
-                      onPermissionChange('read_only');
-                      setDropdownOpen(false);
-                    }}
-                    className="w-full px-3.5 py-2 text-left text-[#F5F7FB] hover:bg-white/10 flex items-center justify-between transition-colors"
-                  >
-                    <span>Read only</span>
-                    {permission === 'read_only' && (
-                      <Check className="w-3.5 h-3.5 text-[#5B5CE2]" />
-                    )}
-                  </button>
-                  <button
-                    onClick={() => {
-                      onPermissionChange('no_access');
-                      setDropdownOpen(false);
-                    }}
-                    className="w-full px-3.5 py-2 text-left text-[#F5F7FB] hover:bg-white/10 flex items-center justify-between transition-colors"
-                  >
-                    <span>No access</span>
-                    {permission === 'no_access' && (
-                      <Check className="w-3.5 h-3.5 text-[#5B5CE2]" />
-                    )}
-                  </button>
-                </div>
-              </>
+              <div 
+                id="google-calendar-permission-menu"
+                className="absolute right-0 mt-1.5 w-64 rounded-xl bg-[#141D2A] border border-white/10 shadow-2xl py-1.5 z-30 text-xs divide-y divide-white/5"
+              >
+                {permissionOptions.map((opt) => {
+                  const isSelected = permission === opt.id;
+                  const Icon = opt.icon;
+                  return (
+                    <button
+                      key={opt.id}
+                      type="button"
+                      id={`permission-opt-${opt.id}`}
+                      onClick={() => {
+                        onPermissionChange(opt.id);
+                        setDropdownOpen(false);
+                      }}
+                      className={`w-full px-3.5 py-2.5 text-left flex items-start gap-2.5 transition-colors ${
+                        isSelected ? 'bg-white/[0.08]' : 'hover:bg-white/[0.04]'
+                      }`}
+                    >
+                      <Icon className={`w-4 h-4 mt-0.5 shrink-0 ${isSelected ? 'text-[#818CF8]' : 'text-[#64748B]'}`} />
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center justify-between gap-1.5">
+                          <span className={`font-medium ${isSelected ? 'text-[#F5F7FB]' : 'text-[#94A3B8]'}`}>
+                            {opt.label}
+                          </span>
+                          {isSelected && (
+                            <Check className="w-3.5 h-3.5 text-[#818CF8] shrink-0" />
+                          )}
+                        </div>
+                        <p className="text-[11px] text-[#64748B] mt-0.5 leading-tight line-clamp-2">
+                          {opt.description}
+                        </p>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
             )}
           </div>
         </div>
@@ -160,7 +224,7 @@ export const PermissionsSection: React.FC<PermissionsSectionProps> = ({
         <div className="flex items-center gap-2">
           <Lock className="w-3.5 h-3.5 text-[#818CF8] shrink-0" />
           <span>
-            We use secure connections (OAuth). You can manage or revoke access anytime.
+            We use secure Google OAuth credentials. Write-enabled permissions permit AI Coach calendar actions.
           </span>
         </div>
 

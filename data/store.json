@@ -1,14 +1,14 @@
 {
   "user": {
-    "name": "Alex",
+    "name": "Alex Das",
     "level": 12,
-    "currentXp": 780,
+    "currentXp": 870,
     "nextLevelXp": 1200,
     "streakDays": 12,
-    "totalPoints": 842,
-    "questsDoneThisWeek": 5,
-    "momentumPoints": 3520,
-    "pointsThisWeek": 240,
+    "totalPoints": 932,
+    "questsDoneThisWeek": 8,
+    "momentumPoints": 3595,
+    "pointsThisWeek": 315,
     "weeklyConsistency": 92
   },
   "quests": [
@@ -31,7 +31,7 @@
       "durationMinutes": 20,
       "xpReward": 30,
       "attribute": "Strength",
-      "completed": false,
+      "completed": true,
       "isStarted": false
     },
     {
@@ -42,7 +42,7 @@
       "durationMinutes": 15,
       "xpReward": 40,
       "attribute": "Knowledge",
-      "completed": false,
+      "completed": true,
       "isStarted": false
     },
     {
@@ -53,7 +53,7 @@
       "durationMinutes": 10,
       "xpReward": 20,
       "attribute": "Discipline",
-      "completed": false,
+      "completed": true,
       "isStarted": false
     }
   ],
@@ -106,7 +106,7 @@
       "id": "task-2",
       "title": "Go for a short walk",
       "description": "Take a 20-minute break outside to get fresh air.",
-      "completed": false,
+      "completed": true,
       "viewCategory": "today",
       "dueText": "Today, 6:00 PM",
       "labels": [
@@ -119,7 +119,7 @@
       "id": "task-3",
       "title": "Read 20 pages",
       "description": "Continue reading Atomic Habits.",
-      "completed": false,
+      "completed": true,
       "viewCategory": "today",
       "dueText": "Today, 9:00 PM",
       "labels": [
@@ -414,9 +414,33 @@
       ],
       "priority": "low",
       "xpReward": 10
+    },
+    {
+      "id": "task-evt-evt-1789261537809",
+      "title": "Strength & Conditioning Workout",
+      "description": "Scheduled by GPT-4o (Omni) via Read & edit permission",
+      "completed": false,
+      "viewCategory": "today",
+      "dueText": "Today, 07:00 AM",
+      "labels": [
+        "Workout"
+      ],
+      "priority": "high",
+      "xpReward": 20
     }
   ],
   "calendarEvents": [
+    {
+      "id": "evt-1789261537809",
+      "title": "Strength & Conditioning Workout",
+      "date": "2026-09-14",
+      "startTime": "07:00 AM",
+      "endTime": "08:00 AM",
+      "category": "workout",
+      "description": "Scheduled by GPT-4o (Omni) via Read & edit permission",
+      "priority": "high",
+      "color": "#F43F5E"
+    },
     {
       "id": "evt-live-1",
       "title": "Gym Workout & Mobility",
@@ -647,7 +671,7 @@
       "title": "Become a Software Engineer",
       "category": "Career",
       "description": "Build strong fundamentals, complete projects, and get a good job.",
-      "progress": 65,
+      "progress": 60,
       "completedTasks": 12,
       "totalTasks": 20,
       "dueDate": "Dec 31, 2025",
@@ -760,7 +784,7 @@
       "title": "Read 24 Books This Year",
       "category": "Personal",
       "description": "Read, learn and grow. Become a better thinker.",
-      "progress": 12,
+      "progress": 13,
       "completedTasks": 3,
       "totalTasks": 24,
       "dueDate": "Dec 31, 2025",
@@ -811,7 +835,7 @@
       "title": "Build a Portfolio Website",
       "category": "Projects",
       "description": "Showcase my skills and projects.",
-      "progress": 30,
+      "progress": 40,
       "completedTasks": 6,
       "totalTasks": 15,
       "dueDate": "Aug 31, 2025",
@@ -1336,7 +1360,7 @@
       "id": "attr-2",
       "name": "Discipline",
       "level": 12,
-      "percentage": 88,
+      "percentage": 91,
       "color": "#F97316",
       "bgLight": "#FFF7ED",
       "iconName": "Flame"
@@ -1345,7 +1369,7 @@
       "id": "attr-3",
       "name": "Strength",
       "level": 6,
-      "percentage": 40,
+      "percentage": 43,
       "color": "#EA580C",
       "bgLight": "#FFEDD5",
       "iconName": "BicepsFlexed"
@@ -1354,7 +1378,7 @@
       "id": "attr-4",
       "name": "Knowledge",
       "level": 10,
-      "percentage": 66,
+      "percentage": 69,
       "color": "#3B82F6",
       "bgLight": "#EFF6FF",
       "iconName": "BookOpen"
@@ -1401,14 +1425,14 @@
       "dayShort": "Sat",
       "xp": 140,
       "heightPercent": 35,
-      "isToday": true
+      "isToday": false
     },
     {
       "day": "Sunday",
       "dayShort": "Sun",
       "xp": 220,
       "heightPercent": 58,
-      "isToday": false
+      "isToday": true
     }
   ],
   "activityHistory": [
@@ -1516,6 +1540,13 @@
       "tasksCompleted": 0,
       "xpEarned": 0,
       "momentumPointsEarned": 0
+    },
+    {
+      "date": "2026-09-13",
+      "habitsCompleted": 3,
+      "tasksCompleted": 0,
+      "xpEarned": 90,
+      "momentumPointsEarned": 75
     }
   ],
   "termsPolicy": {
@@ -1608,13 +1639,13 @@
       }
     ]
   },
-  "lastUpdated": "2026-09-12T23:06:22.407Z",
+  "lastUpdated": "2026-09-13T01:14:21.181Z",
   "aiAgents": [
     {
       "id": "chatgpt",
       "name": "ChatGPT",
-      "status": "not_connected",
-      "selected": false,
+      "status": "connected",
+      "selected": true,
       "description": "Great for general productivity, explanations and daily task breakdown.",
       "tags": [
         "Fast",
@@ -1622,8 +1653,10 @@
         "Popular"
       ],
       "iconType": "chatgpt",
+      "accountEmail": "alex.das@openai.user",
+      "connectedAt": "2026-09-13T01:04:27.877Z",
       "modelTier": "GPT-4o (Omni)",
-      "verified": false,
+      "verified": true,
       "syncStatus": "ready",
       "latencyMs": 185,
       "lastSyncedAt": "2026-09-12T23:06:03.027Z",
@@ -1665,7 +1698,14 @@
       "syncStatus": "ready",
       "latencyMs": 98,
       "lastSyncedAt": "2026-09-12T23:06:03.027Z",
-      "isEnvironmentKeyConfigured": true
+      "isEnvironmentKeyConfigured": false
     }
-  ]
+  ],
+  "calendarIntegration": {
+    "provider": "Google Calendar",
+    "status": "connected",
+    "account": "alex.das@gmail.com",
+    "permission": "read_edit",
+    "useInCoach": true
+  }
 }

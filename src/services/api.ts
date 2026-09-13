@@ -15,7 +15,12 @@ import {
   CoachChatMessage,
   AIAgentVerifyPayload,
   AIVerificationResult,
-  AuthUser
+  AuthUser,
+  FriendUser,
+  FriendRequest,
+  SuggestedFriend,
+  CalendarIntegrationState,
+  CalendarPermissionLevel
 } from '../types';
 
 export function getStoredAuthToken(): string | null {
@@ -229,6 +234,22 @@ export const api = {
     const json = await res.json();
     if (!res.ok || !json.success) throw new Error(json.error || 'Failed to delete account');
     setStoredAuthToken(null);
+  },
+
+  async updateUserProfile(updates: {
+    avatarUrl?: string;
+    displayName?: string;
+    username?: string;
+    bio?: string;
+  }): Promise<{ success: boolean; data: any; account?: any; state?: any }> {
+    const res = await authFetch('/api/user/profile', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(updates),
+    });
+    const json = await res.json();
+    if (!res.ok || !json.success) throw new Error(json.error || 'Failed to update user profile');
+    return json;
   },
 
   // 1. Full State
@@ -558,6 +579,8 @@ export const api = {
     modelId: string;
     message: string;
     history?: any[];
+    calendarPermission?: CalendarPermissionLevel;
+    googleAccessToken?: string;
   }): Promise<CoachChatMessage> {
     const res = await fetch('/api/ai/chat', {
       method: 'POST',
@@ -567,5 +590,110 @@ export const api = {
     const json = await res.json();
     if (!res.ok || !json.success) throw new Error(json.error || 'Failed to send message to AI agent');
     return json.data;
+  },
+
+  async getCalendarIntegration(): Promise<CalendarIntegrationState> {
+    const res = await fetch('/api/calendar/integration');
+    const json = await res.json();
+    if (!res.ok || !json.success) throw new Error(json.error || 'Failed to fetch calendar integration');
+    return json.data;
+  },
+
+  async updateCalendarIntegration(updates: Partial<CalendarIntegrationState>): Promise<CalendarIntegrationState> {
+    const res = await fetch('/api/calendar/integration', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(updates),
+    });
+    const json = await res.json();
+    if (!res.ok || !json.success) throw new Error(json.error || 'Failed to update calendar integration');
+    return json.data;
+  },
+
+  // --- Friends & Social Accountability ---
+  async getFriendsData(): Promise<{
+    friends: FriendUser[];
+    leaderboard: FriendUser[];
+    xpComparison: any[];
+    consistencyStreaks: any[];
+    summary: { friendsCount: number; requestsCount: number; onlineCount: number };
+  }> {
+    const res = await authFetch('/api/friends');
+    const json = await res.json();
+    if (!res.ok || !json.success) throw new Error(json.error || 'Failed to fetch friends data');
+    return {
+      friends: json.data,
+      leaderboard: json.leaderboard,
+      xpComparison: json.xpComparison,
+      consistencyStreaks: json.consistencyStreaks,
+      summary: json.summary,
+    };
+  },
+
+  async getFriendRequests(): Promise<FriendRequest[]> {
+    const res = await authFetch('/api/friends/requests');
+    const json = await res.json();
+    if (!res.ok || !json.success) throw new Error(json.error || 'Failed to fetch friend requests');
+    return json.data;
+  },
+
+  async getSuggestedFriends(): Promise<SuggestedFriend[]> {
+    const res = await authFetch('/api/friends/suggestions');
+    const json = await res.json();
+    if (!res.ok || !json.success) throw new Error(json.error || 'Failed to fetch suggested friends');
+    return json.data;
+  },
+
+  async searchUsers(query: string): Promise<any[]> {
+    const res = await authFetch(`/api/friends/search?q=${encodeURIComponent(query)}`);
+    const json = await res.json();
+    if (!res.ok || !json.success) throw new Error(json.error || 'Failed to search users');
+    return json.data;
+  },
+
+  async sendFriendRequest(payload: {
+    recipientId?: string;
+    username?: string;
+    name?: string;
+    email?: string;
+    reason?: string;
+  }): Promise<{ message: string; data: any; progress: any }> {
+    const res = await authFetch('/api/friends/requests', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    const json = await res.json();
+    if (!res.ok || !json.success) throw new Error(json.error || 'Failed to send friend request');
+    return json;
+  },
+
+  async acceptFriendRequest(requestId: string): Promise<{ message: string; progress: any }> {
+    const res = await authFetch(`/api/friends/requests/${requestId}/accept`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+    });
+    const json = await res.json();
+    if (!res.ok || !json.success) throw new Error(json.error || 'Failed to accept friend request');
+    return json;
+  },
+
+  async declineFriendRequest(requestId: string): Promise<{ message: string; progress: any }> {
+    const res = await authFetch(`/api/friends/requests/${requestId}/decline`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+    });
+    const json = await res.json();
+    if (!res.ok || !json.success) throw new Error(json.error || 'Failed to decline friend request');
+    return json;
+  },
+
+  async removeFriend(friendId: string): Promise<{ success: boolean; progress: any }> {
+    const res = await authFetch(`/api/friends/${friendId}`, {
+      method: 'DELETE',
+    });
+    const json = await res.json();
+    if (!res.ok || !json.success) throw new Error(json.error || 'Failed to remove friend');
+    return json;
   }
 };

@@ -143,10 +143,10 @@ export const FeaturedRewardsSection: React.FC<FeaturedRewardsSectionProps> = ({
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-lg sm:text-xl font-bold text-white tracking-tight">
+          <h2 className="text-lg sm:text-xl font-bold text-slate-900 dark:text-white tracking-tight">
             Featured
           </h2>
-          <p className="text-xs text-[#9AA3B5] mt-0.5">
+          <p className="text-xs text-slate-500 dark:text-[#9AA3B5] mt-0.5">
             Handpicked for your journey.
           </p>
         </div>
@@ -154,7 +154,7 @@ export const FeaturedRewardsSection: React.FC<FeaturedRewardsSectionProps> = ({
         {onSeeAll && (
           <button
             onClick={onSeeAll}
-            className="text-xs font-semibold text-[#818CF8] hover:text-[#A5B4FC] flex items-center gap-1 transition-colors"
+            className="text-xs font-semibold text-indigo-600 dark:text-[#818CF8] hover:text-indigo-700 dark:hover:text-[#A5B4FC] flex items-center gap-1 transition-colors cursor-pointer"
           >
             <span>See All</span>
             <ArrowRight className="w-3.5 h-3.5" />
@@ -172,12 +172,12 @@ export const FeaturedRewardsSection: React.FC<FeaturedRewardsSectionProps> = ({
           return (
             <div
               key={reward.id}
-              className="p-3.5 rounded-2xl bg-[#11161D] border border-white/6 hover:border-indigo-500/35 transition-all flex flex-col justify-between group shadow-sm"
+              className="p-3.5 rounded-2xl bg-white dark:bg-[#11161D] border border-slate-200 dark:border-white/6 hover:border-indigo-500/35 transition-all flex flex-col justify-between group shadow-xs hover:shadow-md"
             >
               <div>
                 {/* Category Pill Tag */}
                 <div className="flex justify-end mb-2">
-                  <span className="px-2 py-0.5 rounded-md bg-[#6366F1]/15 border border-[#6366F1]/25 text-[10px] font-bold text-[#A5B4FC]">
+                  <span className="px-2 py-0.5 rounded-md bg-indigo-50 dark:bg-[#6366F1]/15 border border-indigo-200 dark:border-[#6366F1]/25 text-[10px] font-bold text-indigo-600 dark:text-[#A5B4FC]">
                     {reward.badgeTag}
                   </span>
                 </div>
@@ -194,19 +194,19 @@ export const FeaturedRewardsSection: React.FC<FeaturedRewardsSectionProps> = ({
                 <div className="mt-3">
                   <h3 
                     onClick={() => onSelectReward(reward)}
-                    className="text-sm font-bold text-white group-hover:text-[#A5B4FC] transition-colors cursor-pointer leading-tight truncate"
+                    className="text-sm font-bold text-slate-900 dark:text-white group-hover:text-indigo-600 dark:group-hover:text-[#A5B4FC] transition-colors cursor-pointer leading-tight truncate"
                   >
                     {reward.name}
                   </h3>
-                  <p className="text-[11px] text-[#9AA3B5] mt-1 line-clamp-2 leading-relaxed h-8">
+                  <p className="text-[11px] text-slate-500 dark:text-[#9AA3B5] mt-1 line-clamp-2 leading-relaxed h-8">
                     {reward.description}
                   </p>
                 </div>
               </div>
 
               {/* Price & Action Row */}
-              <div className="mt-3 pt-3 border-t border-white/5 flex flex-col gap-2">
-                <div className="flex items-center gap-1.5 text-xs font-bold text-white">
+              <div className="mt-3 pt-3 border-t border-slate-200 dark:border-white/5 flex flex-col gap-2">
+                <div className="flex items-center gap-1.5 text-xs font-bold text-slate-900 dark:text-white">
                   <Flame className="w-3.5 h-3.5 text-[#F59E0B]" />
                   <span>{reward.cost.toLocaleString()} MP</span>
                 </div>
@@ -214,7 +214,7 @@ export const FeaturedRewardsSection: React.FC<FeaturedRewardsSectionProps> = ({
                 {isActive ? (
                   <button
                     disabled
-                    className="w-full h-8 rounded-xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 text-xs font-semibold flex items-center justify-center gap-1.5 cursor-default"
+                    className="w-full h-8 rounded-xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-600 dark:text-emerald-400 text-xs font-semibold flex items-center justify-center gap-1.5 cursor-default"
                   >
                     <Check className="w-3.5 h-3.5" />
                     <span>Active</span>
@@ -222,20 +222,20 @@ export const FeaturedRewardsSection: React.FC<FeaturedRewardsSectionProps> = ({
                 ) : isOwned ? (
                   <button
                     onClick={() => onUnlockReward(reward)}
-                    className="w-full h-8 rounded-xl bg-white/6 hover:bg-white/10 border border-white/10 text-white text-xs font-semibold transition-colors"
+                    className="w-full h-8 rounded-xl bg-slate-100 dark:bg-white/6 hover:bg-slate-200 dark:hover:bg-white/10 border border-slate-200 dark:border-white/10 text-slate-800 dark:text-white text-xs font-semibold transition-colors cursor-pointer"
                   >
                     Use
                   </button>
                 ) : (
                   <button
                     onClick={() => onUnlockReward(reward)}
-                    className={`w-full h-8 rounded-xl text-xs font-semibold transition-all shadow-sm flex items-center justify-center gap-1.5 ${
+                    className={`w-full h-8 rounded-xl text-xs font-semibold transition-all shadow-xs flex items-center justify-center gap-1.5 cursor-pointer ${
                       canAfford
                         ? 'bg-[#6366F1] hover:bg-[#7C7FF5] text-white shadow-indigo-600/25'
-                        : 'bg-white/5 text-[#9AA3B5] border border-white/8 hover:bg-white/10'
+                        : 'bg-slate-100 dark:bg-white/5 text-slate-400 dark:text-[#9AA3B5] border border-slate-200 dark:border-white/8 hover:bg-slate-200 dark:hover:bg-white/10'
                     }`}
                   >
-                    {!canAfford && <Lock className="w-3 h-3 text-[#687185]" />}
+                    {!canAfford && <Lock className="w-3 h-3 text-slate-400 dark:text-[#687185]" />}
                     <span>Unlock</span>
                   </button>
                 )}

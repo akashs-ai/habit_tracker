@@ -50,15 +50,15 @@ export const ConsistencyTrendCard: React.FC<ConsistencyTrendCardProps> = ({ data
   return (
     <div 
       id="analytics-consistency-trend-card"
-      className="p-4 sm:p-5 rounded-xl bg-[#0F1723] border border-white/7 flex flex-col justify-between"
+      className="p-4 sm:p-5 rounded-xl bg-white dark:bg-[#0F1723] border border-slate-200 dark:border-white/7 shadow-xs flex flex-col justify-between"
     >
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 pb-2">
         <div>
-          <h2 className="text-sm sm:text-base font-bold text-white tracking-tight">
+          <h2 className="text-sm sm:text-base font-bold text-slate-900 dark:text-white tracking-tight">
             Consistency Trend
           </h2>
-          <p className="text-xs text-[#94A3B8] mt-0.5">
+          <p className="text-xs text-slate-500 dark:text-[#94A3B8] mt-0.5">
             Your daily completion rate over time.
           </p>
         </div>
@@ -66,11 +66,11 @@ export const ConsistencyTrendCard: React.FC<ConsistencyTrendCardProps> = ({ data
         {/* Dropdown filters */}
         <div className="flex items-center gap-2 self-start sm:self-auto">
           <button 
-            className="h-7 sm:h-8 px-2.5 rounded-lg bg-white/5 hover:bg-white/8 border border-white/6 text-xs text-[#94A3B8] hover:text-white flex items-center gap-1.5 transition-colors cursor-pointer"
+            className="h-7 sm:h-8 px-2.5 rounded-lg bg-slate-100 dark:bg-white/5 hover:bg-slate-200/70 dark:hover:bg-white/8 border border-slate-200 dark:border-white/6 text-xs text-slate-600 dark:text-[#94A3B8] hover:text-slate-900 dark:hover:text-white flex items-center gap-1.5 transition-colors cursor-pointer"
             onClick={() => setMetricOption(m => m === 'completion' ? 'weekly' : 'completion')}
           >
             <span>{metricOption === 'completion' ? 'Completion Rate' : 'Weekly Average'}</span>
-            <ChevronDown className="w-3.5 h-3.5 text-[#64748B]" />
+            <ChevronDown className="w-3.5 h-3.5 text-slate-400 dark:text-[#64748B]" />
           </button>
         </div>
       </div>
@@ -114,7 +114,7 @@ export const ConsistencyTrendCard: React.FC<ConsistencyTrendCardProps> = ({ data
                   y1={y}
                   x2={svgWidth - paddingRight}
                   y2={y}
-                  stroke="rgba(255, 255, 255, 0.05)"
+                  className="stroke-slate-200 dark:stroke-white/5"
                   strokeDasharray="3 3"
                   strokeWidth="1"
                 />
@@ -122,7 +122,7 @@ export const ConsistencyTrendCard: React.FC<ConsistencyTrendCardProps> = ({ data
                   x={paddingLeft - 10}
                   y={y + 3.5}
                   textAnchor="end"
-                  className="text-[10px] fill-[#64748B] font-medium"
+                  className="text-[10px] fill-slate-400 dark:fill-[#64748B] font-medium"
                 >
                   {val}%
                 </text>
@@ -172,7 +172,7 @@ export const ConsistencyTrendCard: React.FC<ConsistencyTrendCardProps> = ({ data
                   y={svgHeight - 8}
                   textAnchor="middle"
                   className={`text-[11px] font-medium transition-colors ${
-                    isHovered ? 'fill-white font-semibold' : 'fill-[#64748B]'
+                    isHovered ? 'fill-slate-900 dark:fill-white font-semibold' : 'fill-slate-400 dark:fill-[#64748B]'
                   }`}
                 >
                   {pt.dayLabel}
@@ -215,15 +215,15 @@ export const ConsistencyTrendCard: React.FC<ConsistencyTrendCardProps> = ({ data
               left: `${(activePoint.x / svgWidth) * 100}%`,
             }}
           >
-            <div className="bg-[#162033] border border-white/12 shadow-xl shadow-black/60 rounded-lg px-2.5 py-1.5 text-center min-w-[96px] backdrop-blur-md">
-              <p className="text-[10px] text-[#94A3B8] font-medium leading-none">
+            <div className="bg-white dark:bg-[#162033] border border-slate-200 dark:border-white/12 shadow-xl shadow-slate-900/10 dark:shadow-black/60 rounded-lg px-2.5 py-1.5 text-center min-w-[96px] backdrop-blur-md">
+              <p className="text-[10px] text-slate-500 dark:text-[#94A3B8] font-medium leading-none">
                 {activePoint.dayLabel}
               </p>
-              <p className="text-xs font-bold text-white mt-1 leading-none tabular-nums">
+              <p className="text-xs font-bold text-slate-900 dark:text-white mt-1 leading-none tabular-nums">
                 {activePoint.completionRate}% completed
               </p>
               {/* Arrow pointer */}
-              <div className="w-2 h-2 bg-[#162033] border-r border-b border-white/12 rotate-45 mx-auto -mb-2 mt-1" />
+              <div className="w-2 h-2 bg-white dark:bg-[#162033] border-r border-b border-slate-200 dark:border-white/12 rotate-45 mx-auto -mb-2 mt-1" />
             </div>
           </div>
         )}

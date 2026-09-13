@@ -27,14 +27,14 @@ export const GoalBottomRow: React.FC<GoalBottomRowProps> = ({
       className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5"
     >
       {/* 1. Goal Milestones Card */}
-      <div className="bg-[#141821] border border-white/8 rounded-[14px] p-5 flex flex-col justify-between shadow-[0_4px_20px_rgba(0,0,0,0.18)]">
+      <div className="bg-white dark:bg-[#141821] border border-slate-200 dark:border-white/8 rounded-[14px] p-5 flex flex-col justify-between shadow-sm dark:shadow-[0_4px_20px_rgba(0,0,0,0.18)] transition-colors">
         <div className="flex items-center justify-between pb-3">
-          <h4 className="text-sm font-semibold text-[#F7F8FC]">
+          <h4 className="text-sm font-semibold text-slate-900 dark:text-[#F7F8FC]">
             Goal Milestones
           </h4>
           <button
             onClick={onOpenTimelineModal}
-            className="flex items-center gap-1 text-xs text-[#6C63FF] hover:text-[#8B82FF] font-medium transition-colors"
+            className="flex items-center gap-1 text-xs text-[#6C63FF] hover:text-[#8B82FF] font-medium transition-colors cursor-pointer"
           >
             <span>View Timeline</span>
             <ArrowRight className="w-3.5 h-3.5" />
@@ -44,7 +44,7 @@ export const GoalBottomRow: React.FC<GoalBottomRowProps> = ({
         {/* Timeline visualization */}
         <div className="relative py-4 my-auto">
           {/* Base Track */}
-          <div className="absolute top-1/2 left-4 right-4 h-0.5 -translate-y-1/2 bg-white/10" />
+          <div className="absolute top-1/2 left-4 right-4 h-0.5 -translate-y-1/2 bg-slate-200 dark:bg-white/10" />
 
           {/* Active Filled Track (up to 50%) */}
           <div className="absolute top-1/2 left-4 w-[50%] h-0.5 -translate-y-1/2 bg-[#6C63FF]" />
@@ -59,13 +59,13 @@ export const GoalBottomRow: React.FC<GoalBottomRowProps> = ({
                       ? 'bg-[#6C63FF] border-[#6C63FF] ring-4 ring-[#6C63FF]/20'
                       : item.completed
                       ? 'bg-[#6C63FF] border-[#6C63FF]'
-                      : 'bg-[#141821] border-white/20'
+                      : 'bg-white dark:bg-[#141821] border-slate-300 dark:border-white/20'
                   }`}
                 />
-                <span className="text-[11px] font-medium text-[#F7F8FC] mt-2">
+                <span className="text-[11px] font-medium text-slate-900 dark:text-[#F7F8FC] mt-2">
                   {item.step}
                 </span>
-                <span className="text-[10px] text-[#697388]">
+                <span className="text-[10px] text-slate-500 dark:text-[#697388]">
                   {item.date}
                 </span>
               </div>
@@ -75,14 +75,14 @@ export const GoalBottomRow: React.FC<GoalBottomRowProps> = ({
       </div>
 
       {/* 2. Goal Categories Card */}
-      <div className="bg-[#141821] border border-white/8 rounded-[14px] p-5 flex flex-col justify-between shadow-[0_4px_20px_rgba(0,0,0,0.18)]">
+      <div className="bg-white dark:bg-[#141821] border border-slate-200 dark:border-white/8 rounded-[14px] p-5 flex flex-col justify-between shadow-sm dark:shadow-[0_4px_20px_rgba(0,0,0,0.18)] transition-colors">
         <div className="flex items-center justify-between pb-3">
-          <h4 className="text-sm font-semibold text-[#F7F8FC]">
+          <h4 className="text-sm font-semibold text-slate-900 dark:text-[#F7F8FC]">
             Goal Categories
           </h4>
           <button
             onClick={onOpenCategoryModal}
-            className="flex items-center gap-1 text-xs text-[#6C63FF] hover:text-[#8B82FF] font-medium transition-colors"
+            className="flex items-center gap-1 text-xs text-[#6C63FF] hover:text-[#8B82FF] font-medium transition-colors cursor-pointer"
           >
             <span>View All</span>
             <ArrowRight className="w-3.5 h-3.5" />
@@ -96,7 +96,7 @@ export const GoalBottomRow: React.FC<GoalBottomRowProps> = ({
             return (
               <div
                 key={cat.name}
-                className="flex flex-col items-center text-center p-2 rounded-xl hover:bg-white/5 transition-colors cursor-pointer shrink-0"
+                className="flex flex-col items-center text-center p-2 rounded-xl hover:bg-slate-100 dark:hover:bg-white/5 transition-colors cursor-pointer shrink-0"
                 onClick={onOpenCategoryModal}
               >
                 <div
@@ -108,10 +108,10 @@ export const GoalBottomRow: React.FC<GoalBottomRowProps> = ({
                 >
                   <Icon className="w-3.5 h-3.5" />
                 </div>
-                <span className="text-[11px] font-medium text-[#F7F8FC]">
+                <span className="text-[11px] font-medium text-slate-900 dark:text-[#F7F8FC]">
                   {cat.name}
                 </span>
-                <span className="text-[10px] text-[#697388]">
+                <span className="text-[10px] text-slate-500 dark:text-[#697388]">
                   {cat.count} {cat.count === 1 ? 'goal' : 'goals'}
                 </span>
               </div>
@@ -121,7 +121,7 @@ export const GoalBottomRow: React.FC<GoalBottomRowProps> = ({
       </div>
 
       {/* 3. Motivational Inspiration Card */}
-      <div className="relative overflow-hidden bg-[#141821] border border-white/8 rounded-[14px] p-5 flex flex-col justify-between shadow-[0_4px_20px_rgba(0,0,0,0.18)] md:col-span-2 lg:col-span-1 min-h-[140px]">
+      <div className="relative overflow-hidden bg-slate-900 dark:bg-[#141821] border border-slate-200 dark:border-white/8 rounded-[14px] p-5 flex flex-col justify-between shadow-sm dark:shadow-[0_4px_20px_rgba(0,0,0,0.18)] md:col-span-2 lg:col-span-1 min-h-[140px] transition-colors">
         {/* Background Sunset Graphic */}
         <div className="absolute inset-0 pointer-events-none opacity-60">
           <svg

@@ -52,12 +52,12 @@ export const RewardDetailModal: React.FC<RewardDetailModalProps> = ({
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm animate-in fade-in duration-200">
       <div 
         id="reward-detail-modal"
-        className="w-full max-w-[460px] rounded-3xl bg-[#11161D] border border-white/10 p-5 sm:p-6 shadow-2xl relative overflow-hidden flex flex-col gap-4 animate-in zoom-in-95 duration-200"
+        className="w-full max-w-[460px] rounded-3xl bg-white dark:bg-[#11161D] border border-slate-200 dark:border-white/10 p-5 sm:p-6 shadow-2xl relative overflow-hidden flex flex-col gap-4 animate-in zoom-in-95 duration-200"
       >
         {/* Close Button */}
         <button
           onClick={onClose}
-          className="absolute top-4 right-4 w-8 h-8 rounded-full bg-white/6 hover:bg-white/12 border border-white/8 flex items-center justify-center text-[#9AA3B5] hover:text-white transition-colors z-20"
+          className="absolute top-4 right-4 w-8 h-8 rounded-full bg-slate-100 dark:bg-white/6 hover:bg-slate-200 dark:hover:bg-white/12 border border-slate-200 dark:border-white/8 flex items-center justify-center text-slate-600 dark:text-[#9AA3B5] hover:text-slate-900 dark:hover:text-white transition-colors z-20 cursor-pointer"
         >
           <X className="w-4 h-4" />
         </button>
@@ -122,18 +122,18 @@ export const RewardDetailModal: React.FC<RewardDetailModalProps> = ({
 
         {/* Content Details */}
         <div>
-          <h3 className="text-xl font-bold text-white tracking-tight">
+          <h3 className="text-xl font-bold text-slate-900 dark:text-white tracking-tight">
             {reward.name}
           </h3>
-          <p className="text-xs text-[#9AA3B5] mt-1 leading-relaxed">
+          <p className="text-xs text-slate-500 dark:text-[#9AA3B5] mt-1 leading-relaxed">
             {reward.description}
           </p>
         </div>
 
         {/* Momentum Points Cost Display */}
-        <div className="p-3 rounded-xl bg-white/4 border border-white/6 flex items-center justify-between">
-          <span className="text-xs font-semibold text-[#9AA3B5]">Price</span>
-          <div className="flex items-center gap-1.5 text-sm font-extrabold text-white">
+        <div className="p-3 rounded-xl bg-slate-50 dark:bg-white/4 border border-slate-200 dark:border-white/6 flex items-center justify-between">
+          <span className="text-xs font-semibold text-slate-500 dark:text-[#9AA3B5]">Price</span>
+          <div className="flex items-center gap-1.5 text-sm font-extrabold text-slate-900 dark:text-white">
             <Flame className="w-4 h-4 text-[#F59E0B]" />
             <span>{reward.cost.toLocaleString()} Momentum Points</span>
           </div>
@@ -142,10 +142,10 @@ export const RewardDetailModal: React.FC<RewardDetailModalProps> = ({
         {/* Includes Bullet Points per Spec */}
         {reward.includes && reward.includes.length > 0 && (
           <div className="space-y-1.5">
-            <p className="text-xs font-semibold text-white">Includes:</p>
+            <p className="text-xs font-semibold text-slate-900 dark:text-white">Includes:</p>
             <div className="space-y-1">
               {reward.includes.map((inc, i) => (
-                <div key={i} className="flex items-center gap-2 text-xs text-[#9AA3B5]">
+                <div key={i} className="flex items-center gap-2 text-xs text-slate-600 dark:text-[#9AA3B5]">
                   <div className="w-1.5 h-1.5 rounded-full bg-[#6366F1]" />
                   <span>{inc}</span>
                 </div>
@@ -156,21 +156,21 @@ export const RewardDetailModal: React.FC<RewardDetailModalProps> = ({
 
         {/* Terms Agreement & Validation for Unowned Items */}
         {!isOwned && !isActive && (
-          <div className="space-y-2 pt-1 border-t border-white/6">
-            <div className="flex items-start gap-2 text-[11px] text-[#9AA3B5]">
+          <div className="space-y-2 pt-1 border-t border-slate-200 dark:border-white/6">
+            <div className="flex items-start gap-2 text-[11px] text-slate-600 dark:text-[#9AA3B5]">
               <input
                 type="checkbox"
                 id="agree-reward-terms"
                 checked={termsAccepted}
                 onChange={(e) => setTermsAccepted(e.target.checked)}
-                className="mt-0.5 w-3.5 h-3.5 rounded bg-[#171E32] border-white/20 text-[#6366F1] focus:ring-0 cursor-pointer"
+                className="mt-0.5 w-3.5 h-3.5 rounded bg-slate-100 dark:bg-[#171E32] border-slate-300 dark:border-white/20 text-[#6366F1] focus:ring-0 cursor-pointer"
               />
               <label htmlFor="agree-reward-terms" className="leading-tight select-none cursor-pointer">
                 I agree to the{' '}
                 <button
                   type="button"
                   onClick={onOpenTerms}
-                  className="text-[#818CF8] hover:underline font-semibold"
+                  className="text-indigo-600 dark:text-[#818CF8] hover:underline font-semibold cursor-pointer"
                 >
                   Reward Claim Terms & Conditions
                 </button>{' '}
@@ -179,15 +179,15 @@ export const RewardDetailModal: React.FC<RewardDetailModalProps> = ({
             </div>
 
             {claimError && (
-              <div className="p-2.5 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-xs flex items-center gap-2">
+              <div className="p-2.5 rounded-xl bg-red-500/10 border border-red-500/20 text-red-600 dark:text-red-400 text-xs flex items-center gap-2">
                 <AlertCircle className="w-4 h-4 shrink-0" />
                 <span>{claimError}</span>
               </div>
             )}
 
-            <div className="flex items-center justify-between text-[10px] text-[#64748B]">
+            <div className="flex items-center justify-between text-[10px] text-slate-500 dark:text-[#64748B]">
               <span className="flex items-center gap-1">
-                <ShieldCheck className="w-3 h-3 text-[#34D399]" />
+                <ShieldCheck className="w-3 h-3 text-emerald-500 dark:text-[#34D399]" />
                 Server-validated claim
               </span>
               <span>Single-use unlock</span>
@@ -200,7 +200,7 @@ export const RewardDetailModal: React.FC<RewardDetailModalProps> = ({
           {isActive ? (
             <button
               disabled
-              className="w-full h-10 rounded-xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 text-xs font-bold flex items-center justify-center gap-1.5"
+              className="w-full h-10 rounded-xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-600 dark:text-emerald-400 text-xs font-bold flex items-center justify-center gap-1.5"
             >
               <Check className="w-4 h-4" />
               <span>Currently Active</span>
@@ -208,7 +208,7 @@ export const RewardDetailModal: React.FC<RewardDetailModalProps> = ({
           ) : isOwned ? (
             <button
               onClick={() => onActivate(reward)}
-              className="w-full h-10 rounded-xl bg-[#6366F1] hover:bg-[#7C7FF5] text-white text-xs font-bold transition-all shadow-md shadow-indigo-600/25"
+              className="w-full h-10 rounded-xl bg-[#6366F1] hover:bg-[#7C7FF5] text-white text-xs font-bold transition-all shadow-md shadow-indigo-600/25 cursor-pointer"
             >
               Use {reward.badgeTag}
             </button>
@@ -216,10 +216,10 @@ export const RewardDetailModal: React.FC<RewardDetailModalProps> = ({
             <button
               onClick={handleUnlockClick}
               disabled={!canAfford || isProcessing || !termsAccepted}
-              className={`w-full h-10 rounded-xl text-xs font-bold transition-all shadow-md flex items-center justify-center gap-2 ${
+              className={`w-full h-10 rounded-xl text-xs font-bold transition-all shadow-md flex items-center justify-center gap-2 cursor-pointer ${
                 canAfford && termsAccepted
                   ? 'bg-[#6366F1] hover:bg-[#7C7FF5] text-white shadow-indigo-600/25'
-                  : 'bg-white/5 text-[#9AA3B5] border border-white/8 cursor-not-allowed'
+                  : 'bg-slate-100 dark:bg-white/5 text-slate-400 dark:text-[#9AA3B5] border border-slate-200 dark:border-white/8 cursor-not-allowed'
               }`}
             >
               {isProcessing ? (

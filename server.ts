@@ -9,7 +9,8 @@ async function startServer() {
   const app = express();
   const PORT = 3000;
 
-  app.use(express.json());
+  app.use(express.json({ limit: '25mb' }));
+  app.use(express.urlencoded({ extended: true, limit: '25mb' }));
 
   // --- Auth Session & Multi-User Context Middleware ---
   app.use('/api', (req: Request, res: Response, next) => {
@@ -221,6 +222,38 @@ async function startServer() {
     try {
       const state = db.getState();
       res.json({ success: true, data: state.user });
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  app.patch('/api/user/profile', (req: Request, res: Response) => {
+    try {
+      const userId = (req as any).user?.id;
+      const { avatarUrl, displayName, username, bio } = req.body;
+      const result = db.updateUserProfile({ avatarUrl, displayName, username, bio }, userId);
+      res.json({
+        success: true,
+        data: result.user,
+        account: result.account,
+        state: db.getState(),
+      });
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  app.post('/api/user/profile', (req: Request, res: Response) => {
+    try {
+      const userId = (req as any).user?.id;
+      const { avatarUrl, displayName, username, bio } = req.body;
+      const result = db.updateUserProfile({ avatarUrl, displayName, username, bio }, userId);
+      res.json({
+        success: true,
+        data: result.user,
+        account: result.account,
+        state: db.getState(),
+      });
     } catch (err: any) {
       res.status(500).json({ success: false, error: err.message });
     }
@@ -568,7 +601,142 @@ async function startServer() {
     }
   });
 
-  // 10. AI Agents & Coaching Backend
+  // 10. Friends & Social Accountability Backend
+  // Get all friends + requests + leaderboard + progress cards
+  app.get('/api/friends', (req: Request, res: Response) => {
+    try {
+      const userId = (req as any).userId;
+      const progress = db.getFriendsProgressData(userId);
+      res.json({
+        success: true,
+        data: progress.friends,
+        leaderboard: progress.leaderboard,
+        xpComparison: progress.xpComparison,
+        consistencyStreaks: progress.consistencyStreaks,
+        summary: progress.summary,
+      });
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  // Get friends progress (Leaderboard, XP comparison, consistency streaks)
+  app.get('/api/friends/progress', (req: Request, res: Response) => {
+    try {
+      const userId = (req as any).userId;
+      const progress = db.getFriendsProgressData(userId);
+      res.json({
+        success: true,
+        data: progress,
+      });
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  // Get pending friend requests received
+  app.get('/api/friends/requests', (req: Request, res: Response) => {
+    try {
+      const userId = (req as any).userId;
+      const requests = db.getFriendRequests(userId);
+      res.json({ success: true, data: requests });
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  // Get suggested friends
+  app.get('/api/friends/suggestions', (req: Request, res: Response) => {
+    try {
+      const userId = (req as any).userId;
+      const suggestions = db.getSuggestedFriends(userId);
+      res.json({ success: true, data: suggestions });
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  // Search users for adding friends
+  app.get('/api/friends/search', (req: Request, res: Response) => {
+    try {
+      const userId = (req as any).userId;
+      const query = (req.query.q as string) || '';
+      const results = db.searchUsers(query, userId);
+      res.json({ success: true, data: results });
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  // Send a friend request
+  app.post('/api/friends/requests', (req: Request, res: Response) => {
+    try {
+      const userId = (req as any).userId;
+      const { recipientId, username, email, reason } = req.body;
+      const identifier = recipientId || username || email;
+      if (!identifier) {
+        return res.status(400).json({ success: false, error: 'Recipient ID, username, or email is required.' });
+      }
+
+      const result = db.sendFriendRequest(userId, identifier, reason);
+      const progress = db.getFriendsProgressData(userId);
+      res.status(201).json({
+        success: true,
+        data: result.friendship,
+        message: result.message,
+        progress,
+      });
+    } catch (err: any) {
+      res.status(400).json({ success: false, error: err.message });
+    }
+  });
+
+  // Accept a friend request
+  app.post('/api/friends/requests/:id/accept', (req: Request, res: Response) => {
+    try {
+      const userId = (req as any).userId;
+      const result = db.acceptFriendRequest(req.params.id, userId);
+      const progress = db.getFriendsProgressData(userId);
+      res.json({
+        success: true,
+        data: result.friendship,
+        message: result.message,
+        progress,
+      });
+    } catch (err: any) {
+      res.status(400).json({ success: false, error: err.message });
+    }
+  });
+
+  // Decline a friend request
+  app.post('/api/friends/requests/:id/decline', (req: Request, res: Response) => {
+    try {
+      const userId = (req as any).userId;
+      const result = db.rejectFriendRequest(req.params.id, userId);
+      const progress = db.getFriendsProgressData(userId);
+      res.json({
+        success: true,
+        message: result.message,
+        progress,
+      });
+    } catch (err: any) {
+      res.status(400).json({ success: false, error: err.message });
+    }
+  });
+
+  // Remove a friend
+  app.delete('/api/friends/:id', (req: Request, res: Response) => {
+    try {
+      const userId = (req as any).userId;
+      db.removeFriend(req.params.id, userId);
+      const progress = db.getFriendsProgressData(userId);
+      res.json({ success: true, progress });
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  // 11. AI Agents & Coaching Backend
   app.get('/api/ai/agents', (req: Request, res: Response) => {
     try {
       const agents = db.getAIAgents();
@@ -675,13 +843,39 @@ async function startServer() {
     }
   });
 
+  // Calendar Integration
+  app.get('/api/calendar/integration', (req: Request, res: Response) => {
+    try {
+      const integration = db.getCalendarIntegration();
+      res.json({ success: true, data: integration });
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  app.post('/api/calendar/integration', (req: Request, res: Response) => {
+    try {
+      const updates = req.body;
+      const updated = db.updateCalendarIntegration(updates);
+      res.json({ success: true, data: updated });
+    } catch (err: any) {
+      res.status(400).json({ success: false, error: err.message });
+    }
+  });
+
   app.post('/api/ai/chat', async (req: Request, res: Response) => {
     try {
-      const { modelId, message, history } = req.body;
+      const { modelId, message, history, calendarPermission, googleAccessToken } = req.body;
       if (!modelId || !message) {
         return res.status(400).json({ success: false, error: 'modelId and message are required.' });
       }
-      const reply = await generateAIChatResponse({ modelId, message, history });
+      const reply = await generateAIChatResponse({ 
+        modelId, 
+        message, 
+        history,
+        calendarPermission,
+        googleAccessToken
+      });
       res.json({ success: true, data: reply });
     } catch (err: any) {
       res.status(400).json({ success: false, error: err.message });

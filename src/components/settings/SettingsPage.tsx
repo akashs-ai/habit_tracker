@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Search,
   Moon,
@@ -49,6 +49,7 @@ interface SettingsPageProps {
   onLogout?: () => void;
   appearance?: AppearanceSettingsType;
   onUpdateAppearance?: (newSettings: Partial<AppearanceSettingsType>) => void;
+  onUpdateUser?: (updated: Partial<UserSettingsProfile>) => void;
 }
 
 export const SettingsPage: React.FC<SettingsPageProps> = ({
@@ -60,13 +61,39 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
   onLogout,
   appearance: propAppearance,
   onUpdateAppearance: propOnUpdateAppearance,
+  onUpdateUser,
 }) => {
   // Navigation tab state
   const [activeTab, setActiveTab] = useState<SettingsTabId>('account');
   const [showSecurityView, setShowSecurityView] = useState<boolean>(false);
 
   // Core settings states
-  const [profile, setProfile] = useState<UserSettingsProfile>(initialUserProfile);
+  const [profile, setProfile] = useState<UserSettingsProfile>(() => ({
+    ...initialUserProfile,
+    avatarUrl:
+      currentUser?.avatarUrl ||
+      (typeof window !== 'undefined' ? localStorage.getItem('liferpg_user_avatar') : null) ||
+      initialUserProfile.avatarUrl,
+    displayName: currentUser?.fullName || initialUserProfile.displayName,
+    email: currentUser?.email || initialUserProfile.email,
+    username: currentUser?.username || initialUserProfile.username,
+  }));
+
+  useEffect(() => {
+    if (currentUser) {
+      setProfile((prev) => ({
+        ...prev,
+        displayName: currentUser.fullName || prev.displayName,
+        email: currentUser.email || prev.email,
+        username: currentUser.username || prev.username,
+        avatarUrl:
+          currentUser.avatarUrl ||
+          (typeof window !== 'undefined' ? localStorage.getItem('liferpg_user_avatar') : null) ||
+          prev.avatarUrl,
+      }));
+    }
+  }, [currentUser]);
+
   const [localAppearance, setLocalAppearance] = useState<AppearanceSettingsType>(getStoredAppearance);
   const appearance = propAppearance || localAppearance;
 
@@ -102,6 +129,16 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
 
   const handleUpdateProfile = (updated: Partial<UserSettingsProfile>) => {
     setProfile((prev) => ({ ...prev, ...updated }));
+    if (updated.avatarUrl) {
+      try {
+        localStorage.setItem('liferpg_user_avatar', updated.avatarUrl);
+      } catch (e) {
+        console.warn('LocalStorage save avatar warning:', e);
+      }
+    }
+    if (onUpdateUser) {
+      onUpdateUser(updated);
+    }
     addToast('Profile updated successfully.', 'success');
   };
 
@@ -240,9 +277,15 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
               setActiveTab('account');
               setShowSecurityView(false);
             }}
-            className="w-8 h-8 rounded-xl bg-gradient-to-tr from-[#6C63FF] to-[#8B7CFF] flex items-center justify-center text-white text-xs font-bold shadow-xs hover:opacity-90 transition-opacity cursor-pointer"
+            className="w-8 h-8 rounded-full overflow-hidden ring-2 ring-[#6C63FF]/30 hover:opacity-90 transition-opacity cursor-pointer shadow-xs"
+            title="Go to Account Settings"
           >
-            A
+            <img
+              src={profile.avatarUrl || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop&q=80'}
+              alt={profile.displayName}
+              referrerPolicy="no-referrer"
+              className="w-full h-full object-cover"
+            />
           </button>
         </div>
       </header>

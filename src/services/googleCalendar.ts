@@ -8,20 +8,36 @@ import {
   signOut 
 } from 'firebase/auth';
 import firebaseConfig from '../../firebase-applet-config.json';
-import { CalendarEvent, EventCategory } from '../types';
+import { CalendarEvent, EventCategory, CalendarPermissionLevel } from '../types';
 
-export const CALENDAR_SCOPES = [
-  'https://www.googleapis.com/auth/calendar.events',
-  'https://www.googleapis.com/auth/calendar.readonly',
+export const CALENDAR_READONLY_SCOPE = 'https://www.googleapis.com/auth/calendar.readonly';
+export const CALENDAR_EVENTS_SCOPE = 'https://www.googleapis.com/auth/calendar.events';
+export const CALENDAR_FULL_SCOPE = 'https://www.googleapis.com/auth/calendar';
+
+export const CALENDAR_READ_SCOPES = [
+  CALENDAR_READONLY_SCOPE,
+];
+
+export const CALENDAR_READ_EDIT_SCOPES = [
+  CALENDAR_EVENTS_SCOPE,
+  CALENDAR_READONLY_SCOPE,
 ];
 
 // Initialize Firebase App singleton
 const app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
 export const auth = getAuth(app);
 
-export const createGoogleProvider = (): GoogleAuthProvider => {
+export const createGoogleProvider = (
+  permission: CalendarPermissionLevel = 'read_edit'
+): GoogleAuthProvider => {
   const provider = new GoogleAuthProvider();
-  CALENDAR_SCOPES.forEach((scope) => provider.addScope(scope));
+  if (permission === 'read_edit') {
+    // Write-enabled scopes for creating, updating, and deleting events
+    CALENDAR_READ_EDIT_SCOPES.forEach((scope) => provider.addScope(scope));
+  } else if (permission === 'read_only') {
+    // Read-only scope
+    CALENDAR_READ_SCOPES.forEach((scope) => provider.addScope(scope));
+  }
   provider.setCustomParameters({
     prompt: 'select_account',
   });
@@ -32,6 +48,7 @@ export const createGoogleProvider = (): GoogleAuthProvider => {
 let isSigningIn = false;
 let cachedAccessToken: string | null = null;
 let cachedUser: User | null = null;
+let cachedPermission: CalendarPermissionLevel = 'read_edit';
 
 export const initAuth = (
   onAuthSuccess?: (user: User, token: string) => void,
@@ -59,10 +76,17 @@ export const getCurrentGoogleUser = (): User | null => {
   return cachedUser || auth.currentUser;
 };
 
-export const googleSignIn = async (): Promise<{ user: User; accessToken: string } | null> => {
+export const getCurrentPermissionLevel = (): CalendarPermissionLevel => {
+  return cachedPermission;
+};
+
+export const googleSignIn = async (
+  permission: CalendarPermissionLevel = 'read_edit'
+): Promise<{ user: User; accessToken: string; permission: CalendarPermissionLevel } | null> => {
   try {
     isSigningIn = true;
-    const provider = createGoogleProvider();
+    cachedPermission = permission;
+    const provider = createGoogleProvider(permission);
     const result = await signInWithPopup(auth, provider);
     const credential = GoogleAuthProvider.credentialFromResult(result);
     
@@ -72,7 +96,7 @@ export const googleSignIn = async (): Promise<{ user: User; accessToken: string 
 
     cachedAccessToken = credential.accessToken;
     cachedUser = result.user;
-    return { user: result.user, accessToken: cachedAccessToken };
+    return { user: result.user, accessToken: cachedAccessToken, permission };
   } catch (error: any) {
     const code = error?.code || '';
     const message = error?.message || '';
@@ -199,4 +223,173 @@ export async function fetchGoogleCalendarEvents(token: string): Promise<Calendar
       priority: 'medium',
     };
   });
+}
+
+function formatTimeToIso(dateStr: string, timeStr?: string): string {
+  if (!timeStr) return `${dateStr}T09:00:00`;
+  try {
+    const match = timeStr.match(/(\d+):(\d+)\s*(AM|PM)?/i);
+    if (match) {
+      let hours = parseInt(match[1], 10);
+      const minutes = match[2];
+      const ampm = match[3]?.toUpperCase();
+      if (ampm === 'PM' && hours < 12) hours += 12;
+      if (ampm === 'AM' && hours === 12) hours = 0;
+      const hStr = hours < 10 ? '0' + hours : hours.toString();
+      return `${dateStr}T${hStr}:${minutes}:00`;
+    }
+  } catch {}
+  return `${dateStr}T09:00:00`;
+}
+
+/**
+ * Create an event in Google Calendar (Write Scope Required)
+ */
+export async function createGoogleCalendarEvent(
+  token: string,
+  event: {
+    title: string;
+    date: string;
+    startTime?: string;
+    endTime?: string;
+    allDay?: boolean;
+    description?: string;
+    location?: string;
+    category?: EventCategory;
+  }
+): Promise<CalendarEvent> {
+  const url = 'https://www.googleapis.com/calendar/v3/calendars/primary/events';
+  const startIso = formatTimeToIso(event.date, event.startTime);
+  const endIso = formatTimeToIso(event.date, event.endTime || (event.startTime ? undefined : '10:00 AM'));
+  
+  const body: any = {
+    summary: event.title,
+    description: event.description || 'Scheduled via LifeRPG AI Coach',
+    location: event.location,
+  };
+
+  if (event.allDay) {
+    body.start = { date: event.date };
+    body.end = { date: event.date };
+  } else {
+    body.start = { dateTime: new Date(startIso).toISOString() };
+    body.end = { dateTime: new Date(endIso).toISOString() };
+  }
+
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'application/json',
+      Accept: 'application/json',
+    },
+    body: JSON.stringify(body),
+  });
+
+  if (!res.ok) {
+    const errText = await res.text();
+    throw new Error(`Google Calendar create error (${res.status}): ${errText}`);
+  }
+
+  const item = await res.json();
+  const cat = event.category || detectCategory(item.summary || '', item.description);
+  return {
+    id: `gcal-${item.id}`,
+    title: item.summary || event.title,
+    date: event.date,
+    startTime: event.startTime || '09:00 AM',
+    endTime: event.endTime || '10:00 AM',
+    allDay: !!event.allDay,
+    category: cat,
+    color: categoryColor(cat),
+    description: item.description,
+    location: item.location,
+    priority: 'medium',
+  };
+}
+
+/**
+ * Update/reschedule an event in Google Calendar (Write Scope Required)
+ */
+export async function updateGoogleCalendarEvent(
+  token: string,
+  eventId: string,
+  updates: Partial<CalendarEvent>
+): Promise<CalendarEvent> {
+  const cleanId = eventId.replace(/^gcal-/, '');
+  const url = `https://www.googleapis.com/calendar/v3/calendars/primary/events/${cleanId}`;
+
+  const body: any = {};
+  if (updates.title) body.summary = updates.title;
+  if (updates.description) body.description = updates.description;
+  if (updates.location) body.location = updates.location;
+
+  if (updates.date) {
+    if (updates.allDay) {
+      body.start = { date: updates.date };
+      body.end = { date: updates.date };
+    } else {
+      const startIso = formatTimeToIso(updates.date, updates.startTime);
+      const endIso = formatTimeToIso(updates.date, updates.endTime || '10:00 AM');
+      body.start = { dateTime: new Date(startIso).toISOString() };
+      body.end = { dateTime: new Date(endIso).toISOString() };
+    }
+  }
+
+  const res = await fetch(url, {
+    method: 'PATCH',
+    headers: {
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'application/json',
+      Accept: 'application/json',
+    },
+    body: JSON.stringify(body),
+  });
+
+  if (!res.ok) {
+    const errText = await res.text();
+    throw new Error(`Google Calendar update error (${res.status}): ${errText}`);
+  }
+
+  const item = await res.json();
+  const cat = updates.category || detectCategory(item.summary || '', item.description);
+  return {
+    id: `gcal-${item.id}`,
+    title: item.summary || updates.title || 'Event',
+    date: updates.date || parseGCalDate(item.start || {}),
+    startTime: updates.startTime,
+    endTime: updates.endTime,
+    allDay: updates.allDay,
+    category: cat,
+    color: categoryColor(cat),
+    description: item.description,
+    location: item.location,
+    priority: updates.priority || 'medium',
+  };
+}
+
+/**
+ * Delete an event from Google Calendar (Write Scope Required)
+ */
+export async function deleteGoogleCalendarEvent(
+  token: string,
+  eventId: string
+): Promise<boolean> {
+  const cleanId = eventId.replace(/^gcal-/, '');
+  const url = `https://www.googleapis.com/calendar/v3/calendars/primary/events/${cleanId}`;
+
+  const res = await fetch(url, {
+    method: 'DELETE',
+    headers: {
+      Authorization: `Bearer ${token}`,
+      Accept: 'application/json',
+    },
+  });
+
+  if (!res.ok && res.status !== 404) {
+    const errText = await res.text();
+    throw new Error(`Google Calendar delete error (${res.status}): ${errText}`);
+  }
+
+  return true;
 }

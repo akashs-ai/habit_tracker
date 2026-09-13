@@ -50,13 +50,13 @@ export const CalendarDayView: React.FC<CalendarDayViewProps> = ({
   return (
     <div 
       id="calendar-day-view-container" 
-      className="w-full bg-[#0F1217] border border-white/8 rounded-xl p-4 sm:p-6 shadow-sm"
+      className="w-full bg-white dark:bg-[#0F1217] border border-slate-200 dark:border-white/8 rounded-xl p-4 sm:p-6 shadow-sm transition-colors"
     >
       {/* Header with full day information */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-4 border-b border-white/8 mb-4 gap-3">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-4 border-b border-slate-200 dark:border-white/8 mb-4 gap-3">
         <div>
           <div className="flex items-center gap-2">
-            <h3 className="text-base sm:text-lg font-bold text-[#F5F7FF]">
+            <h3 className="text-base sm:text-lg font-bold text-slate-900 dark:text-[#F5F7FF]">
               {formatFullDayHeader(selectedDate)}
             </h3>
             {isToday && (
@@ -65,13 +65,13 @@ export const CalendarDayView: React.FC<CalendarDayViewProps> = ({
               </span>
             )}
           </div>
-          <p className="text-xs text-[#6F7789] mt-0.5">
+          <p className="text-xs text-slate-500 dark:text-[#6F7789] mt-0.5">
             {dayEvents.length} event{dayEvents.length === 1 ? '' : 's'} scheduled for this day
           </p>
         </div>
         <button
           onClick={() => onAddEvent()}
-          className="flex items-center gap-1.5 px-3.5 py-2 bg-[#6C63FF] hover:bg-[#7B73FF] text-white text-xs font-semibold rounded-lg transition-colors shrink-0 shadow-xs self-start sm:self-auto"
+          className="flex items-center gap-1.5 px-3.5 py-2 bg-[#6C63FF] hover:bg-[#7B73FF] text-white text-xs font-semibold rounded-lg transition-colors shrink-0 shadow-xs self-start sm:self-auto cursor-pointer"
         >
           <Plus className="w-3.5 h-3.5" />
           <span>Add Event</span>
@@ -79,7 +79,7 @@ export const CalendarDayView: React.FC<CalendarDayViewProps> = ({
       </div>
 
       {/* Hourly Schedule Timeline */}
-      <div className="flex flex-col divide-y divide-white/6 relative">
+      <div className="flex flex-col divide-y divide-slate-200 dark:divide-white/6 relative">
         {hours.map((hour) => {
           const matchEvts = dayEvents.filter((e) => isEventInSlot(e, hour));
           const slot24 = parseHourTo24(hour);
@@ -88,7 +88,7 @@ export const CalendarDayView: React.FC<CalendarDayViewProps> = ({
           return (
             <div 
               key={hour} 
-              className="flex items-start gap-4 py-3 min-h-[64px] group relative hover:bg-white/[0.015] transition-colors rounded-lg px-1 cursor-pointer"
+              className="flex items-start gap-4 py-3 min-h-[64px] group relative hover:bg-slate-50 dark:hover:bg-white/[0.015] transition-colors rounded-lg px-1 cursor-pointer"
               onClick={() => onAddEvent(hour)}
             >
               {/* Live Time Indicator */}
@@ -99,14 +99,14 @@ export const CalendarDayView: React.FC<CalendarDayViewProps> = ({
                 >
                   <div className="w-2.5 h-2.5 rounded-full bg-[#EF4444] ring-4 ring-[#EF4444]/30 -ml-1" />
                   <div className="flex-1 h-[2px] bg-[#EF4444]" />
-                  <span className="text-[10px] font-bold text-[#EF4444] bg-[#0F1217] px-1.5 py-0.5 rounded border border-[#EF4444]/30 mr-2">
+                  <span className="text-[10px] font-bold text-[#EF4444] bg-white dark:bg-[#0F1217] px-1.5 py-0.5 rounded border border-[#EF4444]/30 mr-2 shadow-xs">
                     NOW
                   </span>
                 </div>
               )}
 
               {/* Hour Column */}
-              <div className="w-20 text-right text-xs font-medium text-[#6F7789] pt-1 shrink-0 group-hover:text-[#F5F7FF] transition-colors">
+              <div className="w-20 text-right text-xs font-medium text-slate-500 dark:text-[#6F7789] pt-1 shrink-0 group-hover:text-slate-900 dark:group-hover:text-[#F5F7FF] transition-colors">
                 {hour}
               </div>
 
@@ -120,29 +120,29 @@ export const CalendarDayView: React.FC<CalendarDayViewProps> = ({
                         e.stopPropagation();
                         onSelectEvent(evt);
                       }}
-                      className="p-3.5 rounded-xl bg-[#151820] hover:bg-[#1A1D24] border border-white/8 hover:border-white/14 cursor-pointer transition-all shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3 relative overflow-hidden"
+                      className="p-3.5 rounded-xl bg-slate-100 dark:bg-[#151820] hover:bg-slate-200 dark:hover:bg-[#1A1D24] border border-slate-200 dark:border-white/8 hover:border-slate-300 dark:hover:border-white/14 cursor-pointer transition-all shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3 relative overflow-hidden"
                       style={{ borderLeftWidth: '4px', borderLeftColor: evt.color }}
                     >
                       <div className="flex flex-col gap-1">
-                        <div className="text-sm font-semibold text-[#F5F7FF] flex items-center gap-2">
+                        <div className="text-sm font-semibold text-slate-900 dark:text-[#F5F7FF] flex items-center gap-2">
                           <span>{evt.title}</span>
                           {evt.priority === 'high' && (
                             <span className="w-2 h-2 rounded-full bg-[#EF4444]" title="High Priority" />
                           )}
                         </div>
-                        <div className="text-xs text-[#A6AEC0] flex items-center flex-wrap gap-3">
+                        <div className="text-xs text-slate-500 dark:text-[#A6AEC0] flex items-center flex-wrap gap-3">
                           <span className="flex items-center gap-1">
-                            <Clock className="w-3 h-3 text-[#6F7789]" />
+                            <Clock className="w-3 h-3 text-slate-400 dark:text-[#6F7789]" />
                             {evt.allDay ? 'All Day' : `${evt.startTime} – ${evt.endTime || ''}`}
                           </span>
                           {evt.location && (
                             <span className="flex items-center gap-1">
-                              <MapPin className="w-3 h-3 text-[#6F7789]" />
+                              <MapPin className="w-3 h-3 text-slate-400 dark:text-[#6F7789]" />
                               {evt.location}
                             </span>
                           )}
                           {evt.subtasks && evt.subtasks.length > 0 && (
-                            <span className="flex items-center gap-1 text-[11px] text-[#A6AEC0]">
+                            <span className="flex items-center gap-1 text-[11px] text-slate-600 dark:text-[#A6AEC0]">
                               <CheckCircle2 className="w-3 h-3 text-[#22C55E]" />
                               {evt.subtasks.filter((s) => s.completed).length}/{evt.subtasks.length} subtasks
                             </span>
@@ -161,7 +161,7 @@ export const CalendarDayView: React.FC<CalendarDayViewProps> = ({
                     </div>
                   ))
                 ) : (
-                  <div className="h-4 flex items-center text-[11px] text-white/10 group-hover:text-white/30 transition-colors">
+                  <div className="h-4 flex items-center text-[11px] text-slate-400/60 dark:text-white/10 group-hover:text-slate-500 dark:group-hover:text-white/30 transition-colors">
                     + Click to schedule at {hour}
                   </div>
                 )}

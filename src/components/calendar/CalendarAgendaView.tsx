@@ -23,7 +23,7 @@ export const CalendarAgendaView: React.FC<CalendarAgendaViewProps> = ({
   }, {} as Record<string, CalendarEvent[]>);
 
   return (
-    <div className="w-full bg-[#0F1217] border border-white/8 rounded-xl p-4 sm:p-6 shadow-sm flex flex-col gap-6">
+    <div className="w-full bg-white dark:bg-[#0F1217] border border-slate-200 dark:border-white/8 rounded-xl p-4 sm:p-6 shadow-sm flex flex-col gap-6 transition-colors">
       {Object.entries(grouped).map(([dateStr, dateEventsList]) => {
         const dateEvents = dateEventsList as CalendarEvent[];
         const displayHeader = formatFullDayHeader(dateStr);
@@ -42,7 +42,7 @@ export const CalendarAgendaView: React.FC<CalendarAgendaViewProps> = ({
                 </span>
               )}
               {!isCurrentDay && relativeBadge !== displayHeader && (
-                <span className="px-2 py-0.5 rounded text-[10px] font-medium bg-white/5 text-[#A6AEC0] border border-white/8">
+                <span className="px-2 py-0.5 rounded text-[10px] font-medium bg-slate-100 dark:bg-white/5 text-slate-600 dark:text-[#A6AEC0] border border-slate-200 dark:border-white/8">
                   {relativeBadge}
                 </span>
               )}
@@ -53,19 +53,19 @@ export const CalendarAgendaView: React.FC<CalendarAgendaViewProps> = ({
                 <div
                   key={evt.id}
                   onClick={() => onSelectEvent(evt)}
-                  className="p-3 bg-[#151820] hover:bg-[#1A1D24] border border-white/6 hover:border-white/12 rounded-lg cursor-pointer transition-all flex items-center justify-between"
+                  className="p-3 bg-slate-100 dark:bg-[#151820] hover:bg-slate-200 dark:hover:bg-[#1A1D24] border border-slate-200 dark:border-white/6 hover:border-slate-300 dark:hover:border-white/12 rounded-lg cursor-pointer transition-all flex items-center justify-between"
                   style={{ borderLeftWidth: '3.5px', borderLeftColor: evt.color }}
                 >
                   <div>
-                    <div className="text-sm font-semibold text-[#F5F7FF]">{evt.title}</div>
-                    <div className="text-xs text-[#A6AEC0] flex items-center gap-2 mt-0.5">
+                    <div className="text-sm font-semibold text-slate-900 dark:text-[#F5F7FF]">{evt.title}</div>
+                    <div className="text-xs text-slate-500 dark:text-[#A6AEC0] flex items-center gap-2 mt-0.5">
                       <span className="flex items-center gap-1">
-                        <Clock className="w-3 h-3 text-[#6F7789]" />
+                        <Clock className="w-3 h-3 text-slate-400 dark:text-[#6F7789]" />
                         {evt.allDay ? 'All day' : `${evt.startTime || ''} – ${evt.endTime || ''}`}
                       </span>
                       {evt.location && (
                         <span className="flex items-center gap-1">
-                          <MapPin className="w-3 h-3 text-[#6F7789]" />
+                          <MapPin className="w-3 h-3 text-slate-400 dark:text-[#6F7789]" />
                           {evt.location}
                         </span>
                       )}

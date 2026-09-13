@@ -91,18 +91,18 @@ export const BadgeProgressSection: React.FC<BadgeProgressSectionProps> = ({
     <div id="badge-progress-container" className="grid grid-cols-1 lg:grid-cols-3 gap-4 items-stretch">
       
       {/* 1. Left 2-Columns: Badge Progress */}
-      <div className="lg:col-span-2 p-4 sm:p-5 rounded-2xl bg-[#11161D] border border-white/6 flex flex-col justify-between">
+      <div className="lg:col-span-2 p-4 sm:p-5 rounded-2xl bg-white dark:bg-[#11161D] border border-slate-200 dark:border-white/6 flex flex-col justify-between shadow-xs">
         {/* Header */}
-        <div className="flex items-center justify-between pb-3 border-b border-white/5">
+        <div className="flex items-center justify-between pb-3 border-b border-slate-200 dark:border-white/5">
           <div>
-            <h3 className="text-base font-bold text-white tracking-tight">Badge Progress</h3>
-            <p className="text-xs text-[#9AA3B5] mt-0.5">Collect badges. Show your journey.</p>
+            <h3 className="text-base font-bold text-slate-900 dark:text-white tracking-tight">Badge Progress</h3>
+            <p className="text-xs text-slate-500 dark:text-[#9AA3B5] mt-0.5">Collect badges. Show your journey.</p>
           </div>
 
           {onSeeAllBadges && (
             <button
               onClick={onSeeAllBadges}
-              className="text-xs font-semibold text-[#818CF8] hover:text-[#A5B4FC] flex items-center gap-1 transition-colors"
+              className="text-xs font-semibold text-indigo-600 dark:text-[#818CF8] hover:text-indigo-700 dark:hover:text-[#A5B4FC] flex items-center gap-1 transition-colors cursor-pointer"
             >
               <span>See All</span>
               <ArrowRight className="w-3.5 h-3.5" />
@@ -119,7 +119,7 @@ export const BadgeProgressSection: React.FC<BadgeProgressSectionProps> = ({
               <div
                 key={badge.id}
                 onClick={() => onSelectBadge(badge)}
-                className="p-3 rounded-xl bg-[#0E1218] border border-white/4 hover:border-indigo-500/30 transition-all flex flex-col items-center text-center cursor-pointer group justify-between min-h-[140px]"
+                className="p-3 rounded-xl bg-slate-50 dark:bg-[#0E1218] border border-slate-200 dark:border-white/4 hover:border-indigo-500/30 transition-all flex flex-col items-center text-center cursor-pointer group justify-between min-h-[140px]"
               >
                 {/* Badge Icon Emblem */}
                 <div className="group-hover:scale-105 transition-transform">
@@ -128,17 +128,17 @@ export const BadgeProgressSection: React.FC<BadgeProgressSectionProps> = ({
 
                 {/* Badge Title & Requirement */}
                 <div className="my-2 min-w-0 w-full">
-                  <p className="text-xs font-bold text-white group-hover:text-[#A5B4FC] transition-colors truncate">
+                  <p className="text-xs font-bold text-slate-900 dark:text-white group-hover:text-indigo-600 dark:group-hover:text-[#A5B4FC] transition-colors truncate">
                     {badge.name}
                   </p>
-                  <p className="text-[10px] text-[#687185] mt-0.5 line-clamp-1">
+                  <p className="text-[10px] text-slate-500 dark:text-[#687185] mt-0.5 line-clamp-1">
                     {badge.requirement}
                   </p>
                 </div>
 
                 {/* Status / Price Tag */}
                 {isOwned ? (
-                  <span className="px-2 py-0.5 rounded-md bg-emerald-500/15 border border-emerald-500/30 text-[10px] font-bold text-emerald-400">
+                  <span className="px-2 py-0.5 rounded-md bg-emerald-500/15 border border-emerald-500/30 text-[10px] font-bold text-emerald-600 dark:text-emerald-400">
                     Owned
                   </span>
                 ) : (
@@ -156,37 +156,37 @@ export const BadgeProgressSection: React.FC<BadgeProgressSectionProps> = ({
       {/* 2. Right 1-Column: Your Next Badge */}
       <div 
         id="your-next-badge-card"
-        className="p-4 sm:p-5 rounded-2xl bg-[#11161D] border border-white/6 flex flex-col justify-between"
+        className="p-4 sm:p-5 rounded-2xl bg-white dark:bg-[#11161D] border border-slate-200 dark:border-white/6 flex flex-col justify-between shadow-xs"
       >
         <div>
-          <h3 className="text-base font-bold text-white tracking-tight">Your Next Badge</h3>
+          <h3 className="text-base font-bold text-slate-900 dark:text-white tracking-tight">Your Next Badge</h3>
           
           {/* Circular Glowing Flame Emblem */}
           <div className="flex flex-col items-center text-center my-4">
             <div className="relative w-20 h-20 rounded-full p-[3px] bg-gradient-to-tr from-[#F97316]/30 via-[#EA580C] to-[#F59E0B]/20 flex items-center justify-center shadow-[0_0_25px_rgba(234,88,12,0.25)]">
-              <div className="w-full h-full rounded-full bg-[#0E1218] flex items-center justify-center">
+              <div className="w-full h-full rounded-full bg-slate-50 dark:bg-[#0E1218] flex items-center justify-center">
                 <Flame className="w-9 h-9 fill-[#F97316] text-[#F97316] filter drop-shadow-[0_0_8px_rgba(249,115,22,0.7)]" />
               </div>
             </div>
 
-            <h4 className="text-sm font-bold text-white mt-2.5">
+            <h4 className="text-sm font-bold text-slate-900 dark:text-white mt-2.5">
               {nextBadge.name}
             </h4>
 
             {/* Days Progress */}
-            <p className="text-xs text-[#9AA3B5] mt-1 font-semibold">
-              <span className="text-white font-extrabold">{nextBadge.currentDays}</span> / {nextBadge.totalDays} days
+            <p className="text-xs text-slate-600 dark:text-[#9AA3B5] mt-1 font-semibold">
+              <span className="text-slate-900 dark:text-white font-extrabold">{nextBadge.currentDays}</span> / {nextBadge.totalDays} days
             </p>
 
             {/* Progress Bar */}
-            <div className="w-full h-2 rounded-full bg-white/8 overflow-hidden mt-3 max-w-[200px]">
+            <div className="w-full h-2 rounded-full bg-slate-200 dark:bg-white/8 overflow-hidden mt-3 max-w-[200px]">
               <div 
                 className="h-full bg-gradient-to-r from-[#3B82F6] to-[#6366F1] rounded-full transition-all duration-500" 
                 style={{ width: `${nextBadge.progressPercentage}%` }}
               />
             </div>
 
-            <p className="text-[11px] text-[#687185] mt-1.5 font-medium">
+            <p className="text-[11px] text-slate-500 dark:text-[#687185] mt-1.5 font-medium">
               {nextBadge.daysRemaining} days remaining
             </p>
           </div>
@@ -195,7 +195,7 @@ export const BadgeProgressSection: React.FC<BadgeProgressSectionProps> = ({
         {/* View Details Button */}
         <button
           onClick={onViewNextBadgeDetails}
-          className="w-full h-9 rounded-xl bg-[#6366F1] hover:bg-[#7C7FF5] text-white text-xs font-semibold transition-all shadow-md shadow-indigo-600/20"
+          className="w-full h-9 rounded-xl bg-[#6366F1] hover:bg-[#7C7FF5] text-white text-xs font-semibold transition-all shadow-md shadow-indigo-600/20 cursor-pointer"
         >
           View Details
         </button>

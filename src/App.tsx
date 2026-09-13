@@ -41,7 +41,8 @@ import {
   RewardBadge,
   CollectionItem,
   AIIntegrationModel,
-  AppNotification
+  AppNotification,
+  UserSettingsProfile
 } from './types';
 import { Sparkles, X } from 'lucide-react';
 import { TasksPage } from './components/tasks/TasksPage';
@@ -283,6 +284,12 @@ export default function App() {
       }
       return next;
     });
+  };
+
+  // Toggle theme directly from header buttons with automatic DOM, state & storage sync
+  const handleToggleTheme = (dark: boolean) => {
+    setIsDark(dark);
+    handleUpdateAppearance({ theme: dark ? 'dark' : 'light' });
   };
 
   // Synchronize initial appearance and handle system theme updates
@@ -684,6 +691,66 @@ export default function App() {
     return res;
   };
 
+  // User Profile Update Handler (Avatar photo change, name, bio)
+  const handleUpdateUserProfile = async (updated: Partial<UserSettingsProfile>) => {
+    // 1. Immediately update currentUser state for Header, Sidebar, and Account views
+    setCurrentUser((prev) => {
+      if (!prev) {
+        return {
+          id: 'user-alex-default',
+          email: updated.email || 'alex.das@gmail.com',
+          username: updated.username || 'alex',
+          fullName: updated.displayName || 'Alex Das',
+          avatarUrl:
+            updated.avatarUrl ||
+            'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop&q=80',
+          timezone: 'America/Los_Angeles',
+          locale: 'en-US',
+          isGuest: false,
+          emailVerified: true,
+        };
+      }
+      return {
+        ...prev,
+        fullName: updated.displayName !== undefined ? updated.displayName : prev.fullName,
+        username: updated.username !== undefined ? updated.username : prev.username,
+        avatarUrl: updated.avatarUrl !== undefined ? updated.avatarUrl : prev.avatarUrl,
+      };
+    });
+
+    // 2. Immediately update in-game user state
+    setUser((prev) => ({
+      ...prev,
+      name: updated.displayName !== undefined ? updated.displayName : prev.name,
+      avatarUrl: updated.avatarUrl !== undefined ? updated.avatarUrl : prev.avatarUrl,
+      bio: updated.bio !== undefined ? updated.bio : prev.bio,
+    }));
+
+    // 3. Persist avatar to localStorage for instant reload cache
+    if (updated.avatarUrl) {
+      try {
+        localStorage.setItem('liferpg_user_avatar', updated.avatarUrl);
+      } catch (e) {
+        console.warn('LocalStorage save avatar warning:', e);
+      }
+    }
+
+    // 4. Persist to authoritative backend
+    try {
+      const res = await api.updateUserProfile({
+        avatarUrl: updated.avatarUrl,
+        displayName: updated.displayName,
+        username: updated.username,
+        bio: updated.bio,
+      });
+      if (res.state) {
+        syncFromBackend(res.state);
+      }
+    } catch (err) {
+      console.warn('Backend profile sync note:', err);
+    }
+  };
+
   return (
     <div className={`min-h-screen flex bg-[#F8FAFC] text-slate-900 dark:bg-[#08090B] dark:text-[#F5F7FF] font-sans transition-colors duration-200`}>
       {/* Full-screen Landing Welcome View if user logged out or requests landing */}
@@ -704,7 +771,9 @@ export default function App() {
               activeTab={activeTab}
               setActiveTab={setActiveTab}
               isDark={isDark}
-              setIsDark={setIsDark}
+              setIsDark={handleToggleTheme}
+              themeMode={appearance.theme}
+              onSetThemeMode={(mode) => handleUpdateAppearance({ theme: mode })}
               userLevel={user.level}
               currentUser={currentUser}
               momentumPoints={(user as any).momentumPoints ?? 4320}
@@ -735,7 +804,9 @@ export default function App() {
                       setIsMobileMenuOpen(false);
                     }}
                     isDark={isDark}
-                    setIsDark={setIsDark}
+                    setIsDark={handleToggleTheme}
+                    themeMode={appearance.theme}
+                    onSetThemeMode={(mode) => handleUpdateAppearance({ theme: mode })}
                     userLevel={user.level}
                     currentUser={currentUser}
                     momentumPoints={(user as any).momentumPoints ?? 4320}
@@ -759,18 +830,19 @@ export default function App() {
       {activeTab === 'settings' ? (
         <SettingsPage
           isDark={isDark}
-          setIsDark={setIsDark}
+          setIsDark={handleToggleTheme}
           onOpenMobileMenu={() => setIsMobileMenuOpen(true)}
           currentUser={currentUser}
           onOpenAuthModal={handleOpenAuth}
           onLogout={handleLogout}
           appearance={appearance}
           onUpdateAppearance={handleUpdateAppearance}
+          onUpdateUser={handleUpdateUserProfile}
         />
       ) : activeTab === 'ai-integration' ? (
         <AiIntegrationPage
           isDark={isDark}
-          setIsDark={setIsDark}
+          setIsDark={handleToggleTheme}
           onToggleMobileMenu={() => setIsMobileMenuOpen(true)}
           models={aiAgents}
           onSelectModel={handleSelectAIModel}
@@ -784,7 +856,7 @@ export default function App() {
       ) : activeTab === 'ai-coach' ? (
         <AiCoachPage
           isDark={isDark}
-          setIsDark={setIsDark}
+          setIsDark={handleToggleTheme}
           onToggleMobileMenu={() => setIsMobileMenuOpen(true)}
           onNavigate={(tab) => setActiveTab(tab)}
           agents={aiAgents}
@@ -810,7 +882,7 @@ export default function App() {
       ) : activeTab === 'analytics' ? (
         <AnalyticsPage
           isDark={isDark}
-          setIsDark={setIsDark}
+          setIsDark={handleToggleTheme}
           onToggleMobileMenu={() => setIsMobileMenuOpen(true)}
           liveUser={user}
           liveTasks={tasks}
@@ -820,7 +892,7 @@ export default function App() {
       ) : activeTab === 'rewards' ? (
         <RewardsPage
           isDark={isDark}
-          setIsDark={setIsDark}
+          setIsDark={handleToggleTheme}
           onToggleMobileMenu={() => setIsMobileMenuOpen(true)}
           liveMomentumPoints={(user as any).momentumPoints ?? 4320}
           livePointsThisWeek={(user as any).pointsThisWeek ?? 240}
@@ -838,7 +910,7 @@ export default function App() {
       ) : activeTab === 'friends' ? (
         <FriendsPage
           isDark={isDark}
-          setIsDark={setIsDark}
+          setIsDark={handleToggleTheme}
           onToggleMobileMenu={() => setIsMobileMenuOpen(true)}
         />
       ) : activeTab === 'goals' ? (
@@ -848,7 +920,7 @@ export default function App() {
           onUpdateGoal={handleUpdateDetailedGoal}
           onDeleteGoal={handleDeleteDetailedGoal}
           isDark={isDark}
-          setIsDark={setIsDark}
+          setIsDark={handleToggleTheme}
           onToggleMobileMenu={() => setIsMobileMenuOpen(true)}
         />
       ) : activeTab === 'calendar' ? (
@@ -858,7 +930,7 @@ export default function App() {
           onUpdateEvent={handleUpdateCalendarEvent}
           onDeleteEvent={handleDeleteCalendarEvent}
           isDark={isDark}
-          setIsDark={setIsDark}
+          setIsDark={handleToggleTheme}
           onToggleMobileMenu={() => setIsMobileMenuOpen(true)}
           notifications={notifications}
           onMarkNotificationAsRead={handleMarkNotificationAsRead}
@@ -874,7 +946,7 @@ export default function App() {
           onUpdateTask={handleUpdateTask}
           onDeleteTask={handleDeleteTask}
           isDark={isDark}
-          setIsDark={setIsDark}
+          setIsDark={handleToggleTheme}
           onToggleMobileMenu={() => setIsMobileMenuOpen(true)}
           notifications={notifications}
           onMarkNotificationAsRead={handleMarkNotificationAsRead}

@@ -1,11 +1,33 @@
 import React, { useState } from 'react';
 import { xpComparisonData } from '../../data/friendsMockData';
 
-export const XPComparisonCard: React.FC = () => {
+interface XPComparisonItem {
+  name: string;
+  xp: number;
+  display: string;
+  color: string;
+}
+
+interface XPComparisonCardProps {
+  data?: XPComparisonItem[];
+}
+
+export const XPComparisonCard: React.FC<XPComparisonCardProps> = ({ data }) => {
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
 
-  const maxXP = 5000;
-  const chartHeightPx = 130;
+  const items = data && data.length > 0 ? data : xpComparisonData;
+  const maxXP = Math.max(...items.map((i) => i.xp), 3000);
+
+  // Dynamic status note
+  const youItem = items.find((i) => i.name === 'You');
+  const leader = [...items].sort((a, b) => b.xp - a.xp)[0];
+  let motivationalText = "Keep completing quests to gain XP!";
+  if (youItem && leader && leader.name !== 'You') {
+    const diff = leader.xp - youItem.xp;
+    motivationalText = `You're ${(diff >= 1000 ? `${(diff / 1000).toFixed(1)}k` : diff)} XP behind ${leader.name}. Keep going!`;
+  } else if (youItem && leader && leader.name === 'You') {
+    motivationalText = "You are currently leading in XP this week! Outstanding work!";
+  }
 
   return (
     <div 
@@ -18,7 +40,7 @@ export const XPComparisonCard: React.FC = () => {
         
         {/* Legend */}
         <div className="flex flex-wrap items-center gap-3 mt-2 text-[11px] text-[#9AA3B5]">
-          {xpComparisonData.map((item) => (
+          {items.map((item) => (
             <div key={item.name} className="flex items-center gap-1">
               <span className="w-2 h-2 rounded-full" style={{ backgroundColor: item.color }} />
               <span className={item.name === 'You' ? 'text-white font-semibold' : ''}>{item.name}</span>
@@ -30,7 +52,7 @@ export const XPComparisonCard: React.FC = () => {
       {/* Bar Chart Container */}
       <div className="mt-5 pt-3 pb-1">
         <div className="flex items-end justify-between gap-2 sm:gap-4 h-[140px] px-2">
-          {xpComparisonData.map((item, idx) => {
+          {items.map((item, idx) => {
             const heightPercent = Math.min((item.xp / maxXP) * 100, 100);
             const isHovered = hoveredIndex === idx;
 
@@ -79,7 +101,7 @@ export const XPComparisonCard: React.FC = () => {
       {/* Bottom Health/Accountability Note */}
       <div className="mt-4 pt-3 border-t border-white/5 flex items-center justify-between text-xs text-[#9AA3B5]">
         <p className="flex items-center gap-1.5">
-          <span>You're 1.1k XP behind Rohan. Keep going!</span>
+          <span>{motivationalText}</span>
           <span>💪</span>
         </p>
       </div>

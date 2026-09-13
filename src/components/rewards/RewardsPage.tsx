@@ -209,17 +209,17 @@ export const RewardsPage: React.FC<RewardsPageProps> = ({
   };
 
   return (
-    <div id="rewards-page-container" className="flex-1 flex flex-col min-w-0 pb-24 lg:pb-12 bg-[#090B0F] text-[#F7F8FC]">
+    <div id="rewards-page-container" className="flex-1 flex flex-col min-w-0 pb-24 lg:pb-12 bg-[#F8FAFC] dark:bg-[#090B0F] text-slate-900 dark:text-[#F7F8FC]">
       {/* 1. TOP BAR */}
       <header 
         id="rewards-top-bar"
-        className="h-[72px] bg-[#0D1015] border-b border-white/6 px-4 sm:px-6 lg:px-8 flex items-center justify-between sticky top-0 z-30"
+        className="h-[72px] bg-white dark:bg-[#0D1015] border-b border-slate-200 dark:border-white/6 px-4 sm:px-6 lg:px-8 flex items-center justify-between sticky top-0 z-30 shadow-xs"
       >
         {/* Mobile Hamburger & Logo (visible on < lg) */}
         <div className="flex items-center gap-3 lg:hidden">
           <button 
             onClick={onToggleMobileMenu}
-            className="w-9 h-9 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center text-[#9AA3B5] hover:text-white"
+            className="w-9 h-9 rounded-xl bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/10 flex items-center justify-center text-slate-600 dark:text-[#9AA3B5] hover:text-slate-900 dark:hover:text-white cursor-pointer"
           >
             <Menu className="w-5 h-5" />
           </button>
@@ -227,23 +227,23 @@ export const RewardsPage: React.FC<RewardsPageProps> = ({
             <div className="w-7 h-7 rounded-lg bg-indigo-600 flex items-center justify-center text-white font-bold text-xs">
               L
             </div>
-            <span className="font-bold text-base text-white tracking-tight">LifeRPG</span>
+            <span className="font-bold text-base text-slate-900 dark:text-white tracking-tight">LifeRPG</span>
           </div>
         </div>
 
         {/* Global Search Bar on Desktop (matching image exact placeholder) */}
         <div className="hidden lg:flex items-center flex-1 max-w-[480px]">
           <div className="relative w-full">
-            <Search className="w-4 h-4 text-[#687185] absolute left-3.5 top-3" />
+            <Search className="w-4 h-4 text-slate-400 dark:text-[#687185] absolute left-3.5 top-3" />
             <input 
               id="rewards-global-search-input"
               type="text"
               value={globalSearch}
               onChange={(e) => setGlobalSearch(e.target.value)}
               placeholder="Search rewards, themes, icons, badges..."
-              className="w-full h-10 pl-10 pr-12 rounded-xl bg-[#12161E] border border-white/8 text-xs text-white placeholder:text-[#687185] focus:outline-none focus:border-[#6366F1] transition-all"
+              className="w-full h-10 pl-10 pr-12 rounded-xl bg-slate-100 dark:bg-[#12161E] border border-slate-200 dark:border-white/8 text-xs text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-[#687185] focus:outline-none focus:border-[#6366F1] transition-all"
             />
-            <kbd className="absolute right-3 top-2.5 px-1.5 py-0.5 rounded bg-white/5 border border-white/10 text-[10px] text-[#687185] font-mono">
+            <kbd className="absolute right-3 top-2.5 px-1.5 py-0.5 rounded bg-slate-200 dark:bg-white/5 border border-slate-300 dark:border-white/10 text-[10px] text-slate-500 dark:text-[#687185] font-mono">
               ⌘ K
             </kbd>
           </div>
@@ -253,27 +253,27 @@ export const RewardsPage: React.FC<RewardsPageProps> = ({
         <div className="flex items-center gap-3">
           <button 
             onClick={() => setIsTermsModalOpen(true)}
-            className="h-9 px-3 rounded-xl bg-indigo-500/10 hover:bg-indigo-500/20 border border-indigo-500/30 text-indigo-300 text-xs font-semibold flex items-center gap-1.5 transition-all shadow-xs"
+            className="h-9 px-3 rounded-xl bg-indigo-500/10 hover:bg-indigo-500/20 border border-indigo-500/30 text-indigo-600 dark:text-indigo-300 text-xs font-semibold flex items-center gap-1.5 transition-all shadow-xs cursor-pointer"
             title="Reward Claim Policy & Terms"
           >
-            <ShieldCheck className="w-4 h-4 text-[#818CF8]" />
+            <ShieldCheck className="w-4 h-4 text-indigo-600 dark:text-[#818CF8]" />
             <span className="hidden sm:inline">Claim Policy</span>
           </button>
 
           <button 
             onClick={() => setIsDark(!isDark)}
             title="Toggle theme"
-            className="w-9 h-9 rounded-xl bg-white/5 border border-white/8 flex items-center justify-center text-[#9AA3B5] hover:text-white transition-colors"
+            className="w-9 h-9 rounded-xl bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/8 flex items-center justify-center text-slate-600 dark:text-[#9AA3B5] hover:text-slate-900 dark:hover:text-white transition-colors cursor-pointer"
           >
             {isDark ? <Moon className="w-4 h-4" /> : <Sun className="w-4 h-4" />}
           </button>
 
           <button 
             title="Notifications"
-            className="w-9 h-9 rounded-xl bg-white/5 border border-white/8 flex items-center justify-center text-[#9AA3B5] hover:text-white transition-colors relative"
+            className="w-9 h-9 rounded-xl bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/8 flex items-center justify-center text-slate-600 dark:text-[#9AA3B5] hover:text-slate-900 dark:hover:text-white transition-colors relative cursor-pointer"
           >
             <Bell className="w-4 h-4" />
-            <span className="absolute top-2 right-2 w-2 h-2 rounded-full bg-red-500 ring-2 ring-[#0D1015]" />
+            <span className="absolute top-2 right-2 w-2 h-2 rounded-full bg-red-500 ring-2 ring-white dark:ring-[#0D1015]" />
           </button>
 
           {/* User Avatar Alex */}
@@ -285,7 +285,7 @@ export const RewardsPage: React.FC<RewardsPageProps> = ({
             className="w-9 h-9 rounded-full bg-gradient-to-tr from-[#6366F1] to-[#818CF8] p-[1.5px] cursor-pointer ring-2 ring-indigo-500/20 hover:ring-indigo-500/50 transition-all"
             title="View Profile Badge"
           >
-            <div className="w-full h-full rounded-full bg-[#11161D] flex items-center justify-center text-xs font-bold text-white">
+            <div className="w-full h-full rounded-full bg-slate-100 dark:bg-[#11161D] flex items-center justify-center text-xs font-bold text-slate-900 dark:text-white">
               A
             </div>
           </div>
@@ -355,9 +355,9 @@ export const RewardsPage: React.FC<RewardsPageProps> = ({
       {actionToast && (
         <div 
           id="rewards-action-toast"
-          className="fixed bottom-20 lg:bottom-8 right-6 z-50 bg-[#151A22] text-white px-4 py-2.5 rounded-2xl shadow-xl border border-white/10 flex items-center gap-2.5 animate-in fade-in slide-in-from-bottom-4 duration-300"
+          className="fixed bottom-20 lg:bottom-8 right-6 z-50 bg-white dark:bg-[#151A22] text-slate-900 dark:text-white px-4 py-2.5 rounded-2xl shadow-xl border border-slate-200 dark:border-white/10 flex items-center gap-2.5 animate-in fade-in slide-in-from-bottom-4 duration-300"
         >
-          <div className="w-5 h-5 rounded-full bg-[#6366F1]/20 text-[#818CF8] flex items-center justify-center">
+          <div className="w-5 h-5 rounded-full bg-[#6366F1]/20 text-[#6366F1] dark:text-[#818CF8] flex items-center justify-center">
             <Check className="w-3 h-3 stroke-[3]" />
           </div>
           <span className="text-xs font-semibold">{actionToast}</span>

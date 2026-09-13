@@ -332,16 +332,16 @@ export const CalendarPage: React.FC<CalendarPageProps> = ({
 
           {/* Search Input */}
           <div className="relative w-full max-w-sm sm:max-w-md">
-            <Search className="w-4 h-4 text-[#6F7789] absolute left-3.5 top-1/2 -translate-y-1/2" />
+            <Search className="w-4 h-4 text-slate-400 dark:text-[#6F7789] absolute left-3.5 top-1/2 -translate-y-1/2" />
             <input
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Search events, tasks, or type / for commands..."
-              className="w-full h-10 pl-9 pr-14 bg-[#151820] border border-white/8 rounded-xl text-xs sm:text-sm text-[#F5F7FF] placeholder:text-[#6F7789] focus:outline-none focus:ring-1 focus:ring-[#6C63FF] focus:border-[#6C63FF] transition-all"
+              className="w-full h-10 pl-9 pr-14 bg-slate-100 dark:bg-[#151820] border border-slate-200 dark:border-white/8 rounded-xl text-xs sm:text-sm text-slate-900 dark:text-[#F5F7FF] placeholder:text-slate-400 dark:placeholder:text-[#6F7789] focus:outline-none focus:ring-1 focus:ring-[#6C63FF] focus:border-[#6C63FF] transition-all"
             />
             <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-0.5 pointer-events-none">
-              <kbd className="px-1.5 py-0.5 text-[10px] font-medium text-[#A6AEC0] bg-[#111318] border border-white/10 rounded shadow-2xs">
+              <kbd className="px-1.5 py-0.5 text-[10px] font-medium text-slate-500 dark:text-[#A6AEC0] bg-slate-200 dark:bg-[#111318] border border-slate-300 dark:border-white/10 rounded shadow-2xs">
                 ⌘ K
               </kbd>
             </div>
@@ -352,7 +352,7 @@ export const CalendarPage: React.FC<CalendarPageProps> = ({
         <div className="flex items-center gap-2 sm:gap-3.5 pl-3">
           <button
             onClick={() => setIsDark(!isDark)}
-            className="p-2 rounded-xl text-[#A6AEC0] hover:text-white hover:bg-white/5 transition-colors"
+            className="p-2 rounded-xl text-slate-600 dark:text-[#A6AEC0] hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-white/5 transition-colors cursor-pointer"
             aria-label="Toggle theme"
           >
             {isDark ? (
@@ -511,7 +511,7 @@ export const CalendarPage: React.FC<CalendarPageProps> = ({
             />
 
             {/* 2. Selected-Day Events */}
-            <div className="bg-[#111318] border border-white/8 rounded-xl p-4 shadow-xs">
+            <div className="bg-white dark:bg-[#111318] border border-slate-200 dark:border-white/8 rounded-xl p-4 shadow-xs">
               <SelectedDayPanel
                 selectedDate={selectedDate}
                 events={selectedDayEvents}
@@ -521,7 +521,7 @@ export const CalendarPage: React.FC<CalendarPageProps> = ({
             </div>
 
             {/* 3. Upcoming Events (Next 7-14 Days) */}
-            <div className="bg-[#111318] border border-white/8 rounded-xl p-4 shadow-xs">
+            <div className="bg-white dark:bg-[#111318] border border-slate-200 dark:border-white/8 rounded-xl p-4 shadow-xs">
               <UpcomingEventsPanel
                 events={upcomingEvents}
                 onSelectEvent={setSelectedEventForDetail}

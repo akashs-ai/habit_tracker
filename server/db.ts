@@ -28,7 +28,11 @@ import {
   AnalyticsAchievement,
   AIIntegrationModel,
   AIAgentVerifyPayload,
-  AuthUser
+  AuthUser,
+  FriendUser,
+  FriendRequest,
+  SuggestedFriend,
+  CalendarIntegrationState
 } from '../src/types';
 import { 
   initialUserProfile, 
@@ -126,6 +130,16 @@ export interface ActivityCheckIn {
   momentumPointsEarned: number;
 }
 
+export interface FriendshipRecord {
+  id: string;
+  user_id: string;
+  friend_id: string;
+  status: 'pending' | 'accepted' | 'rejected';
+  reason?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface AppStoreData {
   user: UserProfile & {
     momentumPoints: number;
@@ -147,6 +161,7 @@ export interface AppStoreData {
   activityHistory: ActivityCheckIn[];
   termsPolicy: RewardTermsPolicy;
   aiAgents?: AIIntegrationModel[];
+  calendarIntegration?: CalendarIntegrationState;
   lastUpdated: string;
 }
 
@@ -162,6 +177,7 @@ export const defaultAIAgents: AIIntegrationModel[] = [
     accountEmail: 'alex.das@openai.user',
     connectedAt: new Date().toISOString(),
     modelTier: 'GPT-4o (Omni)',
+    verified: true,
   },
   {
     id: 'claude',
@@ -198,12 +214,15 @@ class LifeRpgDatabase {
   private activeUserId: string = 'user-alex-default';
   private users: UserAccount[] = [];
   private sessions: UserSession[] = [];
+  private friendships: FriendshipRecord[] = [];
   private userStores: Record<string, AppStoreData> = {};
 
   constructor() {
     this.ensureDataDir();
     this.loadUsers();
+    this.ensureSeedUsers();
     this.loadSessions();
+    this.loadFriendships();
     this.userStores[this.defaultUserId] = this.loadInitialData();
   }
 
@@ -293,6 +312,280 @@ class LifeRpgDatabase {
     } catch (err) {
       console.error('Failed to save sessions.json:', err);
     }
+  }
+
+  private get FRIENDSHIPS_FILE() {
+    return path.join(DATA_DIR, 'friendships.json');
+  }
+
+  private saveFriendships() {
+    try {
+      fs.writeFileSync(this.FRIENDSHIPS_FILE, JSON.stringify(this.friendships, null, 2), 'utf-8');
+    } catch (err) {
+      console.error('Failed to save friendships.json:', err);
+    }
+  }
+
+  private loadFriendships() {
+    try {
+      if (fs.existsSync(this.FRIENDSHIPS_FILE)) {
+        this.friendships = JSON.parse(fs.readFileSync(this.FRIENDSHIPS_FILE, 'utf-8'));
+      } else {
+        this.friendships = [];
+      }
+    } catch (e) {
+      console.warn('Could not read friendships.json, re-initializing:', e);
+      this.friendships = [];
+    }
+
+    if (this.friendships.length === 0) {
+      this.ensureSeedFriendships();
+    }
+  }
+
+  private ensureSeedUsers() {
+    const seedUsersData = [
+      {
+        id: 'user-rohan',
+        email: 'rohan.mehta@dev.io',
+        username: 'rohan.dev',
+        fullName: 'Rohan Mehta',
+        avatarUrl: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150&auto=format&fit=crop&q=80',
+        level: 18,
+        xp: 4320,
+        streakDays: 28,
+        weeklyQuests: 7,
+        status: 'online' as const,
+        activityStatus: 'Online',
+        bio: 'Building a better me, one day at a time.',
+        tags: ['DSA', 'Fitness', 'Productivity'],
+      },
+      {
+        id: 'user-sneha',
+        email: 'sneha.kapoor@design.io',
+        username: 'sneha.k',
+        fullName: 'Sneha Kapoor',
+        avatarUrl: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=150&auto=format&fit=crop&q=80',
+        level: 16,
+        xp: 3980,
+        streakDays: 26,
+        weeklyQuests: 6,
+        status: 'online' as const,
+        activityStatus: 'Reading',
+        bio: 'Designing user-friendly interfaces & daily mindfulness practice.',
+        tags: ['UI/UX', 'Reading', 'Deep Work'],
+      },
+      {
+        id: 'user-kabir',
+        email: 'kabir.malhotra@code.org',
+        username: 'kabir.dev',
+        fullName: 'Kabir Malhotra',
+        avatarUrl: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&auto=format&fit=crop&q=80',
+        level: 12,
+        xp: 2740,
+        streakDays: 18,
+        weeklyQuests: 5,
+        status: 'away' as const,
+        activityStatus: 'Away',
+        bio: 'Backend developer, runner, lifelong learner.',
+        tags: ['Coding', 'Tech', 'Running'],
+      },
+      {
+        id: 'user-ishita',
+        email: 'ishita.sen@growth.in',
+        username: 'ishita.sen',
+        fullName: 'Ishita Sen',
+        avatarUrl: 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=150&auto=format&fit=crop&q=80',
+        level: 11,
+        xp: 2610,
+        streakDays: 17,
+        weeklyQuests: 4,
+        status: 'online' as const,
+        activityStatus: 'Focusing',
+        bio: 'Daily consistency with coding and morning workouts.',
+        tags: ['Fitness', 'Focus', 'Writing'],
+      },
+      {
+        id: 'user-meera',
+        email: 'meera.joshi@read.co',
+        username: 'meera.n',
+        fullName: 'Meera Joshi',
+        avatarUrl: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=150&auto=format&fit=crop&q=80',
+        level: 10,
+        xp: 2340,
+        streakDays: 16,
+        weeklyQuests: 4,
+        status: 'offline' as const,
+        activityStatus: 'Offline',
+        bio: 'Avid reader & passionate about personal development.',
+        tags: ['Reading', 'Growth', 'Journaling'],
+      },
+      {
+        id: 'user-priya',
+        email: 'priya.sharma@engineer.net',
+        username: 'priya.s',
+        fullName: 'Priya Sharma',
+        avatarUrl: 'https://images.unsplash.com/photo-1517841905240-472988babdf9?w=150&auto=format&fit=crop&q=80',
+        level: 9,
+        xp: 2120,
+        streakDays: 14,
+        weeklyQuests: 3,
+        status: 'online' as const,
+        activityStatus: 'Working',
+        bio: 'Software engineer building intuitive web experiences.',
+        tags: ['Tech', 'Deep Work'],
+      },
+      {
+        id: 'user-arjun',
+        email: 'arjun.verma@college.edu',
+        username: 'arjun.v',
+        fullName: 'Arjun Verma',
+        avatarUrl: 'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=150&auto=format&fit=crop&q=80',
+        level: 10,
+        xp: 2250,
+        streakDays: 15,
+        weeklyQuests: 4,
+        status: 'online' as const,
+        activityStatus: 'Coding',
+        bio: 'CS student, competitive programmer, campus community organizer.',
+        tags: ['Algorithms', 'College'],
+      },
+      {
+        id: 'user-neha',
+        email: 'neha.singh@fitness.org',
+        username: 'neha.singh',
+        fullName: 'Neha Singh',
+        avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80',
+        level: 11,
+        xp: 2480,
+        streakDays: 16,
+        weeklyQuests: 5,
+        status: 'online' as const,
+        activityStatus: 'Studying',
+        bio: 'Fitness, healthy routines, and daily system design prep.',
+        tags: ['DSA', 'Fitness'],
+      },
+      {
+        id: 'user-aarav',
+        email: 'aarav.mehta@athlete.com',
+        username: 'aarav.fit',
+        fullName: 'Aarav Mehta',
+        avatarUrl: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=150&auto=format&fit=crop&q=80',
+        level: 9,
+        xp: 2010,
+        streakDays: 14,
+        weeklyQuests: 3,
+        status: 'online' as const,
+        activityStatus: 'At Gym',
+        bio: 'Strength conditioning, daily stretching, and clean eating.',
+        tags: ['Fitness', 'Focus'],
+      },
+    ];
+
+    let usersChanged = false;
+    for (const seed of seedUsersData) {
+      let existing = this.users.find((u) => u.id === seed.id || u.username === seed.username);
+      if (!existing) {
+        existing = {
+          id: seed.id,
+          email: seed.email,
+          username: seed.username,
+          fullName: seed.fullName,
+          avatarUrl: seed.avatarUrl,
+          timezone: 'America/Los_Angeles',
+          locale: 'en-US',
+          isGuest: false,
+          emailVerified: true,
+          passwordHash: 'password123',
+          createdAt: '2025-01-20T10:00:00.000Z',
+          updatedAt: new Date().toISOString(),
+          lastSeenAt: new Date().toISOString(),
+        };
+        this.users.push(existing);
+        usersChanged = true;
+      }
+
+      // Ensure their store has realistic stats
+      const userFile = path.join(DATA_DIR, 'user_stores', `${seed.id}.json`);
+      if (!fs.existsSync(userFile)) {
+        const store = this.createStarterStore(seed.fullName, false);
+        store.user.level = seed.level;
+        store.user.currentXp = seed.xp;
+        (store.user as any).xp = seed.xp;
+        store.user.nextLevelXp = (seed.level + 1) * 300;
+        store.user.streakDays = seed.streakDays;
+        (store.user as any).avatarUrl = seed.avatarUrl;
+        (store.user as any).bio = seed.bio;
+        (store.user as any).status = seed.status;
+        (store.user as any).activityStatus = seed.activityStatus;
+        (store.user as any).tags = seed.tags;
+        (store.user as any).weeklyQuestsCompleted = seed.weeklyQuests;
+        this.saveUserStore(seed.id, store);
+        this.userStores[seed.id] = store;
+      }
+    }
+
+    if (usersChanged) {
+      this.saveUsers();
+    }
+  }
+
+  private ensureSeedFriendships() {
+    const defaultFriendships: FriendshipRecord[] = [
+      {
+        id: 'fr-alex-rohan',
+        user_id: 'user-alex-default',
+        friend_id: 'user-rohan',
+        status: 'accepted',
+        createdAt: '2025-01-25T12:00:00.000Z',
+        updatedAt: '2025-01-25T12:00:00.000Z',
+      },
+      {
+        id: 'fr-alex-sneha',
+        user_id: 'user-alex-default',
+        friend_id: 'user-sneha',
+        status: 'accepted',
+        createdAt: '2025-01-28T14:30:00.000Z',
+        updatedAt: '2025-01-28T14:30:00.000Z',
+      },
+      {
+        id: 'fr-alex-kabir',
+        user_id: 'user-alex-default',
+        friend_id: 'user-kabir',
+        status: 'accepted',
+        createdAt: '2025-02-02T09:15:00.000Z',
+        updatedAt: '2025-02-02T09:15:00.000Z',
+      },
+      {
+        id: 'fr-alex-ishita',
+        user_id: 'user-alex-default',
+        friend_id: 'user-ishita',
+        status: 'accepted',
+        createdAt: '2025-02-05T16:45:00.000Z',
+        updatedAt: '2025-02-05T16:45:00.000Z',
+      },
+      {
+        id: 'req-arjun-alex',
+        user_id: 'user-arjun',
+        friend_id: 'user-alex-default',
+        status: 'pending',
+        reason: 'From your college',
+        createdAt: new Date(Date.now() - 10 * 60000).toISOString(),
+        updatedAt: new Date(Date.now() - 10 * 60000).toISOString(),
+      },
+      {
+        id: 'req-neha-alex',
+        user_id: 'user-neha',
+        friend_id: 'user-alex-default',
+        status: 'pending',
+        reason: 'Similar goals: DSA, Fitness',
+        createdAt: new Date(Date.now() - 3600000).toISOString(),
+        updatedAt: new Date(Date.now() - 3600000).toISOString(),
+      },
+    ];
+
+    this.friendships = defaultFriendships;
+    this.saveFriendships();
   }
 
   private get data(): AppStoreData {
@@ -496,6 +789,360 @@ class LifeRpgDatabase {
     const session = this.sessions.find((s) => s.token === token);
     if (!session) return null;
     return this.getUserById(session.userId);
+  }
+
+  public updateUserProfile(
+    updates: { avatarUrl?: string; displayName?: string; username?: string; bio?: string },
+    userId?: string
+  ): { user: UserProfile; account: UserAccount | null } {
+    const uid = userId || this.activeUserId || this.defaultUserId;
+
+    // Update account record
+    const account = this.getUserById(uid);
+    if (account) {
+      if (updates.avatarUrl !== undefined) account.avatarUrl = updates.avatarUrl;
+      if (updates.displayName !== undefined) account.fullName = updates.displayName;
+      if (updates.username !== undefined) account.username = updates.username;
+      account.updatedAt = new Date().toISOString();
+      this.saveUsers();
+    }
+
+    // Update game profile in state
+    if (updates.avatarUrl !== undefined) this.data.user.avatarUrl = updates.avatarUrl;
+    if (updates.displayName !== undefined) this.data.user.name = updates.displayName;
+    if (updates.bio !== undefined) this.data.user.bio = updates.bio;
+
+    this.persist();
+    return {
+      user: this.data.user,
+      account: account || null,
+    };
+  }
+
+  // --- Friends & Social Accountability Methods ---
+  public getFriendships(userId?: string): FriendshipRecord[] {
+    const uid = userId || this.activeUserId || this.defaultUserId;
+    return this.friendships.filter((f) => f.user_id === uid || f.friend_id === uid);
+  }
+
+  public getFriends(userId?: string): FriendUser[] {
+    const uid = userId || this.activeUserId || this.defaultUserId;
+    const accepted = this.friendships.filter(
+      (f) => (f.user_id === uid || f.friend_id === uid) && f.status === 'accepted'
+    );
+
+    const friendsList: FriendUser[] = [];
+
+    // Current user representation
+    const myAccount = this.getUserById(uid);
+    const myStore = this.getStore(uid);
+
+    const meUser: FriendUser = {
+      id: uid,
+      name: `${myAccount?.fullName || 'Alex'} (You)`,
+      username: myAccount?.username || 'alex',
+      avatarUrl: myAccount?.avatarUrl || (myStore.user as any).avatarUrl || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop&q=80',
+      level: myStore.user.level || 12,
+      xp: (myStore.user as any).xp || myStore.user.currentXp || 2860,
+      consistencyDays: myStore.user.streakDays || 21,
+      status: 'online',
+      activityStatus: 'Studying',
+      bio: (myStore.user as any).bio || 'Consistency > Intensity. Mastering fullstack systems.',
+      tags: ['Coding', 'Systems', 'Focus'],
+      isCurrentUser: true,
+      isFriend: true,
+    };
+    friendsList.push(meUser);
+
+    for (const f of accepted) {
+      const friendId = f.user_id === uid ? f.friend_id : f.user_id;
+      const account = this.getUserById(friendId);
+      const store = this.getStore(friendId);
+
+      friendsList.push({
+        id: friendId,
+        name: account?.fullName || 'Friend',
+        username: account?.username || friendId,
+        avatarUrl: account?.avatarUrl || (store.user as any).avatarUrl || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150&auto=format&fit=crop&q=80',
+        level: store.user.level || 10,
+        xp: (store.user as any).xp || store.user.currentXp || 2000,
+        consistencyDays: store.user.streakDays || 14,
+        status: (store.user as any).status || 'online',
+        activityStatus: (store.user as any).activityStatus || 'Active',
+        bio: (store.user as any).bio || 'Building a better me, one day at a time.',
+        tags: (store.user as any).tags || ['Fitness', 'Focus'],
+        isCurrentUser: false,
+        isFriend: true,
+      });
+    }
+
+    return friendsList;
+  }
+
+  public getFriendRequests(userId?: string): FriendRequest[] {
+    const uid = userId || this.activeUserId || this.defaultUserId;
+    const pending = this.friendships.filter(
+      (f) => f.friend_id === uid && f.status === 'pending'
+    );
+
+    return pending.map((rec) => {
+      const sender = this.getUserById(rec.user_id);
+      const elapsedMinutes = Math.max(1, Math.round((Date.now() - new Date(rec.createdAt).getTime()) / 60000));
+      let timeAgo = `${elapsedMinutes}m ago`;
+      if (elapsedMinutes >= 60) {
+        timeAgo = `${Math.round(elapsedMinutes / 60)}h ago`;
+      }
+
+      return {
+        id: rec.id,
+        name: sender?.fullName || 'Adventurer',
+        username: sender?.username || rec.user_id,
+        avatarUrl: sender?.avatarUrl || 'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=150&auto=format&fit=crop&q=80',
+        reason: rec.reason || 'Wants to connect as an accountability partner',
+        mutualCount: 2,
+        timeAgo,
+      };
+    });
+  }
+
+  public getSuggestedFriends(userId?: string): SuggestedFriend[] {
+    const uid = userId || this.activeUserId || this.defaultUserId;
+    const existingRelatedIds = new Set<string>([uid]);
+
+    for (const f of this.friendships) {
+      if (f.user_id === uid) existingRelatedIds.add(f.friend_id);
+      if (f.friend_id === uid) existingRelatedIds.add(f.user_id);
+    }
+
+    const suggestions: SuggestedFriend[] = [];
+    for (const u of this.users) {
+      if (!existingRelatedIds.has(u.id)) {
+        suggestions.push({
+          id: u.id,
+          name: u.fullName,
+          username: u.username,
+          avatarUrl: u.avatarUrl,
+          sharedInterest: 'Similar goals: Focus & Consistency',
+        });
+      }
+    }
+
+    return suggestions;
+  }
+
+  public searchUsers(query: string, currentUserId?: string) {
+    const uid = currentUserId || this.activeUserId || this.defaultUserId;
+    const q = (query || '').trim().toLowerCase();
+
+    return this.users
+      .filter((u) => u.id !== uid)
+      .filter((u) => !q || u.fullName.toLowerCase().includes(q) || u.username.toLowerCase().includes(q) || u.email.toLowerCase().includes(q))
+      .map((u) => {
+        const store = this.getStore(u.id);
+        const friendship = this.friendships.find(
+          (f) => (f.user_id === uid && f.friend_id === u.id) || (f.friend_id === uid && f.user_id === u.id)
+        );
+
+        let status: 'none' | 'friends' | 'pending_sent' | 'pending_received' = 'none';
+        if (friendship) {
+          if (friendship.status === 'accepted') status = 'friends';
+          else if (friendship.status === 'pending') {
+            status = friendship.user_id === uid ? 'pending_sent' : 'pending_received';
+          }
+        }
+
+        return {
+          id: u.id,
+          name: u.fullName,
+          username: u.username,
+          avatarUrl: u.avatarUrl,
+          level: store.user.level || 10,
+          xp: (store.user as any).xp || store.user.currentXp || 2000,
+          consistencyDays: store.user.streakDays || 14,
+          status: (store.user as any).status || 'online',
+          reason: (store.user as any).bio || 'Similar goals: Fitness, Focus',
+          friendshipStatus: status,
+          friendshipId: friendship?.id,
+        };
+      });
+  }
+
+  public sendFriendRequest(requesterId: string, recipientIdOrIdentifier: string, reason?: string) {
+    let target = this.getUserById(recipientIdOrIdentifier) 
+      || this.getUserByUsername(recipientIdOrIdentifier) 
+      || this.getUserByEmail(recipientIdOrIdentifier);
+
+    if (!target) {
+      // Auto-register candidate friend if inviting a new username
+      const cleanUsername = recipientIdOrIdentifier.trim().toLowerCase().replace(/[^a-z0-9_.]/g, '');
+      const newId = `user-${cleanUsername || Date.now()}`;
+      target = {
+        id: newId,
+        email: `${cleanUsername || 'user'}@example.com`,
+        username: cleanUsername || `user_${Date.now()}`,
+        fullName: recipientIdOrIdentifier.trim(),
+        avatarUrl: `https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150&auto=format&fit=crop&q=80`,
+        timezone: 'America/Los_Angeles',
+        locale: 'en-US',
+        isGuest: false,
+        emailVerified: false,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        lastSeenAt: new Date().toISOString(),
+      };
+      this.users.push(target);
+      this.saveUsers();
+    }
+
+    if (target.id === requesterId) {
+      throw new Error("You cannot send a friend request to yourself.");
+    }
+
+    // Check existing
+    const existing = this.friendships.find(
+      (f) => (f.user_id === requesterId && f.friend_id === target!.id) ||
+             (f.user_id === target!.id && f.friend_id === requesterId)
+    );
+
+    if (existing) {
+      if (existing.status === 'accepted') {
+        throw new Error(`You are already connected with ${target.fullName}.`);
+      }
+      if (existing.status === 'pending') {
+        if (existing.user_id === requesterId) {
+          return { success: true, friendship: existing, message: `Invite already pending for ${target.fullName}.` };
+        } else {
+          // They sent you a request! Auto-accept into mutual connection
+          existing.status = 'accepted';
+          existing.updatedAt = new Date().toISOString();
+          this.saveFriendships();
+          return { success: true, friendship: existing, message: `Mutual request! You are now friends with ${target.fullName}.` };
+        }
+      }
+      // If previously rejected, allow re-requesting
+      existing.status = 'pending';
+      existing.user_id = requesterId;
+      existing.friend_id = target.id;
+      existing.reason = reason || 'Similar goals: Habit tracking & Focus';
+      existing.updatedAt = new Date().toISOString();
+      this.saveFriendships();
+      return { success: true, friendship: existing, message: `Friend request sent to ${target.fullName}.` };
+    }
+
+    const newRecord: FriendshipRecord = {
+      id: `fr-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+      user_id: requesterId,
+      friend_id: target.id,
+      status: 'pending',
+      reason: reason || 'Similar goals: Habit tracking & Focus',
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+
+    this.friendships.push(newRecord);
+    this.saveFriendships();
+
+    return {
+      success: true,
+      friendship: newRecord,
+      message: `Friend request sent to ${target.fullName}.`,
+    };
+  }
+
+  public acceptFriendRequest(requestIdOrSenderId: string, currentUserId?: string) {
+    const uid = currentUserId || this.activeUserId || this.defaultUserId;
+    const index = this.friendships.findIndex(
+      (f) => (f.id === requestIdOrSenderId || (f.user_id === requestIdOrSenderId && f.friend_id === uid)) && f.status === 'pending'
+    );
+
+    if (index === -1) {
+      throw new Error('Friend request not found or already accepted.');
+    }
+
+    this.friendships[index].status = 'accepted';
+    this.friendships[index].updatedAt = new Date().toISOString();
+    this.saveFriendships();
+
+    const friendId = this.friendships[index].user_id === uid 
+      ? this.friendships[index].friend_id 
+      : this.friendships[index].user_id;
+
+    const friendAccount = this.getUserById(friendId);
+    return {
+      success: true,
+      friendship: this.friendships[index],
+      message: `You are now friends with ${friendAccount?.fullName || 'friend'}!`,
+    };
+  }
+
+  public rejectFriendRequest(requestIdOrSenderId: string, currentUserId?: string) {
+    const uid = currentUserId || this.activeUserId || this.defaultUserId;
+    const index = this.friendships.findIndex(
+      (f) => f.id === requestIdOrSenderId || (f.user_id === requestIdOrSenderId && f.friend_id === uid)
+    );
+
+    if (index !== -1) {
+      this.friendships[index].status = 'rejected';
+      this.friendships[index].updatedAt = new Date().toISOString();
+      this.saveFriendships();
+    }
+
+    return { success: true, message: 'Request declined.' };
+  }
+
+  public removeFriend(friendUserId: string, currentUserId?: string) {
+    const uid = currentUserId || this.activeUserId || this.defaultUserId;
+    this.friendships = this.friendships.filter(
+      (f) => !((f.user_id === uid && f.friend_id === friendUserId) || (f.friend_id === uid && f.user_id === friendUserId))
+    );
+    this.saveFriendships();
+    return { success: true };
+  }
+
+  public getFriendsProgressData(currentUserId?: string) {
+    const uid = currentUserId || this.activeUserId || this.defaultUserId;
+    const friends = this.getFriends(uid);
+    const requests = this.getFriendRequests(uid);
+
+    // Leaderboard sorted by XP descending
+    const leaderboard = [...friends].sort((a, b) => b.xp - a.xp);
+
+    // XP comparison data
+    const chartColors = ['#6366F1', '#38BDF8', '#FB7185', '#FBBF24', '#34D399', '#A855F7', '#EC4899'];
+    const topForChart = leaderboard.slice(0, 5);
+    const xpComparison = topForChart.map((u, i) => ({
+      name: u.isCurrentUser ? 'You' : u.name.split(' ')[0],
+      xp: u.xp,
+      color: chartColors[i % chartColors.length],
+      display: `${(u.xp / 1000).toFixed(1)}k`,
+      isCurrent: Boolean(u.isCurrentUser),
+    }));
+
+    // Consistency streaks sorted by days descending
+    const consistencyStreaks = [...friends]
+      .sort((a, b) => b.consistencyDays - a.consistencyDays)
+      .slice(0, 5)
+      .map((u) => ({
+        name: u.isCurrentUser ? `${u.name.split(' ')[0]} (You)` : u.name,
+        avatarUrl: u.avatarUrl,
+        days: u.consistencyDays,
+        isCurrent: Boolean(u.isCurrentUser),
+      }));
+
+    const acceptedFriendsOnly = friends.filter((f) => !f.isCurrentUser);
+    const onlineCount = friends.filter((f) => f.status === 'online').length;
+
+    return {
+      friends,
+      leaderboard,
+      xpComparison,
+      consistencyStreaks,
+      summary: {
+        friendsCount: acceptedFriendsOnly.length,
+        requestsCount: requests.length,
+        onlineCount,
+      },
+    };
   }
 
   public register(payload: {
@@ -856,12 +1503,22 @@ class LifeRpgDatabase {
             return {
               ...def,
               ...agent,
+              verified: agent.verified !== undefined ? agent.verified : (agent.status === 'connected'),
               syncStatus: agent.syncStatus || (agent.status === 'connected' ? 'synced' : 'ready'),
               latencyMs: agent.latencyMs || (agent.id === 'gemini' ? 98 : agent.id === 'chatgpt' ? 185 : 162),
               lastSyncedAt: agent.lastSyncedAt || new Date().toISOString(),
               isEnvironmentKeyConfigured: agent.id === 'gemini' ? Boolean(process.env.GEMINI_API_KEY) : false,
             };
           });
+
+          const anyConnected = parsed.aiAgents.some((a: any) => a.status === 'connected' && a.verified);
+          if (!anyConnected && parsed.aiAgents.length > 0) {
+            parsed.aiAgents[0].status = 'connected';
+            parsed.aiAgents[0].verified = true;
+            parsed.aiAgents[0].selected = true;
+            parsed.aiAgents[0].accountEmail = parsed.aiAgents[0].accountEmail || 'alex.das@openai.user';
+            parsed.aiAgents[0].modelTier = parsed.aiAgents[0].modelTier || 'GPT-4o (Omni)';
+          }
         }
 
         return parsed;
@@ -1273,6 +1930,31 @@ class LifeRpgDatabase {
     this.addXpAndPoints(allDone ? -20 : 20, allDone ? -15 : 15, evt.category);
     this.persist();
     return evt;
+  }
+
+  // --- Calendar Integration State ---
+  public getCalendarIntegration(): CalendarIntegrationState {
+    if (!this.data.calendarIntegration) {
+      this.data.calendarIntegration = {
+        provider: 'Google Calendar',
+        status: 'connected',
+        account: 'alex.das@gmail.com',
+        permission: 'read_edit',
+        useInCoach: true,
+      };
+      this.persist();
+    }
+    return this.data.calendarIntegration;
+  }
+
+  public updateCalendarIntegration(updates: Partial<CalendarIntegrationState>): CalendarIntegrationState {
+    const current = this.getCalendarIntegration();
+    this.data.calendarIntegration = {
+      ...current,
+      ...updates,
+    };
+    this.persist();
+    return this.data.calendarIntegration;
   }
 
   // --- Detailed Goals & Cross-Calculation ---

@@ -24,22 +24,22 @@ export const HabitBreakdownCard: React.FC<HabitBreakdownCardProps> = ({ categori
   return (
     <div 
       id="analytics-habit-breakdown-card"
-      className="p-4 sm:p-5 rounded-xl bg-[#0F1723] border border-white/7 flex flex-col justify-between"
+      className="p-4 sm:p-5 rounded-xl bg-white dark:bg-[#0F1723] border border-slate-200 dark:border-white/7 shadow-xs flex flex-col justify-between"
     >
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-2">
-        <h2 className="text-sm sm:text-base font-bold text-white tracking-tight">
+        <h2 className="text-sm sm:text-base font-bold text-slate-900 dark:text-white tracking-tight">
           Habit Breakdown
         </h2>
 
         {/* Tab Pills */}
-        <div className="flex items-center gap-1 bg-white/4 p-0.5 rounded-lg border border-white/6 self-start sm:self-auto">
+        <div className="flex items-center gap-1 bg-slate-100 dark:bg-white/4 p-0.5 rounded-lg border border-slate-200 dark:border-white/6 self-start sm:self-auto">
           <button
             onClick={() => setActiveTab('type')}
             className={`px-2.5 py-1 rounded-md text-[11px] font-semibold transition-all ${
               activeTab === 'type'
                 ? 'bg-[#6366F1] text-white shadow-xs'
-                : 'text-[#94A3B8] hover:text-white'
+                : 'text-slate-600 dark:text-[#94A3B8] hover:text-slate-900 dark:hover:text-white'
             }`}
           >
             Habit Type
@@ -49,7 +49,7 @@ export const HabitBreakdownCard: React.FC<HabitBreakdownCardProps> = ({ categori
             className={`px-2.5 py-1 rounded-md text-[11px] font-semibold transition-all ${
               activeTab === 'time'
                 ? 'bg-[#6366F1] text-white shadow-xs'
-                : 'text-[#94A3B8] hover:text-white'
+                : 'text-slate-600 dark:text-[#94A3B8] hover:text-slate-900 dark:hover:text-white'
             }`}
           >
             Time Spent
@@ -59,7 +59,7 @@ export const HabitBreakdownCard: React.FC<HabitBreakdownCardProps> = ({ categori
             className={`px-2.5 py-1 rounded-md text-[11px] font-semibold transition-all ${
               activeTab === 'completion'
                 ? 'bg-[#6366F1] text-white shadow-xs'
-                : 'text-[#94A3B8] hover:text-white'
+                : 'text-slate-600 dark:text-[#94A3B8] hover:text-slate-900 dark:hover:text-white'
             }`}
           >
             Completion
@@ -76,7 +76,7 @@ export const HabitBreakdownCard: React.FC<HabitBreakdownCardProps> = ({ categori
               cx={center}
               cy={center}
               r={radius}
-              className="stroke-white/6 fill-none"
+              className="stroke-slate-100 dark:stroke-white/6 fill-none"
               strokeWidth={strokeWidth}
             />
             {categories.map((cat) => {
@@ -106,12 +106,12 @@ export const HabitBreakdownCard: React.FC<HabitBreakdownCardProps> = ({ categori
 
           {/* Center Label */}
           <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none text-center">
-            <span className="text-xl font-extrabold text-white tracking-tight leading-none tabular-nums">
+            <span className="text-xl font-extrabold text-slate-900 dark:text-white tracking-tight leading-none tabular-nums">
               {hoveredCategory
                 ? categories.find(c => c.name === hoveredCategory)?.count || totalCount
                 : totalCount}
             </span>
-            <span className="text-[10px] text-[#94A3B8] font-medium mt-0.5 leading-none">
+            <span className="text-[10px] text-slate-500 dark:text-[#94A3B8] font-medium mt-0.5 leading-none">
               {hoveredCategory || 'Total Habits'}
             </span>
           </div>
@@ -127,7 +127,7 @@ export const HabitBreakdownCard: React.FC<HabitBreakdownCardProps> = ({ categori
                 onMouseEnter={() => setHoveredCategory(cat.name)}
                 onMouseLeave={() => setHoveredCategory(null)}
                 className={`flex items-center justify-between gap-2 text-xs py-0.5 px-1.5 rounded transition-all cursor-pointer ${
-                  isHovered ? 'bg-white/6 text-white' : 'text-[#94A3B8]'
+                  isHovered ? 'bg-slate-100 dark:bg-white/6 text-slate-900 dark:text-white' : 'text-slate-600 dark:text-[#94A3B8]'
                 }`}
               >
                 <div className="flex items-center gap-2 min-w-0">
@@ -135,11 +135,11 @@ export const HabitBreakdownCard: React.FC<HabitBreakdownCardProps> = ({ categori
                     className="w-2 h-2 rounded-full shrink-0"
                     style={{ backgroundColor: cat.color }}
                   />
-                  <span className={`truncate ${isHovered ? 'text-white font-medium' : 'text-[#CBD5E1]'}`}>
+                  <span className={`truncate ${isHovered ? 'text-slate-900 dark:text-white font-medium' : 'text-slate-700 dark:text-[#CBD5E1]'}`}>
                     {cat.name}
                   </span>
                 </div>
-                <span className="font-semibold text-white/90 tabular-nums">
+                <span className="font-semibold text-slate-900 dark:text-white/90 tabular-nums">
                   {cat.percentage}%
                 </span>
               </div>

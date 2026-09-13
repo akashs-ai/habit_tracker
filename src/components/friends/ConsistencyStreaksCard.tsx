@@ -2,13 +2,24 @@ import React from 'react';
 import { ArrowRight, Flame } from 'lucide-react';
 import { consistencyStreaksData } from '../../data/friendsMockData';
 
+export interface StreakItem {
+  name: string;
+  days: number;
+  avatarUrl: string;
+  isCurrent?: boolean;
+}
+
 interface ConsistencyStreaksCardProps {
+  streaks?: StreakItem[];
   onViewAll?: () => void;
 }
 
 export const ConsistencyStreaksCard: React.FC<ConsistencyStreaksCardProps> = ({
+  streaks,
   onViewAll,
 }) => {
+  const items = streaks && streaks.length > 0 ? streaks : consistencyStreaksData;
+
   return (
     <div 
       id="friends-consistency-streaks-card"
@@ -30,7 +41,7 @@ export const ConsistencyStreaksCard: React.FC<ConsistencyStreaksCardProps> = ({
 
       {/* Rows */}
       <div className="space-y-2 mt-3">
-        {consistencyStreaksData.map((item) => (
+        {items.map((item) => (
           <div
             key={item.name}
             className={`flex items-center justify-between p-2 rounded-xl text-xs transition-colors ${

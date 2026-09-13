@@ -68,6 +68,9 @@ export interface UserProfile {
   streakDays: number;
   totalPoints: number;
   questsDoneThisWeek: number;
+  xp?: number;
+  avatarUrl?: string;
+  bio?: string;
 }
 
 export type TaskView = 'today' | 'upcoming' | 'overdue' | 'someday' | 'all' | 'inbox' | 'completed';
@@ -398,6 +401,13 @@ export interface CoachChatMessage {
     description: string;
     actionLabel: string;
   };
+  calendarAction?: {
+    action: 'created' | 'rescheduled' | 'deleted' | 'permission_denied';
+    eventTitle?: string;
+    date?: string;
+    time?: string;
+    details?: string;
+  };
 }
 
 export interface CoachPack {
@@ -473,11 +483,13 @@ export interface AIVerificationResult {
   error?: string;
 }
 
+export type CalendarPermissionLevel = 'read_only' | 'read_edit' | 'no_access';
+
 export interface CalendarIntegrationState {
   provider: string;
   status: 'connected' | 'not_connected';
   account: string;
-  permission: 'read_only' | 'no_access';
+  permission: CalendarPermissionLevel;
   useInCoach: boolean;
 }
 

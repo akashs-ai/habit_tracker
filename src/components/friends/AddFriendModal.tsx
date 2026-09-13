@@ -1,11 +1,12 @@
-import React, { useState } from 'react';
-import { X, Search, UserPlus, Check, Copy, Link as LinkIcon, Share2 } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { X, Search, UserPlus, Check, Copy, Link as LinkIcon, Share2, Send, Loader2 } from 'lucide-react';
 import { FriendUser } from '../../types';
+import { api } from '../../services/api';
 
 interface AddFriendModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onAddFriend: (user: Partial<FriendUser>) => void;
+  onAddFriend: (user: Partial<FriendUser> & { id?: string; reason?: string }) => void;
 }
 
 export const AddFriendModal: React.FC<AddFriendModalProps> = ({
@@ -15,12 +16,18 @@ export const AddFriendModal: React.FC<AddFriendModalProps> = ({
 }) => {
   const [activeTab, setActiveTab] = useState<'search' | 'invite'>('search');
   const [searchQuery, setSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState<any[]>([]);
+  const [isSearching, setIsSearching] = useState(false);
   const [addedIds, setAddedIds] = useState<Record<string, boolean>>({});
   const [isCopied, setIsCopied] = useState(false);
 
-  if (!isOpen) return null;
+  // Direct invite input
+  const [inviteIdentifier, setInviteIdentifier] = useState('');
+  const [inviteNote, setInviteNote] = useState('');
+  const [isSendingInvite, setIsSendingInvite] = useState(false);
+  const [inviteFeedback, setInviteFeedback] = useState<string | null>(null);
 
-  const potentialFriends = [
+  const fallbackFriends = [
     {
       id: 'pot-1',
       name: 'Ishita Sen',
@@ -67,15 +74,53 @@ export const AddFriendModal: React.FC<AddFriendModalProps> = ({
     }
   ];
 
-  const filteredList = potentialFriends.filter((p) => 
-    p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    p.username.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    p.reason.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  // Perform live search when searchQuery changes
+  useEffect(() => {
+    if (!isOpen) return;
 
-  const handleAdd = (user: typeof potentialFriends[0]) => {
+    if (!searchQuery.trim()) {
+      setSearchResults(fallbackFriends);
+      setIsSearching(false);
+      return;
+    }
+
+    const timer = setTimeout(async () => {
+      setIsSearching(true);
+      try {
+        const results = await api.searchUsers(searchQuery.trim());
+        if (results && results.length > 0) {
+          setSearchResults(results);
+        } else {
+          // Fallback filter
+          const filtered = fallbackFriends.filter((p) =>
+            p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            p.username.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            p.reason.toLowerCase().includes(searchQuery.toLowerCase())
+          );
+          setSearchResults(filtered);
+        }
+      } catch (err) {
+        // Fallback filter on network error
+        const filtered = fallbackFriends.filter((p) =>
+          p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          p.username.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          p.reason.toLowerCase().includes(searchQuery.toLowerCase())
+        );
+        setSearchResults(filtered);
+      } finally {
+        setIsSearching(false);
+      }
+    }, 250);
+
+    return () => clearTimeout(timer);
+  }, [searchQuery, isOpen]);
+
+  if (!isOpen) return null;
+
+  const handleAdd = (user: any) => {
     setAddedIds((prev) => ({ ...prev, [user.id]: true }));
     onAddFriend({
+      id: user.id,
       name: user.name,
       username: user.username,
       avatarUrl: user.avatarUrl,
@@ -83,7 +128,29 @@ export const AddFriendModal: React.FC<AddFriendModalProps> = ({
       xp: user.xp,
       consistencyDays: user.consistencyDays,
       status: user.status,
+      reason: user.reason || 'Requested connection',
     });
+  };
+
+  const handleSendDirectInvite = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!inviteIdentifier.trim()) return;
+    setIsSendingInvite(true);
+    setInviteFeedback(null);
+    try {
+      await onAddFriend({
+        username: inviteIdentifier.trim(),
+        name: inviteIdentifier.trim(),
+        reason: inviteNote.trim() || 'Shared goals & accountability',
+      });
+      setInviteFeedback(`Invite sent to ${inviteIdentifier.trim()}!`);
+      setInviteIdentifier('');
+      setInviteNote('');
+    } catch (err: any) {
+      setInviteFeedback(err?.message || 'Failed to send invite.');
+    } finally {
+      setIsSendingInvite(false);
+    }
   };
 
   const handleCopyInvite = () => {
@@ -105,7 +172,7 @@ export const AddFriendModal: React.FC<AddFriendModalProps> = ({
       >
         {/* Header */}
         <div className="flex items-center justify-between pb-4 border-b border-white/8">
-          <span className="text-sm font-semibold text-[#9AA3B5]">Add Friend (Modal)</span>
+          <span className="text-sm font-semibold text-[#9AA3B5]">Add Friend</span>
           <button 
             id="close-add-friend-modal-btn"
             onClick={onClose}
@@ -149,37 +216,40 @@ export const AddFriendModal: React.FC<AddFriendModalProps> = ({
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="Search by name, email, or username..."
-                className="w-full h-11 pl-10 pr-4 rounded-xl bg-[#12161E] border border-white/10 text-white text-xs placeholder:text-[#687185] focus:outline-none focus:border-[#6366F1] transition-colors"
+                className="w-full h-11 pl-10 pr-10 rounded-xl bg-[#12161E] border border-white/10 text-white text-xs placeholder:text-[#687185] focus:outline-none focus:border-[#6366F1] transition-colors"
               />
+              {isSearching && (
+                <Loader2 className="w-4 h-4 text-[#6366F1] absolute right-3.5 top-3.5 animate-spin" />
+              )}
             </div>
 
             {/* Results List */}
             <div className="mt-4 space-y-2.5 max-h-[280px] overflow-y-auto pr-1">
-              {filteredList.map((user) => {
+              {searchResults.map((user) => {
                 const isAdded = addedIds[user.id];
                 return (
                   <div 
                     key={user.id}
                     className="flex items-center justify-between p-3 rounded-xl bg-[#12161E] border border-white/5 hover:border-white/10 transition-colors"
                   >
-                    <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-3 min-w-0">
                       <img 
-                        src={user.avatarUrl} 
+                        src={user.avatarUrl || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150'} 
                         alt={user.name}
-                        className="w-9 h-9 rounded-full object-cover border border-white/10"
+                        className="w-9 h-9 rounded-full object-cover border border-white/10 shrink-0"
                         referrerPolicy="no-referrer"
                       />
-                      <div>
-                        <p className="text-xs font-bold text-white leading-tight">{user.name}</p>
-                        <p className="text-[11px] text-[#687185]">@{user.username}</p>
-                        <p className="text-[10px] text-[#9AA3B5] mt-0.5">{user.reason}</p>
+                      <div className="min-w-0">
+                        <p className="text-xs font-bold text-white leading-tight truncate">{user.name}</p>
+                        <p className="text-[11px] text-[#687185] truncate">@{user.username}</p>
+                        <p className="text-[10px] text-[#9AA3B5] mt-0.5 truncate">{user.reason || `Level ${user.level || 1} • ${user.consistencyDays || 0}d streak`}</p>
                       </div>
                     </div>
 
                     <button 
                       onClick={() => handleAdd(user)}
                       disabled={isAdded}
-                      className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all ${
+                      className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all shrink-0 ${
                         isAdded
                           ? 'bg-[#34D399]/15 text-[#34D399] border border-[#34D399]/30'
                           : 'bg-[#6366F1] hover:bg-[#7C7FF5] text-white shadow-sm shadow-indigo-600/20'
@@ -188,10 +258,11 @@ export const AddFriendModal: React.FC<AddFriendModalProps> = ({
                       {isAdded ? (
                         <>
                           <Check className="w-3 h-3" />
-                          <span>Added</span>
+                          <span>Sent</span>
                         </>
                       ) : (
                         <>
+                          <UserPlus className="w-3 h-3" />
                           <span>Add</span>
                         </>
                       )}
@@ -199,15 +270,56 @@ export const AddFriendModal: React.FC<AddFriendModalProps> = ({
                   </div>
                 );
               })}
-              {filteredList.length === 0 && (
+              {searchResults.length === 0 && !isSearching && (
                 <div className="py-8 text-center text-xs text-[#687185]">
-                  No people found matching "{searchQuery}"
+                  No people found matching "{searchQuery}". Try searching by exact username or use the Invite tab!
                 </div>
               )}
             </div>
           </div>
         ) : (
           <div className="mt-5 space-y-4">
+            {/* Direct Send Invite by Username or Email */}
+            <form onSubmit={handleSendDirectInvite} className="p-4 rounded-xl bg-[#12161E] border border-white/5 space-y-3">
+              <h4 className="text-xs font-bold text-white">Send Direct Invitation</h4>
+              <div className="space-y-2">
+                <input 
+                  type="text"
+                  value={inviteIdentifier}
+                  onChange={(e) => setInviteIdentifier(e.target.value)}
+                  placeholder="Enter username or email address..."
+                  className="w-full h-10 px-3 rounded-lg bg-[#0B0E14] border border-white/10 text-white text-xs placeholder:text-[#687185] focus:outline-none focus:border-[#6366F1]"
+                  required
+                />
+                <input 
+                  type="text"
+                  value={inviteNote}
+                  onChange={(e) => setInviteNote(e.target.value)}
+                  placeholder="Add an optional note or shared goal..."
+                  className="w-full h-10 px-3 rounded-lg bg-[#0B0E14] border border-white/10 text-white text-xs placeholder:text-[#687185] focus:outline-none focus:border-[#6366F1]"
+                />
+              </div>
+
+              {inviteFeedback && (
+                <p className={`text-xs ${inviteFeedback.includes('Failed') || inviteFeedback.includes('already') ? 'text-amber-400' : 'text-emerald-400'}`}>
+                  {inviteFeedback}
+                </p>
+              )}
+
+              <button
+                type="submit"
+                disabled={isSendingInvite || !inviteIdentifier.trim()}
+                className="w-full h-9 rounded-lg bg-[#6366F1] hover:bg-[#7C7FF5] disabled:opacity-50 text-white text-xs font-semibold flex items-center justify-center gap-2 transition-colors shadow-sm"
+              >
+                {isSendingInvite ? (
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                ) : (
+                  <Send className="w-3.5 h-3.5" />
+                )}
+                <span>{isSendingInvite ? 'Sending Request...' : 'Send Friend Request'}</span>
+              </button>
+            </form>
+
             <div className="p-4 rounded-xl bg-[#12161E] border border-white/5 text-center">
               <div className="w-10 h-10 rounded-xl bg-indigo-500/10 text-[#6366F1] mx-auto flex items-center justify-center mb-3">
                 <LinkIcon className="w-5 h-5" />
@@ -223,6 +335,7 @@ export const AddFriendModal: React.FC<AddFriendModalProps> = ({
                   className="bg-transparent px-2.5 text-xs text-white flex-1 focus:outline-none select-all"
                 />
                 <button 
+                  type="button"
                   onClick={handleCopyInvite}
                   className="px-3 py-1.5 rounded-lg bg-[#6366F1] hover:bg-[#7C7FF5] text-white text-xs font-semibold flex items-center gap-1.5 transition-colors"
                 >

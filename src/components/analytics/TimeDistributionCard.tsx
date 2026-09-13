@@ -28,27 +28,27 @@ export const TimeDistributionCard: React.FC<TimeDistributionCardProps> = ({
   return (
     <div 
       id="analytics-time-distribution-card"
-      className="p-4 sm:p-5 rounded-xl bg-[#0F1723] border border-white/7 flex flex-col justify-between"
+      className="p-4 sm:p-5 rounded-xl bg-white dark:bg-[#0F1723] border border-slate-200 dark:border-white/7 shadow-xs flex flex-col justify-between"
     >
       {/* Header */}
-      <div className="flex items-center justify-between pb-3 border-b border-white/5">
+      <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-white/5">
         <div>
-          <h2 className="text-sm sm:text-base font-bold text-white tracking-tight">
+          <h2 className="text-sm sm:text-base font-bold text-slate-900 dark:text-white tracking-tight">
             Time Distribution
           </h2>
-          <p className="text-xs text-[#94A3B8] mt-0.5">
+          <p className="text-xs text-slate-500 dark:text-[#94A3B8] mt-0.5">
             Where your time goes.
           </p>
         </div>
 
         {/* Habits vs Tasks Tabs */}
-        <div className="flex items-center gap-1 bg-white/4 p-0.5 rounded-lg border border-white/6">
+        <div className="flex items-center gap-1 bg-slate-100 dark:bg-white/4 p-0.5 rounded-lg border border-slate-200 dark:border-white/6">
           <button
             onClick={() => setActiveTab('habits')}
             className={`px-2.5 py-1 rounded-md text-[11px] font-semibold transition-all ${
               activeTab === 'habits'
                 ? 'bg-[#6366F1] text-white shadow-xs'
-                : 'text-[#94A3B8] hover:text-white'
+                : 'text-slate-600 dark:text-[#94A3B8] hover:text-slate-900 dark:hover:text-white'
             }`}
           >
             Habits
@@ -58,7 +58,7 @@ export const TimeDistributionCard: React.FC<TimeDistributionCardProps> = ({
             className={`px-2.5 py-1 rounded-md text-[11px] font-semibold transition-all ${
               activeTab === 'tasks'
                 ? 'bg-[#6366F1] text-white shadow-xs'
-                : 'text-[#94A3B8] hover:text-white'
+                : 'text-slate-600 dark:text-[#94A3B8] hover:text-slate-900 dark:hover:text-white'
             }`}
           >
             Tasks
@@ -75,7 +75,7 @@ export const TimeDistributionCard: React.FC<TimeDistributionCardProps> = ({
               cx={center}
               cy={center}
               r={radius}
-              className="stroke-white/6 fill-none"
+              className="stroke-slate-100 dark:stroke-white/6 fill-none"
               strokeWidth={strokeWidth}
             />
             {currentItems.map((item) => {
@@ -106,12 +106,12 @@ export const TimeDistributionCard: React.FC<TimeDistributionCardProps> = ({
 
           {/* Center text */}
           <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none text-center">
-            <span className="text-lg font-bold text-white tracking-tight leading-none tabular-nums">
+            <span className="text-lg font-bold text-slate-900 dark:text-white tracking-tight leading-none tabular-nums">
               {hoveredCategory
                 ? `${currentItems.find(i => i.category === hoveredCategory)?.hours}h`
                 : `${totalHours.toFixed(1)}h`}
             </span>
-            <span className="text-[10px] text-[#94A3B8] font-medium mt-0.5 leading-none">
+            <span className="text-[10px] text-slate-500 dark:text-[#94A3B8] font-medium mt-0.5 leading-none">
               {hoveredCategory || 'Total time'}
             </span>
           </div>
@@ -127,7 +127,7 @@ export const TimeDistributionCard: React.FC<TimeDistributionCardProps> = ({
                 onMouseEnter={() => setHoveredCategory(item.category)}
                 onMouseLeave={() => setHoveredCategory(null)}
                 className={`flex items-center justify-between gap-2 text-xs py-0.5 px-1.5 rounded transition-all cursor-pointer ${
-                  isHovered ? 'bg-white/6 text-white' : 'text-[#94A3B8]'
+                  isHovered ? 'bg-slate-100 dark:bg-white/6 text-slate-900 dark:text-white' : 'text-slate-600 dark:text-[#94A3B8]'
                 }`}
               >
                 <div className="flex items-center gap-1.5 min-w-0">
@@ -135,11 +135,11 @@ export const TimeDistributionCard: React.FC<TimeDistributionCardProps> = ({
                     className="w-2 h-2 rounded-full shrink-0"
                     style={{ backgroundColor: item.color }}
                   />
-                  <span className={`truncate text-[11px] ${isHovered ? 'text-white font-medium' : 'text-[#CBD5E1]'}`}>
+                  <span className={`truncate text-[11px] ${isHovered ? 'text-slate-900 dark:text-white font-medium' : 'text-slate-700 dark:text-[#CBD5E1]'}`}>
                     {item.category}
                   </span>
                 </div>
-                <span className="text-[11px] font-semibold text-white/90 tabular-nums">
+                <span className="text-[11px] font-semibold text-slate-900 dark:text-white/90 tabular-nums">
                   {item.hours}h
                 </span>
               </div>

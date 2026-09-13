@@ -22,7 +22,7 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
   return (
     <nav
       id="mobile-bottom-navigation"
-      className="lg:hidden fixed bottom-0 left-0 right-0 h-[68px] bg-[#080F1A]/95 backdrop-blur-lg border-t border-white/7 px-2 flex items-center justify-around z-40 pb-safe shadow-xl"
+      className="lg:hidden fixed bottom-0 left-0 right-0 h-[68px] bg-white/95 dark:bg-[#080F1A]/95 backdrop-blur-lg border-t border-slate-200 dark:border-white/7 px-2 flex items-center justify-around z-40 pb-safe shadow-xl transition-colors"
     >
       {items.map((item) => {
         const Icon = item.icon;
@@ -32,14 +32,14 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
             key={item.id}
             id={`mobile-nav-${item.id}`}
             onClick={() => setActiveTab(item.id)}
-            className={`flex flex-col items-center justify-center gap-1 py-1 px-2 rounded-xl transition-all ${
+            className={`flex flex-col items-center justify-center gap-1 py-1 px-2 rounded-xl transition-all cursor-pointer ${
               isActive
-                ? 'text-[#818CF8]'
-                : 'text-[#64748B] hover:text-[#94A3B8]'
+                ? 'text-indigo-600 dark:text-[#818CF8]'
+                : 'text-slate-500 dark:text-[#64748B] hover:text-slate-900 dark:hover:text-[#94A3B8]'
             }`}
           >
-            <Icon className={`w-5 h-5 ${isActive ? 'stroke-[2.4] text-[#818CF8]' : 'stroke-2 text-[#64748B]'}`} />
-            <span className={`text-[10px] ${isActive ? 'font-bold text-[#818CF8]' : 'font-medium text-[#64748B]'}`}>
+            <Icon className={`w-5 h-5 ${isActive ? 'stroke-[2.4] text-indigo-600 dark:text-[#818CF8]' : 'stroke-2 text-slate-400 dark:text-[#64748B]'}`} />
+            <span className={`text-[10px] ${isActive ? 'font-bold text-indigo-600 dark:text-[#818CF8]' : 'font-medium text-slate-500 dark:text-[#64748B]'}`}>
               {item.label}
             </span>
           </button>

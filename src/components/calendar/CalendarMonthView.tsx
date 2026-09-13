@@ -52,14 +52,14 @@ export const CalendarMonthView: React.FC<CalendarMonthViewProps> = ({
   return (
     <div 
       id="calendar-month-grid-container"
-      className="w-full bg-[#0F1217] border border-white/8 rounded-xl overflow-hidden shadow-sm"
+      className="w-full bg-white dark:bg-[#0F1217] border border-slate-200 dark:border-white/8 rounded-xl overflow-hidden shadow-sm transition-colors"
     >
       {/* 7 Column Headers */}
-      <div className="grid grid-cols-7 border-b border-white/8 bg-[#111318]">
+      <div className="grid grid-cols-7 border-b border-slate-200 dark:border-white/8 bg-slate-50 dark:bg-[#111318]">
         {weekdays.map((day) => (
           <div
             key={day}
-            className="h-[42px] flex items-center justify-center text-xs font-semibold text-[#6F7789] uppercase tracking-wider"
+            className="h-[42px] flex items-center justify-center text-xs font-semibold text-slate-500 dark:text-[#6F7789] uppercase tracking-wider"
           >
             {day}
           </div>
@@ -67,7 +67,7 @@ export const CalendarMonthView: React.FC<CalendarMonthViewProps> = ({
       </div>
 
       {/* Date Grid */}
-      <div className="grid grid-cols-7 divide-x divide-y divide-white/8">
+      <div className="grid grid-cols-7 divide-x divide-y divide-slate-200 dark:divide-white/8">
         {monthDays.map((cell) => {
           const isSelected = selectedDate === cell.date;
           const isToday = cell.date === todayISO;
@@ -83,10 +83,10 @@ export const CalendarMonthView: React.FC<CalendarMonthViewProps> = ({
               onDoubleClick={() => onAddEventOnDate(cell.date)}
               className={`min-h-[96px] sm:min-h-[110px] lg:min-h-[120px] p-2 transition-all flex flex-col justify-between cursor-pointer group select-none relative ${
                 isSelected
-                  ? 'border-2 border-[#6C63FF] bg-[#6C63FF]/8 z-10 shadow-xs'
+                  ? 'border-2 border-[#6C63FF] bg-[#6C63FF]/10 z-10 shadow-xs'
                   : isToday
-                  ? 'bg-white/[0.02]'
-                  : 'hover:bg-white/[0.02]'
+                  ? 'bg-indigo-50/50 dark:bg-white/[0.02]'
+                  : 'hover:bg-slate-50 dark:hover:bg-white/[0.02]'
               }`}
             >
               {/* Top Row: Date Number */}
@@ -98,8 +98,8 @@ export const CalendarMonthView: React.FC<CalendarMonthViewProps> = ({
                       : isSelected
                       ? 'text-[#6C63FF] font-bold bg-[#6C63FF]/15'
                       : cell.isCurrentMonth
-                      ? 'text-[#F5F7FF] font-medium'
-                      : 'text-[#4F5665]'
+                      ? 'text-slate-800 dark:text-[#F5F7FF] font-medium'
+                      : 'text-slate-400 dark:text-[#4F5665]'
                   }`}
                 >
                   {cell.day}
@@ -111,7 +111,7 @@ export const CalendarMonthView: React.FC<CalendarMonthViewProps> = ({
                     e.stopPropagation();
                     onAddEventOnDate(cell.date);
                   }}
-                  className="opacity-0 group-hover:opacity-100 text-[10px] text-[#A6AEC0] hover:text-[#6C63FF] transition-opacity px-1 rounded hover:bg-white/5"
+                  className="opacity-0 group-hover:opacity-100 text-[10px] text-slate-400 dark:text-[#A6AEC0] hover:text-[#6C63FF] transition-opacity px-1 rounded hover:bg-slate-200 dark:hover:bg-white/5"
                   title="Add Event on this date"
                 >
                   +
@@ -127,14 +127,14 @@ export const CalendarMonthView: React.FC<CalendarMonthViewProps> = ({
                       e.stopPropagation();
                       onSelectEvent(evt);
                     }}
-                    className="w-full text-left px-2 py-1 rounded bg-[#151820] hover:bg-[#1A1D24] border border-white/6 hover:border-white/12 transition-all group/chip cursor-pointer relative overflow-hidden"
+                    className="w-full text-left px-2 py-1 rounded bg-slate-100 dark:bg-[#151820] hover:bg-slate-200 dark:hover:bg-[#1A1D24] border border-slate-200 dark:border-white/6 hover:border-slate-300 dark:hover:border-white/12 transition-all group/chip cursor-pointer relative overflow-hidden"
                     style={{ borderLeftWidth: '3px', borderLeftColor: evt.color }}
                   >
-                    <div className="text-[10px] font-semibold text-[#F5F7FF] truncate leading-tight group-hover/chip:text-white">
+                    <div className="text-[10px] font-semibold text-slate-800 dark:text-[#F5F7FF] truncate leading-tight group-hover/chip:text-slate-950 dark:group-hover/chip:text-white">
                       {evt.title}
                     </div>
                     {evt.startTime && !evt.allDay && (
-                      <div className="text-[9px] text-[#A6AEC0] truncate leading-tight">
+                      <div className="text-[9px] text-slate-500 dark:text-[#A6AEC0] truncate leading-tight">
                         {evt.startTime}
                         {evt.endTime ? ` – ${evt.endTime}` : ''}
                       </div>
