@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { 
   ChevronLeft, 
   ChevronRight, 
@@ -11,7 +11,8 @@ import {
   Menu,
   Sparkles
 } from 'lucide-react';
-import { TaskItem, TaskView, TaskPriority } from '../../types';
+import { TaskItem, TaskView, TaskPriority, AppNotification } from '../../types';
+import { NotificationDropdown } from '../NotificationDropdown';
 import { TaskSubNav } from './TaskSubNav';
 import { TaskRow } from './TaskRow';
 import { TaskComposer } from './TaskComposer';
@@ -27,6 +28,11 @@ interface TasksPageProps {
   isDark: boolean;
   setIsDark: (dark: boolean) => void;
   onToggleMobileMenu: () => void;
+  notifications?: AppNotification[];
+  onMarkNotificationAsRead?: (id: string) => void;
+  onMarkAllNotificationsAsRead?: () => void;
+  onClearAllNotifications?: () => void;
+  onNavigateTab?: (tab: string) => void;
 }
 
 export const TasksPage: React.FC<TasksPageProps> = ({
@@ -38,6 +44,11 @@ export const TasksPage: React.FC<TasksPageProps> = ({
   isDark,
   setIsDark,
   onToggleMobileMenu,
+  notifications = [],
+  onMarkNotificationAsRead,
+  onMarkAllNotificationsAsRead,
+  onClearAllNotifications,
+  onNavigateTab,
 }) => {
   const [activeView, setActiveView] = useState<TaskView>('today');
   const [selectedLabel, setSelectedLabel] = useState<string | null>(null);
@@ -46,6 +57,20 @@ export const TasksPage: React.FC<TasksPageProps> = ({
   const [taskDate, setTaskDate] = useState<Date>(() => getTodayDate());
   const [showFilterDropdown, setShowFilterDropdown] = useState(false);
   const [isComposerOpen, setIsComposerOpen] = useState(false);
+  const [isNotificationOpen, setIsNotificationOpen] = useState(false);
+  const notificationRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (notificationRef.current && !notificationRef.current.contains(e.target as Node)) {
+        setIsNotificationOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const unreadCount = notifications.filter((n) => !n.read).length;
 
   // Check if taskDate is today using unified dateUtils
   const isSelectedDateToday = useMemo(() => {
@@ -189,14 +214,39 @@ export const TasksPage: React.FC<TasksPageProps> = ({
             )}
           </button>
 
-          {/* Notification Bell */}
-          <button
-            className="relative p-2 rounded-xl text-[#64748B] dark:text-[#94A3B8] hover:bg-[#F1F5F9] dark:hover:bg-[#18181B] transition-colors"
-            aria-label="Notifications"
-          >
-            <Bell className="w-4 h-4" />
-            <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-[#EF4444] rounded-full ring-2 ring-white dark:ring-[#111113]" />
-          </button>
+          {/* Notification Bell with Badge & Dropdown */}
+          <div ref={notificationRef} className="relative">
+            <button
+              id="tasks-notification-bell-btn"
+              type="button"
+              onClick={() => setIsNotificationOpen(!isNotificationOpen)}
+              className={`relative p-2 rounded-xl transition-colors cursor-pointer ${
+                isNotificationOpen
+                  ? 'bg-[#6366F1]/15 text-[#6366F1]'
+                  : 'text-[#64748B] dark:text-[#94A3B8] hover:bg-[#F1F5F9] dark:hover:bg-[#18181B]'
+              }`}
+              aria-label="Notifications"
+              aria-expanded={isNotificationOpen}
+            >
+              <Bell className="w-4 h-4" />
+              {unreadCount > 0 && (
+                <span className="absolute top-1.5 right-1.5 min-w-[12px] h-[12px] px-0.5 bg-[#EF4444] text-white text-[8px] font-bold rounded-full ring-2 ring-white dark:ring-[#111113] flex items-center justify-center">
+                  {unreadCount > 9 ? '9+' : unreadCount}
+                </span>
+              )}
+            </button>
+
+            {/* Notification Dropdown Panel */}
+            <NotificationDropdown
+              isOpen={isNotificationOpen}
+              onClose={() => setIsNotificationOpen(false)}
+              notifications={notifications}
+              onMarkAsRead={(id) => onMarkNotificationAsRead?.(id)}
+              onMarkAllAsRead={() => onMarkAllNotificationsAsRead?.()}
+              onClearAll={() => onClearAllNotifications?.()}
+              onNavigateToTab={(tab) => onNavigateTab?.(tab)}
+            />
+          </div>
 
           {/* User Avatar Circle */}
           <div className="w-8 h-8 rounded-full bg-[#6366F1] text-white flex items-center justify-center font-bold text-sm shadow-2xs">

@@ -168,12 +168,12 @@ export const GoalsPage: React.FC<GoalsPageProps> = ({
   return (
     <div
       id="goals-page-root"
-      className="min-h-screen bg-[#08090D] text-[#F7F8FC] flex flex-col flex-1 pb-24 lg:pb-12 select-none"
+      className="min-h-screen bg-slate-50 dark:bg-[#08090D] text-slate-900 dark:text-[#F7F8FC] flex flex-col flex-1 pb-24 lg:pb-12 select-none"
     >
       {/* Top Header Bar */}
       <header
         id="goals-top-header"
-        className="h-[72px] bg-[#0E1118]/80 backdrop-blur-md sticky top-0 z-20 px-4 sm:px-8 border-b border-white/6 flex items-center justify-between transition-colors"
+        className="h-[72px] bg-white/80 dark:bg-[#0E1118]/80 backdrop-blur-md sticky top-0 z-20 px-4 sm:px-8 border-b border-slate-200 dark:border-white/6 flex items-center justify-between transition-colors"
       >
         <div className="flex items-center gap-3 sm:gap-4 flex-1">
           {/* Mobile Menu Trigger */}

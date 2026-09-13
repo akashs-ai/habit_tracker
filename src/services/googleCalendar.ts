@@ -19,12 +19,19 @@ export const CALENDAR_SCOPES = [
 const app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
 export const auth = getAuth(app);
 
-const provider = new GoogleAuthProvider();
-CALENDAR_SCOPES.forEach((scope) => provider.addScope(scope));
+export const createGoogleProvider = (): GoogleAuthProvider => {
+  const provider = new GoogleAuthProvider();
+  CALENDAR_SCOPES.forEach((scope) => provider.addScope(scope));
+  provider.setCustomParameters({
+    prompt: 'select_account',
+  });
+  return provider;
+};
 
-// Flags & in-memory cached token (NEVER stored in localStorage or sessionStorage)
+// In-memory token cache (never persisted into localStorage/sessionStorage for security)
 let isSigningIn = false;
 let cachedAccessToken: string | null = null;
+let cachedUser: User | null = null;
 
 export const initAuth = (
   onAuthSuccess?: (user: User, token: string) => void,
@@ -32,10 +39,14 @@ export const initAuth = (
 ) => {
   return onAuthStateChanged(auth, async (user: User | null) => {
     if (user && cachedAccessToken) {
+      cachedUser = user;
       if (onAuthSuccess) onAuthSuccess(user, cachedAccessToken);
     } else {
-      cachedAccessToken = null;
-      if (onAuthFailure) onAuthFailure();
+      if (!isSigningIn) {
+        cachedAccessToken = null;
+        cachedUser = null;
+        if (onAuthFailure) onAuthFailure();
+      }
     }
   });
 };
@@ -44,21 +55,42 @@ export const getAccessToken = async (): Promise<string | null> => {
   return cachedAccessToken;
 };
 
+export const getCurrentGoogleUser = (): User | null => {
+  return cachedUser || auth.currentUser;
+};
+
 export const googleSignIn = async (): Promise<{ user: User; accessToken: string } | null> => {
   try {
     isSigningIn = true;
+    const provider = createGoogleProvider();
     const result = await signInWithPopup(auth, provider);
     const credential = GoogleAuthProvider.credentialFromResult(result);
+    
     if (!credential?.accessToken) {
-      throw new Error('No access token returned from Google sign-in');
+      throw new Error('No access token returned from Google sign-in. Please ensure third-party cookies/popups are allowed.');
     }
+
     cachedAccessToken = credential.accessToken;
+    cachedUser = result.user;
     return { user: result.user, accessToken: cachedAccessToken };
   } catch (error: any) {
-    if (error?.code === 'auth/popup-closed-by-user' || error?.code === 'auth/cancelled-popup-request') {
+    const code = error?.code || '';
+    const message = error?.message || '';
+
+    // Handle user cancellations or refusal gracefully without noisy error toasts
+    if (
+      code === 'auth/popup-closed-by-user' || 
+      code === 'auth/cancelled-popup-request' ||
+      code === 'auth/user-cancelled' ||
+      message.includes('user-cancelled') ||
+      message.includes('closed by user') ||
+      message.includes('user closed the popup') ||
+      message.includes('cancelled-popup-request')
+    ) {
       return null;
     }
-    console.error('Google Sign-in failed:', error);
+    
+    console.warn('Google Calendar OAuth sign-in issue:', error);
     throw error;
   } finally {
     isSigningIn = false;
@@ -68,6 +100,7 @@ export const googleSignIn = async (): Promise<{ user: User; accessToken: string 
 export const googleSignOut = async (): Promise<void> => {
   await signOut(auth);
   cachedAccessToken = null;
+  cachedUser = null;
 };
 
 function parseGCalTime(isoDateTime?: string): string | undefined {

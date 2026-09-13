@@ -1,17 +1,73 @@
-import React from 'react';
-import { Search, Bell, Menu } from 'lucide-react';
+import React, { useState, useRef, useEffect } from 'react';
+import { Search, Bell, Menu, LogIn, LogOut, User, Sparkles, ChevronDown, Compass, Settings, Volume2, VolumeX } from 'lucide-react';
+import { AuthUser, AppNotification } from '../types';
+import { soundFx } from '../utils/audioFx';
+import { NotificationDropdown } from './NotificationDropdown';
 
 interface HeaderProps {
   onToggleMobileMenu?: () => void;
   searchQuery: string;
   setSearchQuery: (q: string) => void;
+  currentUser?: AuthUser | null;
+  onOpenAuthModal?: (screen: 'login' | 'signup' | 'guest_prompt') => void;
+  onLogout?: () => void;
+  onNavigateToSettings?: () => void;
+  notifications?: AppNotification[];
+  onMarkNotificationAsRead?: (id: string) => void;
+  onMarkAllNotificationsAsRead?: () => void;
+  onClearAllNotifications?: () => void;
+  onNavigateTab?: (tab: string) => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
   onToggleMobileMenu,
   searchQuery,
   setSearchQuery,
+  currentUser,
+  onOpenAuthModal,
+  onLogout,
+  onNavigateToSettings,
+  notifications = [],
+  onMarkNotificationAsRead,
+  onMarkAllNotificationsAsRead,
+  onClearAllNotifications,
+  onNavigateTab,
 }) => {
+  const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
+  const [isNotificationOpen, setIsNotificationOpen] = useState(false);
+  const [isMuted, setIsMuted] = useState(() => soundFx.getIsMuted());
+  const menuRef = useRef<HTMLDivElement>(null);
+  const notificationRef = useRef<HTMLDivElement>(null);
+
+  const handleToggleSound = () => {
+    const nextMuted = soundFx.toggleMute();
+    setIsMuted(nextMuted);
+    if (!nextMuted) {
+      soundFx.playCheckmark();
+    }
+  };
+
+  // Close dropdowns on outside click
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      const target = e.target as Node;
+      if (menuRef.current && !menuRef.current.contains(target)) {
+        setIsUserMenuOpen(false);
+      }
+      if (notificationRef.current && !notificationRef.current.contains(target)) {
+        setIsNotificationOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const unreadCount = notifications.filter((n) => !n.read).length;
+
+  const displayName = currentUser?.fullName || (currentUser?.isGuest ? 'Guest Explorer' : 'Alex Das');
+  const displayEmail = currentUser?.email || 'iitangaming18@gmail.com';
+  const displayAvatar = currentUser?.avatarUrl || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop&q=80';
+
   return (
     <header 
       id="top-header"
@@ -48,33 +104,179 @@ export const Header: React.FC<HeaderProps> = ({
       </div>
 
       {/* Right Header Section */}
-      <div className="flex items-center gap-4 sm:gap-6 pl-3">
-        {/* Notification Bell with Badge */}
-        <button
-          id="notification-bell-btn"
-          className="relative p-2 rounded-xl text-[#4B5563] dark:text-[#A1A1AA] hover:bg-[#F3F4F6] dark:hover:bg-[#18181B] transition-colors"
-          aria-label="Notifications"
-        >
-          <Bell className="w-5 h-5" />
-          <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-[#EF4444] rounded-full ring-2 ring-white dark:ring-[#111113]" />
-        </button>
+      <div className="flex items-center gap-3 sm:gap-5 pl-3">
+        {/* Guest Pill Trigger (if in guest mode) */}
+        {currentUser?.isGuest && onOpenAuthModal && (
+          <button
+            type="button"
+            onClick={() => onOpenAuthModal('signup')}
+            className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[#6366F1]/15 hover:bg-[#6366F1]/25 border border-[#6366F1]/40 text-[#818CF8] text-xs font-semibold transition-all shadow-2xs"
+          >
+            <Sparkles className="w-3.5 h-3.5" />
+            <span>Save Progress</span>
+          </button>
+        )}
 
-        {/* Motivational Daily Quote (visible on md+) */}
-        <div id="header-quote" className="hidden md:block max-w-[280px] lg:max-w-xs text-right">
+        {/* Motivational Daily Quote (visible on lg+) */}
+        <div id="header-quote" className="hidden lg:block max-w-[240px] text-right">
           <p className="text-xs text-[#52525B] dark:text-[#A1A1AA] font-normal italic leading-tight">
-            &ldquo;A better you is a collection of better days.&rdquo;
+            &ldquo;Small steps, bigger tomorrow.&rdquo;
           </p>
         </div>
 
-        {/* User Avatar Circle */}
-        <div id="header-avatar" className="relative cursor-pointer">
-          <img
-            src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop&q=80"
-            alt="Alex"
-            referrerPolicy="no-referrer"
-            className="w-9 h-9 rounded-full object-cover ring-2 ring-[#7C6CFF]/25 shadow-xs"
+        {/* Sound Effects Toggle Button */}
+        <button
+          id="header-sound-toggle-btn"
+          type="button"
+          onClick={handleToggleSound}
+          className={`p-2 rounded-xl border transition-all active:scale-95 ${
+            isMuted 
+              ? 'text-[#9CA3AF] border-transparent hover:bg-white/5' 
+              : 'text-[#F59E0B] border-[#F59E0B]/30 bg-[#F59E0B]/10 hover:bg-[#F59E0B]/20 shadow-2xs'
+          }`}
+          title={isMuted ? 'Sound Effects Muted (Click to enable)' : 'Tactile Sound Effects Active (Click to mute)'}
+          aria-label={isMuted ? 'Unmute sound effects' : 'Mute sound effects'}
+        >
+          {isMuted ? <VolumeX className="w-5 h-5" /> : <Volume2 className="w-5 h-5 animate-pulse" />}
+        </button>
+
+        {/* Notification Bell with Badge & Dropdown */}
+        <div ref={notificationRef} className="relative">
+          <button
+            id="notification-bell-btn"
+            type="button"
+            onClick={() => setIsNotificationOpen(!isNotificationOpen)}
+            className={`relative p-2 rounded-xl transition-all cursor-pointer ${
+              isNotificationOpen
+                ? 'bg-[#7C6CFF]/15 text-[#7C6CFF]'
+                : 'text-[#4B5563] dark:text-[#A1A1AA] hover:bg-[#F3F4F6] dark:hover:bg-[#18181B]'
+            }`}
+            aria-label="Notifications"
+            aria-expanded={isNotificationOpen}
+          >
+            <Bell className="w-5 h-5" />
+            {unreadCount > 0 && (
+              <span className="absolute top-1.5 right-1.5 min-w-[14px] h-[14px] px-1 bg-[#EF4444] text-white text-[9px] font-bold rounded-full ring-2 ring-white dark:ring-[#111113] flex items-center justify-center">
+                {unreadCount > 9 ? '9+' : unreadCount}
+              </span>
+            )}
+          </button>
+
+          {/* Notification Dropdown Panel */}
+          <NotificationDropdown
+            isOpen={isNotificationOpen}
+            onClose={() => setIsNotificationOpen(false)}
+            notifications={notifications}
+            onMarkAsRead={(id) => onMarkNotificationAsRead?.(id)}
+            onMarkAllAsRead={() => onMarkAllNotificationsAsRead?.()}
+            onClearAll={() => onClearAllNotifications?.()}
+            onNavigateToTab={(tab) => onNavigateTab?.(tab)}
           />
-          <span className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-[#22C55E] rounded-full ring-2 ring-white dark:ring-[#111113]" />
+        </div>
+
+        {/* User Account Menu Container */}
+        <div ref={menuRef} className="relative">
+          <button
+            type="button"
+            id="header-avatar-btn"
+            onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
+            className="flex items-center gap-2 p-1 rounded-full hover:ring-2 hover:ring-[#7C6CFF]/30 transition-all focus:outline-none"
+            aria-expanded={isUserMenuOpen}
+          >
+            <div className="relative">
+              <img
+                src={displayAvatar}
+                alt={displayName}
+                referrerPolicy="no-referrer"
+                className="w-9 h-9 rounded-full object-cover ring-2 ring-[#7C6CFF]/25 shadow-xs"
+              />
+              <span className={`absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full ring-2 ring-white dark:ring-[#111113] ${currentUser?.isGuest ? 'bg-[#F59E0B]' : 'bg-[#22C55E]'}`} />
+            </div>
+          </button>
+
+          {/* User Account Dropdown Menu */}
+          {isUserMenuOpen && (
+            <div className="absolute right-0 mt-2 w-64 rounded-2xl bg-[#101726] border border-white/10 shadow-2xl py-2 z-50 animate-in fade-in duration-150">
+              {/* Profile Header */}
+              <div className="px-4 py-3 border-b border-white/[0.08]">
+                <div className="flex items-center justify-between gap-2">
+                  <p className="text-xs font-bold text-white truncate">{displayName}</p>
+                  {currentUser?.isGuest ? (
+                    <span className="px-2 py-0.5 text-[10px] font-semibold bg-[#F59E0B]/20 text-[#FBBF24] rounded-full border border-[#F59E0B]/30">
+                      Guest
+                    </span>
+                  ) : (
+                    <span className="px-2 py-0.5 text-[10px] font-semibold bg-[#22C55E]/20 text-[#4ADE80] rounded-full border border-[#22C55E]/30">
+                      Member
+                    </span>
+                  )}
+                </div>
+                <p className="text-[11px] text-[#94A3B8] truncate mt-0.5">{displayEmail}</p>
+              </div>
+
+              {/* Action Links */}
+              <div className="py-1">
+                {currentUser?.isGuest && onOpenAuthModal && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsUserMenuOpen(false);
+                      onOpenAuthModal('signup');
+                    }}
+                    className="w-full px-4 py-2 text-left text-xs font-medium text-[#818CF8] hover:bg-[#6366F1]/10 flex items-center gap-2.5 transition-colors"
+                  >
+                    <Sparkles className="w-4 h-4 text-[#818CF8]" />
+                    <span>Save Progress & Sign Up</span>
+                  </button>
+                )}
+
+                {onNavigateToSettings && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsUserMenuOpen(false);
+                      onNavigateToSettings();
+                    }}
+                    className="w-full px-4 py-2 text-left text-xs text-[#CBD5E1] hover:text-white hover:bg-white/[0.04] flex items-center gap-2.5 transition-colors"
+                  >
+                    <Settings className="w-4 h-4 text-[#94A3B8]" />
+                    <span>Account Settings</span>
+                  </button>
+                )}
+
+                {onOpenAuthModal && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsUserMenuOpen(false);
+                      onOpenAuthModal('login');
+                    }}
+                    className="w-full px-4 py-2 text-left text-xs text-[#CBD5E1] hover:text-white hover:bg-white/[0.04] flex items-center gap-2.5 transition-colors"
+                  >
+                    <User className="w-4 h-4 text-[#94A3B8]" />
+                    <span>Switch Account / Sign In</span>
+                  </button>
+                )}
+              </div>
+
+              {/* Log Out */}
+              {onLogout && (
+                <div className="pt-1 border-t border-white/[0.08]">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsUserMenuOpen(false);
+                      onLogout();
+                    }}
+                    className="w-full px-4 py-2 text-left text-xs font-medium text-[#F87171] hover:bg-[#EF4444]/10 flex items-center gap-2.5 transition-colors"
+                  >
+                    <LogOut className="w-4 h-4" />
+                    <span>Log Out</span>
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </div>
     </header>

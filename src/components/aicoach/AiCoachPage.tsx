@@ -32,6 +32,7 @@ interface AiCoachPageProps {
   onSyncModels?: () => void;
   isSyncingModels?: boolean;
   lastSyncedTime?: string | null;
+  userEmail?: string;
 }
 
 export const AiCoachPage: React.FC<AiCoachPageProps> = ({
@@ -45,6 +46,7 @@ export const AiCoachPage: React.FC<AiCoachPageProps> = ({
   onSyncModels: propOnSyncModels,
   isSyncingModels = false,
   lastSyncedTime,
+  userEmail = 'iitangaming18@gmail.com',
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [messages, setMessages] = useState<CoachChatMessage[]>(initialChatMessages);
@@ -102,13 +104,18 @@ export const AiCoachPage: React.FC<AiCoachPageProps> = ({
 
   const handleConnectAgent = async (
     agentId: string,
-    details: { accountEmail?: string; apiKey?: string; modelTier?: string; loginMethod?: string }
+    details: any
   ) => {
-    const res = await api.connectAIAgent(agentId, details);
-    setLocalAgents(res.agents);
-    setSelectedModelId(agentId);
-    if (propOnSyncModels) {
-      propOnSyncModels();
+    try {
+      const res = await api.verifyAndConnectAIAgent(agentId, details);
+      setLocalAgents(res.agents);
+      setSelectedModelId(agentId);
+      if (propOnSyncModels) {
+        propOnSyncModels();
+      }
+    } catch (err) {
+      console.error('Failed to verify and connect AI agent in coach:', err);
+      throw err;
     }
   };
 
@@ -289,6 +296,7 @@ export const AiCoachPage: React.FC<AiCoachPageProps> = ({
                 onSyncModels={propOnSyncModels}
                 isSyncingModels={isSyncingModels}
                 lastSyncedTime={lastSyncedTime}
+                userEmail={userEmail}
               />
             </div>
           </div>
@@ -316,6 +324,7 @@ export const AiCoachPage: React.FC<AiCoachPageProps> = ({
               onSyncModels={propOnSyncModels}
               isSyncingModels={isSyncingModels}
               lastSyncedTime={lastSyncedTime}
+              userEmail={userEmail}
             />
           </div>
         </div>
@@ -327,6 +336,7 @@ export const AiCoachPage: React.FC<AiCoachPageProps> = ({
         onClose={() => setConnectingAgent(null)}
         model={connectingAgent}
         onConnect={handleConnectAgent}
+        userEmail={userEmail}
       />
 
       {/* Detail Dialog Modal */}

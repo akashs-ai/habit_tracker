@@ -1,7 +1,5 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { 
-  ChevronLeft, 
-  ChevronRight, 
   Plus, 
   MoreVertical, 
   Crown, 
@@ -15,6 +13,8 @@ import {
   Target
 } from 'lucide-react';
 import { Quest, QuestCategory } from '../types';
+import { soundFx } from '../utils/audioFx';
+import { ParticleBurst, FloatingText } from './effects/ParticleBurst';
 
 interface TodayQuestsProps {
   quests: Quest[];
@@ -31,6 +31,8 @@ export const TodayQuests: React.FC<TodayQuestsProps> = ({
   activeFilter,
   setActiveFilter,
 }) => {
+  const [activeParticles, setActiveParticles] = useState<{ id: number; x: number; y: number }[]>([]);
+  const [activeFloatingTexts, setActiveFloatingTexts] = useState<{ id: number; x: number; y: number; text: string }[]>([]);
   const categories: { id: QuestCategory; label: string }[] = [
     { id: 'all', label: 'All' },
     { id: 'focus', label: 'Focus' },
@@ -98,27 +100,61 @@ export const TodayQuests: React.FC<TodayQuestsProps> = ({
     }
   };
 
+  const handleQuestAction = (e: React.MouseEvent, quest: Quest) => {
+    e.stopPropagation();
+    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+    const spawnX = rect.left + rect.width / 2;
+    const spawnY = rect.top + rect.height / 2;
+
+    if (!quest.completed) {
+      soundFx.playQuestComplete();
+      const burstId = Date.now() + Math.random();
+      setActiveParticles((prev) => [...prev, { id: burstId, x: spawnX, y: spawnY }]);
+      setActiveFloatingTexts((prev) => [
+        ...prev,
+        { id: burstId, x: spawnX, y: spawnY, text: `+${quest.xpReward} XP` },
+      ]);
+    } else {
+      soundFx.playCheckmark();
+    }
+
+    onToggleComplete(quest.id);
+  };
+
   return (
-    <section id="todays-quests-section" className="flex flex-col gap-4">
+    <section id="todays-quests-section" className="flex flex-col gap-4 relative">
+      {/* Dynamic Particle Bursts */}
+      {activeParticles.map((burst) => (
+        <ParticleBurst
+          key={burst.id}
+          x={burst.x}
+          y={burst.y}
+          onComplete={() => {
+            setActiveParticles((prev) => prev.filter((p) => p.id !== burst.id));
+          }}
+        />
+      ))}
+
+      {/* Floating XP Rewards */}
+      {activeFloatingTexts.map((ft) => (
+        <FloatingText
+          key={ft.id}
+          x={ft.x}
+          y={ft.y}
+          text={ft.text}
+          color="#F59E0B"
+          onComplete={() => {
+            setActiveFloatingTexts((prev) => prev.filter((f) => f.id !== ft.id));
+          }}
+        />
+      ))}
+
       {/* Header with Navigation & Filter Pills */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 flex-wrap">
         <div className="flex items-center gap-3">
           <h2 className="text-xl sm:text-2xl font-bold text-[#111827] dark:text-[#FAFAFA] tracking-tight">
             Today&apos;s Quests
           </h2>
-
-          {/* Date Selector */}
-          <div className="flex items-center gap-1 bg-white dark:bg-[#18181B] border border-[#E5E7EB] dark:border-[#27272A] rounded-xl px-2 py-1 shadow-2xs">
-            <button className="p-0.5 text-[#6B7280] dark:text-[#9CA3AF] hover:text-[#111827] dark:hover:text-white transition-colors">
-              <ChevronLeft className="w-3.5 h-3.5" />
-            </button>
-            <span className="text-xs font-semibold text-[#374151] dark:text-[#D1D5DB] px-1">
-              Thu, 10 Mar
-            </span>
-            <button className="p-0.5 text-[#6B7280] dark:text-[#9CA3AF] hover:text-[#111827] dark:hover:text-white transition-colors">
-              <ChevronRight className="w-3.5 h-3.5" />
-            </button>
-          </div>
         </div>
 
         {/* Filters and Add Button */}
@@ -216,16 +252,16 @@ export const TodayQuests: React.FC<TodayQuestsProps> = ({
                 {/* Action Button: Start Quest or Mark Complete */}
                 {quest.category === 'focus' && !quest.completed ? (
                   <button
-                    onClick={() => onToggleComplete(quest.id)}
-                    className="w-full flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl bg-[#111827] dark:bg-[#FAFAFA] hover:bg-[#1F2937] dark:hover:bg-white text-white dark:text-[#111827] text-xs font-semibold transition-all shadow-xs"
+                    onClick={(e) => handleQuestAction(e, quest)}
+                    className="w-full flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl bg-[#111827] dark:bg-[#FAFAFA] hover:bg-[#1F2937] dark:hover:bg-white active:scale-95 text-white dark:text-[#111827] text-xs font-semibold transition-all shadow-xs"
                   >
                     <span>Start Quest</span>
                     <ArrowRight className="w-3.5 h-3.5" />
                   </button>
                 ) : (
                   <button
-                    onClick={() => onToggleComplete(quest.id)}
-                    className={`w-full flex items-center justify-center gap-2 py-2 px-3 rounded-xl text-xs font-semibold border transition-all ${
+                    onClick={(e) => handleQuestAction(e, quest)}
+                    className={`w-full flex items-center justify-center gap-2 py-2 px-3 rounded-xl text-xs font-semibold border transition-all active:scale-95 ${
                       quest.completed
                         ? 'bg-[#22C55E] border-[#22C55E] text-white shadow-xs'
                         : 'bg-white/80 dark:bg-[#1C1C20] border-[#E5E7EB] dark:border-[#34343A] text-[#374151] dark:text-[#E4E4E7] hover:border-[#7C6CFF] hover:text-[#7C6CFF]'
@@ -234,7 +270,7 @@ export const TodayQuests: React.FC<TodayQuestsProps> = ({
                     <div
                       className={`w-4 h-4 rounded-full flex items-center justify-center border transition-all ${
                         quest.completed
-                          ? 'border-white bg-white text-[#22C55E]'
+                          ? 'border-white bg-white text-[#22C55E] scale-110'
                           : 'border-[#9CA3AF] bg-transparent'
                       }`}
                     >

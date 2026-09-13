@@ -12,8 +12,43 @@ import {
   Attribute, 
   WeeklyData,
   AIIntegrationModel,
-  CoachChatMessage
+  CoachChatMessage,
+  AIAgentVerifyPayload,
+  AIVerificationResult,
+  AuthUser
 } from '../types';
+
+export function getStoredAuthToken(): string | null {
+  try {
+    return localStorage.getItem('liferpg_auth_token');
+  } catch (e) {
+    return null;
+  }
+}
+
+export function setStoredAuthToken(token: string | null): void {
+  try {
+    if (token) {
+      localStorage.setItem('liferpg_auth_token', token);
+    } else {
+      localStorage.removeItem('liferpg_auth_token');
+    }
+  } catch (e) {
+    // ignore
+  }
+}
+
+export async function authFetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
+  const token = getStoredAuthToken();
+  const headers = new Headers(init?.headers || {});
+  if (token && !headers.has('Authorization')) {
+    headers.set('Authorization', `Bearer ${token}`);
+  }
+  return fetch(input, {
+    ...init,
+    headers,
+  });
+}
 
 export interface FullAppState {
   user: UserProfile & {
@@ -64,9 +99,141 @@ export interface RewardTermsPolicy {
 }
 
 export const api = {
+  // --- Authentication ---
+  async getMe(): Promise<{ user: AuthUser; token: string; state: FullAppState }> {
+    const res = await authFetch('/api/auth/me');
+    const json = await res.json();
+    if (!res.ok || !json.success) throw new Error(json.error || 'Failed to fetch user session');
+    return {
+      user: json.user,
+      token: json.token,
+      state: json.state,
+    };
+  },
+
+  async register(payload: {
+    fullName: string;
+    email: string;
+    username: string;
+    password: string;
+    termsAccepted: boolean;
+    guestToken?: string;
+  }): Promise<{ user: AuthUser; token: string; migrated: boolean; state: FullAppState }> {
+    const res = await authFetch('/api/auth/register', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    const json = await res.json();
+    if (!res.ok || !json.success) throw new Error(json.error || 'Failed to register account');
+    setStoredAuthToken(json.token);
+    return json;
+  },
+
+  async login(payload: {
+    identifier: string;
+    password?: string;
+    rememberMe?: boolean;
+  }): Promise<{ user: AuthUser; token: string; state: FullAppState }> {
+    const res = await authFetch('/api/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    const json = await res.json();
+    if (!res.ok || !json.success) throw new Error(json.error || 'Invalid credentials');
+    setStoredAuthToken(json.token);
+    return json;
+  },
+
+  async socialLogin(payload: {
+    provider: 'google' | 'github' | 'discord' | 'apple';
+    email?: string;
+    fullName?: string;
+  }): Promise<{ user: AuthUser; token: string; state: FullAppState }> {
+    const res = await authFetch('/api/auth/social', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    const json = await res.json();
+    if (!res.ok || !json.success) throw new Error(json.error || 'Failed to authenticate with social provider');
+    setStoredAuthToken(json.token);
+    return json;
+  },
+
+  async continueAsGuest(): Promise<{ user: AuthUser; token: string; state: FullAppState }> {
+    const res = await authFetch('/api/auth/guest', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+    });
+    const json = await res.json();
+    if (!res.ok || !json.success) throw new Error(json.error || 'Failed to initialize guest session');
+    setStoredAuthToken(json.token);
+    return json;
+  },
+
+  async forgotPassword(email: string): Promise<{ message: string; resetToken?: string }> {
+    const res = await authFetch('/api/auth/forgot-password', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email }),
+    });
+    const json = await res.json();
+    if (!res.ok || !json.success) throw new Error(json.error || 'Failed to process password reset');
+    return json;
+  },
+
+  async resetPassword(payload: {
+    token?: string;
+    email?: string;
+    newPassword: string;
+  }): Promise<{ message: string }> {
+    const res = await authFetch('/api/auth/reset-password', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    const json = await res.json();
+    if (!res.ok || !json.success) throw new Error(json.error || 'Failed to reset password');
+    return json;
+  },
+
+  async verifyEmail(payload: { email: string; code?: string }): Promise<{ message: string; emailVerified: boolean }> {
+    const res = await authFetch('/api/auth/verify-email', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    const json = await res.json();
+    if (!res.ok || !json.success) throw new Error(json.error || 'Failed to verify email');
+    return json;
+  },
+
+  async logout(): Promise<void> {
+    try {
+      await authFetch('/api/auth/logout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+      });
+    } catch (e) {
+      // ignore
+    }
+    setStoredAuthToken(null);
+  },
+
+  async deleteAccount(): Promise<void> {
+    const res = await authFetch('/api/auth/account', {
+      method: 'DELETE',
+    });
+    const json = await res.json();
+    if (!res.ok || !json.success) throw new Error(json.error || 'Failed to delete account');
+    setStoredAuthToken(null);
+  },
+
   // 1. Full State
   async getState(): Promise<FullAppState> {
-    const res = await fetch('/api/state');
+    const res = await authFetch('/api/state');
     if (!res.ok) throw new Error('Failed to load application state from server');
     const json = await res.json();
     return json.data;
@@ -304,9 +471,34 @@ export const api = {
     return json.data;
   },
 
+  async verifyAndConnectAIAgent(
+    agentIdOrPayload: string | AIAgentVerifyPayload,
+    details?: any
+  ): Promise<{ agent: AIIntegrationModel; agents: AIIntegrationModel[]; verificationReport?: any }> {
+    const payload: AIAgentVerifyPayload =
+      typeof agentIdOrPayload === 'string'
+        ? { agentId: agentIdOrPayload, ...details }
+        : agentIdOrPayload;
+
+    const res = await fetch('/api/ai/agents/verify-and-connect', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    const json = await res.json();
+    if (!res.ok || !json.success) {
+      throw new Error(json.error || 'Credential verification failed');
+    }
+    return {
+      agent: json.data,
+      agents: json.agents,
+      verificationReport: json.verificationReport,
+    };
+  },
+
   async connectAIAgent(
     agentId: string,
-    details?: { accountEmail?: string; apiKey?: string; modelTier?: string; loginMethod?: string }
+    details?: { accountEmail?: string; apiKey?: string; modelTier?: string; loginMethod?: string; password?: string; authMethod?: any }
   ): Promise<{ agent: AIIntegrationModel; agents: AIIntegrationModel[] }> {
     const res = await fetch('/api/ai/agents/connect', {
       method: 'POST',

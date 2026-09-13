@@ -1,5 +1,20 @@
 @import "tailwindcss";
 
+@custom-variant dark (&:where(.dark, .dark *));
+
+:root {
+  /* Default Global Accent Variables */
+  --primary-accent: #6C63FF;
+  --accent-color: #6C63FF;
+  --accent-rgb: 108, 99, 255;
+  --accent-glow: rgba(108, 99, 255, 0.28);
+  --accent-subtle: rgba(108, 99, 255, 0.12);
+  --accent-hover: #5B52E2;
+
+  /* Density variables */
+  --density-scale: 1;
+}
+
 @layer base {
   body {
     font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
@@ -29,4 +44,113 @@
 ::-webkit-scrollbar-thumb:hover {
   background: rgba(150, 150, 160, 0.45);
 }
+
+/* ==========================================================
+   INTERFACE DENSITY SCALING RULES
+   ========================================================== */
+[data-density="compact"] {
+  --density-scale: 0.85;
+}
+
+/* Compact layout padding & spacing reductions */
+[data-density="compact"] .space-y-7 > :not([hidden]) ~ :not([hidden]) {
+  margin-top: 1.125rem !important;
+}
+
+[data-density="compact"] .space-y-6 > :not([hidden]) ~ :not([hidden]) {
+  margin-top: 0.875rem !important;
+}
+
+[data-density="compact"] .space-y-5 > :not([hidden]) ~ :not([hidden]) {
+  margin-top: 0.75rem !important;
+}
+
+[data-density="compact"] .space-y-4 > :not([hidden]) ~ :not([hidden]) {
+  margin-top: 0.625rem !important;
+}
+
+[data-density="compact"] .gap-8 {
+  gap: 1.25rem !important;
+}
+
+[data-density="compact"] .gap-6 {
+  gap: 1rem !important;
+}
+
+[data-density="compact"] .gap-4 {
+  gap: 0.625rem !important;
+}
+
+[data-density="compact"] .p-6,
+[data-density="compact"] .p-7,
+[data-density="compact"] .md\:p-7 {
+  padding: 1.125rem !important;
+}
+
+[data-density="compact"] .p-5 {
+  padding: 0.875rem !important;
+}
+
+[data-density="compact"] .p-4 {
+  padding: 0.75rem !important;
+}
+
+[data-density="compact"] .py-6 {
+  padding-top: 1rem !important;
+  padding-bottom: 1rem !important;
+}
+
+[data-density="compact"] .py-5 {
+  padding-top: 0.75rem !important;
+  padding-bottom: 0.75rem !important;
+}
+
+[data-density="compact"] .py-4 {
+  padding-top: 0.625rem !important;
+  padding-bottom: 0.625rem !important;
+}
+
+[data-density="compact"] .py-3,
+[data-density="compact"] .py-3\.5 {
+  padding-top: 0.5rem !important;
+  padding-bottom: 0.5rem !important;
+}
+
+[data-density="compact"] .px-6 {
+  padding-left: 1.125rem !important;
+  padding-right: 1.125rem !important;
+}
+
+[data-density="compact"] .px-8 {
+  padding-left: 1.25rem !important;
+  padding-right: 1.25rem !important;
+}
+
+[data-density="compact"] #top-header {
+  height: 60px !important;
+}
+
+/* ==========================================================
+   GLOBAL ACCENT UTILITIES
+   ========================================================== */
+.accent-bg {
+  background-color: var(--accent-color) !important;
+}
+
+.accent-text {
+  color: var(--accent-color) !important;
+}
+
+.accent-border {
+  border-color: var(--accent-color) !important;
+}
+
+.accent-glow {
+  box-shadow: 0 0 16px var(--accent-glow) !important;
+}
+
+.accent-ring {
+  --tw-ring-color: var(--accent-color) !important;
+}
+
 

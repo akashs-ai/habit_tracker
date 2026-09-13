@@ -41,6 +41,8 @@ import { BadgeDetailModal } from './BadgeDetailModal';
 import { RewardTermsModal } from './RewardTermsModal';
 import { ShieldCheck, FileText } from 'lucide-react';
 import { api } from '../../services/api';
+import { soundFx } from '../../utils/audioFx';
+import { ParticleBurst, FloatingText } from '../effects/ParticleBurst';
 
 interface RewardsPageProps {
   isDark: boolean;
@@ -109,6 +111,7 @@ export const RewardsPage: React.FC<RewardsPageProps> = ({
   const [selectedRewardForModal, setSelectedRewardForModal] = useState<RewardItem | null>(null);
   const [selectedBadgeForModal, setSelectedBadgeForModal] = useState<RewardBadge | null>(null);
   const [isTermsModalOpen, setIsTermsModalOpen] = useState(false);
+  const [rewardParticles, setRewardParticles] = useState<{ id: number; x: number; y: number }[]>([]);
 
   // Toast Feedback State
   const [actionToast, setActionToast] = useState<string | null>(null);
@@ -131,7 +134,7 @@ export const RewardsPage: React.FC<RewardsPageProps> = ({
   // Handlers
   const handleUnlockReward = async (reward: RewardItem, termsAccepted: boolean = true) => {
     if (reward.status === 'owned' || reward.status === 'active') {
-      // Toggle active
+      soundFx.playCheckmark();
       handleActivateReward(reward);
       return;
     }
@@ -142,17 +145,24 @@ export const RewardsPage: React.FC<RewardsPageProps> = ({
     }
 
     if (momentumPoints < reward.cost) {
-      showToast(`Not enough Momentum Points! Need ${reward.cost.toLocaleString()} MP.`);
+      showToast(`Not enough Gold / Momentum Points! Need ${reward.cost.toLocaleString()} MP.`);
       return;
     }
 
     try {
+      soundFx.playCoin();
+      setTimeout(() => soundFx.playRewardUnlocked(), 180);
+      setRewardParticles((prev) => [
+        ...prev,
+        { id: Date.now(), x: window.innerWidth / 2, y: window.innerHeight / 2 },
+      ]);
+
       if (onClaimReward) {
         await onClaimReward(reward.id, termsAccepted);
       } else {
         await api.claimReward(reward.id, termsAccepted);
       }
-      showToast(`🎉 Claim verified! Unlocked "${reward.name}" (-${reward.cost} MP)`);
+      showToast(`🎉 Claim verified! Unlocked "${reward.name}" (-${reward.cost} Gold)`);
       setSelectedRewardForModal(null);
     } catch (err: any) {
       showToast(`Claim rejected: ${err.message || 'Validation failed'}`);
@@ -380,6 +390,20 @@ export const RewardsPage: React.FC<RewardsPageProps> = ({
         onClose={() => setSelectedBadgeForModal(null)}
         onToggleProfileBadge={handleToggleProfileBadge}
       />
+
+      {/* Reward Claim Celebration Particles */}
+      {rewardParticles.map((burst) => (
+        <ParticleBurst
+          key={burst.id}
+          x={burst.x}
+          y={burst.y}
+          count={36}
+          colors={['#F59E0B', '#FBBF24', '#FCD34D', '#6366F1', '#EC4899', '#10B981']}
+          onComplete={() => {
+            setRewardParticles((prev) => prev.filter((p) => p.id !== burst.id));
+          }}
+        />
+      ))}
     </div>
   );
 };

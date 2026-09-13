@@ -10,6 +10,8 @@ import {
 } from 'lucide-react';
 import { TaskItem } from '../../types';
 import { TaskDetailExpanded } from './TaskDetailExpanded';
+import { soundFx } from '../../utils/audioFx';
+import { ParticleBurst, FloatingText } from '../effects/ParticleBurst';
 
 interface TaskRowProps {
   task: TaskItem;
@@ -28,20 +30,28 @@ export const TaskRow: React.FC<TaskRowProps> = ({
   const [isCompleting, setIsCompleting] = useState(false);
   const [showXpAnim, setShowXpAnim] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
+  const [burstCoords, setBurstCoords] = useState<{ x: number; y: number } | null>(null);
 
   const handleCompleteClick = (e: React.MouseEvent) => {
     e.stopPropagation();
+    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+    const spawnX = rect.left + rect.width / 2;
+    const spawnY = rect.top + rect.height / 2;
+
     if (!task.completed) {
+      soundFx.playCheckmark();
+      setBurstCoords({ x: spawnX, y: spawnY });
       setIsCompleting(true);
       setShowXpAnim(true);
       setTimeout(() => {
         onToggleComplete(task.id);
         setIsCompleting(false);
-      }, 350);
+      }, 300);
       setTimeout(() => {
         setShowXpAnim(false);
       }, 1200);
     } else {
+      soundFx.playCheckmark();
       onToggleComplete(task.id);
     }
   };
@@ -217,6 +227,23 @@ export const TaskRow: React.FC<TaskRowProps> = ({
           onUpdateTask={onUpdateTask}
           onClose={() => setIsExpanded(false)}
         />
+      )}
+
+      {/* Tactile Particle Celebration */}
+      {burstCoords && (
+        <>
+          <ParticleBurst
+            x={burstCoords.x}
+            y={burstCoords.y}
+            onComplete={() => setBurstCoords(null)}
+          />
+          <FloatingText
+            x={burstCoords.x}
+            y={burstCoords.y}
+            text={`+${task.xpReward || 15} XP`}
+            color="#6366F1"
+          />
+        </>
       )}
     </div>
   );

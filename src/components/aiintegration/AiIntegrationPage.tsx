@@ -30,11 +30,12 @@ interface AiIntegrationPageProps {
   onToggleMobileMenu?: () => void;
   models?: AIIntegrationModel[];
   onSelectModel?: (id: string) => void;
-  onConnectSubmit?: (agentId: string, details: { accountEmail?: string; apiKey?: string; modelTier?: string; loginMethod?: string }) => Promise<void>;
+  onConnectSubmit?: (agentId: string, details: any) => Promise<void>;
   onDisconnectModel?: (agentId: string) => Promise<void>;
   onSyncModels?: () => void;
   isSyncing?: boolean;
   lastSyncedTime?: string | null;
+  userEmail?: string;
 }
 
 export const AiIntegrationPage: React.FC<AiIntegrationPageProps> = ({
@@ -48,6 +49,7 @@ export const AiIntegrationPage: React.FC<AiIntegrationPageProps> = ({
   onSyncModels: propOnSyncModels,
   isSyncing = false,
   lastSyncedTime,
+  userEmail = 'iitangaming18@gmail.com',
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [localModels, setLocalModels] = useState<AIIntegrationModel[]>(initialAIModels);
@@ -114,17 +116,18 @@ export const AiIntegrationPage: React.FC<AiIntegrationPageProps> = ({
 
   const handleConnectSubmit = async (
     agentId: string,
-    details: { accountEmail?: string; apiKey?: string; modelTier?: string; loginMethod?: string }
+    details: any
   ) => {
     if (propOnConnectSubmit) {
       await propOnConnectSubmit(agentId, details);
       return;
     }
     try {
-      const res = await api.connectAIAgent(agentId, details);
+      const res = await api.verifyAndConnectAIAgent(agentId, details);
       setLocalModels(res.agents);
     } catch (err) {
-      console.error('Failed to connect agent:', err);
+      console.error('Failed to verify and connect agent:', err);
+      throw err;
     }
   };
 
@@ -190,9 +193,9 @@ export const AiIntegrationPage: React.FC<AiIntegrationPageProps> = ({
   };
 
   return (
-    <div className="min-h-screen bg-[#070B12] text-[#F5F7FB] flex flex-col">
+    <div className="min-h-screen bg-slate-50 dark:bg-[#070B12] text-slate-900 dark:text-[#F5F7FB] flex flex-col">
       {/* Top Global Header (Locked Layout matching LifeRPG Shell) */}
-      <header className="h-[68px] border-b border-white/[0.07] px-4 md:px-8 flex items-center justify-between gap-4 sticky top-0 bg-[#070B12]/95 backdrop-blur-md z-30">
+      <header className="h-[68px] border-b border-slate-200 dark:border-white/[0.07] px-4 md:px-8 flex items-center justify-between gap-4 sticky top-0 bg-white/95 dark:bg-[#070B12]/95 backdrop-blur-md z-30">
         {/* Mobile menu trigger + Search Input */}
         <div className="flex items-center gap-3 flex-1 max-w-xl">
           {onToggleMobileMenu && (
@@ -336,6 +339,7 @@ export const AiIntegrationPage: React.FC<AiIntegrationPageProps> = ({
         onClose={() => setConnectModalModel(null)}
         model={connectModalModel}
         onConnect={handleConnectSubmit}
+        userEmail={userEmail}
       />
 
       <SecurityLearnMoreModal

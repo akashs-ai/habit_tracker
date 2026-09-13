@@ -418,241 +418,227 @@
   ],
   "calendarEvents": [
     {
-      "id": "evt-1",
-      "title": "Gym",
-      "date": "2025-02-24",
+      "id": "evt-live-1",
+      "title": "Gym Workout & Mobility",
+      "date": "2026-09-12",
       "startTime": "7:00 AM",
       "endTime": "8:00 AM",
       "category": "workout",
       "color": "#22C55E",
-      "description": "Upper body resistance training session."
-    },
-    {
-      "id": "evt-2",
-      "title": "DSA Practice",
-      "date": "2025-02-25",
-      "startTime": "7:00 PM",
-      "endTime": "8:30 PM",
-      "category": "study",
-      "color": "#7C5CFF",
-      "description": "Binary search tree problems on LeetCode."
-    },
-    {
-      "id": "evt-3",
-      "title": "Project Work",
-      "date": "2025-02-27",
-      "startTime": "10:00 AM",
-      "endTime": "12:00 PM",
-      "category": "project",
-      "color": "#3B82F6",
-      "description": "Sprint planning and API design review."
-    },
-    {
-      "id": "evt-4",
-      "title": "Read Book",
-      "date": "2025-03-01",
-      "startTime": "9:00 AM",
-      "endTime": "10:00 AM",
-      "category": "personal",
-      "color": "#F59E0B",
-      "description": "Atomic Habits - Chapters 4 & 5."
-    },
-    {
-      "id": "evt-5",
-      "title": "Plan Week",
-      "date": "2025-03-02",
-      "startTime": "5:00 PM",
-      "endTime": "6:00 PM",
-      "category": "personal",
-      "color": "#F59E0B",
-      "description": "Weekly review, schedule priorities and goals."
-    },
-    {
-      "id": "evt-6",
-      "title": "College",
-      "date": "2025-03-05",
-      "startTime": "9:00 AM",
-      "endTime": "1:00 PM",
-      "category": "study",
-      "color": "#7C5CFF",
-      "description": "Computer Networks and Operating Systems lecture."
-    },
-    {
-      "id": "evt-7",
-      "title": "Video Edit",
-      "date": "2025-03-07",
-      "startTime": "3:00 PM",
-      "endTime": "5:00 PM",
-      "category": "entertainment",
-      "color": "#06B6D4",
-      "description": "Cut final b-roll footage and export."
-    },
-    {
-      "id": "evt-8",
-      "title": "Design UI",
-      "date": "2025-03-11",
-      "startTime": "10:00 AM",
-      "endTime": "12:00 PM",
-      "category": "project",
-      "color": "#7C5CFF",
-      "location": "Figma Workspace",
-      "description": "Work on the new dashboard design in Figma. Focus on calendar page.",
+      "location": "Iron Forge Fitness",
+      "description": "Compound lifts, bench press, deadlift, and core mobility cool-down.",
       "priority": "high",
       "subtasks": [
         {
-          "id": "st-1",
-          "title": "Finalize layout",
+          "id": "st-g1",
+          "title": "5 min dynamic warm up",
           "completed": true
         },
         {
-          "id": "st-2",
-          "title": "Add interactions",
-          "completed": false
+          "id": "st-g2",
+          "title": "3x5 Bench press",
+          "completed": true
         },
         {
-          "id": "st-3",
-          "title": "Review with reference",
+          "id": "st-g3",
+          "title": "Hydration & stretching",
+          "completed": false
+        }
+      ]
+    },
+    {
+      "id": "evt-live-2",
+      "title": "UI/UX Review & Frontend Architecture",
+      "date": "2026-09-12",
+      "startTime": "10:00 AM",
+      "endTime": "11:30 AM",
+      "category": "project",
+      "color": "#7C5CFF",
+      "location": "Studio Dashboard / Figma",
+      "description": "Review unified date calculations, verify live timezone normalization, and test interactive calendar components.",
+      "priority": "high",
+      "subtasks": [
+        {
+          "id": "st-u1",
+          "title": "Verify date range calculations",
+          "completed": true
+        },
+        {
+          "id": "st-u2",
+          "title": "Review mobile calendar interactions",
           "completed": false
         }
       ],
       "attachments": [
         {
-          "name": "Figma_Design.fig",
-          "size": "12.4 MB"
+          "name": "LifeRPG_Design_System.fig",
+          "size": "8.4 MB"
         }
       ]
     },
     {
-      "id": "evt-9",
-      "title": "Lunch with Friends",
-      "date": "2025-03-11",
+      "id": "evt-live-3",
+      "title": "Healthy Lunch & Team Catchup",
+      "date": "2026-09-12",
       "startTime": "1:00 PM",
       "endTime": "2:00 PM",
       "category": "social",
       "color": "#F59E0B",
-      "location": "Cafeteria / Bistro",
-      "description": "Catch up over healthy lunch."
+      "location": "Green Garden Bistro",
+      "description": "High protein nutrition, relax, catch up on weekly wins."
     },
     {
-      "id": "evt-10",
-      "title": "Free Fire (Custom)",
-      "date": "2025-03-11",
+      "id": "evt-live-4",
+      "title": "System Architecture & Backend Sync",
+      "date": "2026-09-12",
+      "startTime": "3:30 PM",
+      "endTime": "5:00 PM",
+      "category": "study",
+      "color": "#3B82F6",
+      "location": "Dev Workstation",
+      "description": "Review atomic persistence, database transactional handlers, and client-server sync performance."
+    },
+    {
+      "id": "evt-live-5",
+      "title": "Free Fire / Guild Tournament",
+      "date": "2026-09-12",
       "startTime": "10:00 PM",
-      "endTime": "12:00 AM",
+      "endTime": "11:30 PM",
       "category": "entertainment",
       "color": "#EC4899",
-      "description": "Custom guild tournament room with squad."
+      "location": "Discord Voice #room-1",
+      "description": "Custom tournament matches with squad to unwind and earn entertainment XP."
     },
     {
-      "id": "evt-11",
-      "title": "Project Work",
-      "date": "2025-03-13",
-      "startTime": "10:00 AM",
-      "endTime": "12:00 PM",
-      "category": "project",
-      "color": "#3B82F6",
-      "description": "Implement responsive calendar components."
-    },
-    {
-      "id": "evt-12",
-      "title": "Meditate",
-      "date": "2025-03-13",
-      "startTime": "7:00 AM",
-      "endTime": "7:30 AM",
-      "category": "health",
-      "color": "#22C55E",
-      "description": "Mindfulness breathing exercise."
-    },
-    {
-      "id": "evt-13",
-      "title": "Gym",
-      "date": "2025-03-14",
-      "startTime": "7:00 AM",
-      "endTime": "8:00 AM",
-      "category": "workout",
-      "color": "#22C55E",
-      "description": "Leg day and mobility."
-    },
-    {
-      "id": "evt-14",
-      "title": "Movie Night",
-      "date": "2025-03-14",
-      "startTime": "8:00 PM",
-      "endTime": "11:00 PM",
-      "category": "entertainment",
-      "color": "#7C5CFF",
-      "description": "Interstellar rewatch."
-    },
-    {
-      "id": "evt-15",
-      "title": "Gym",
-      "date": "2025-03-17",
-      "startTime": "7:00 AM",
-      "endTime": "8:00 AM",
-      "category": "workout",
-      "color": "#22C55E",
-      "description": "Push day."
-    },
-    {
-      "id": "evt-16",
-      "title": "DSA Contest",
-      "date": "2025-03-18",
-      "startTime": "8:00 PM",
-      "endTime": "10:00 PM",
+      "id": "evt-live-6",
+      "title": "DSA Practice & LeetCode Grind",
+      "date": "2026-09-11",
+      "startTime": "7:00 PM",
+      "endTime": "8:30 PM",
       "category": "study",
       "color": "#7C5CFF",
-      "description": "Weekly rated contest."
+      "description": "Graph algorithms, Dijkstra and BFS traversal optimizations."
     },
     {
-      "id": "evt-17",
-      "title": "Project Deadline",
-      "date": "2025-03-21",
-      "startTime": "5:00 PM",
-      "endTime": "6:00 PM",
-      "allDay": false,
-      "category": "health",
-      "color": "#EF4444",
-      "description": "Final submission for Q1 milestones."
-    },
-    {
-      "id": "evt-18",
-      "title": "Family Time",
-      "date": "2025-03-23",
-      "startTime": "5:00 PM",
-      "endTime": "7:00 PM",
-      "category": "social",
-      "color": "#EC4899",
-      "description": "Sunday dinner and conversation."
-    },
-    {
-      "id": "evt-19",
-      "title": "Read Book",
-      "date": "2025-03-26",
-      "startTime": "9:00 PM",
-      "endTime": "10:00 PM",
-      "category": "personal",
-      "color": "#3B82F6",
-      "description": "Deep Work by Cal Newport."
-    },
-    {
-      "id": "evt-20",
-      "title": "Plan Next Month",
-      "date": "2025-03-28",
-      "startTime": "6:00 PM",
-      "endTime": "7:00 PM",
+      "id": "evt-live-7",
+      "title": "Sprint Planning & Backlog Grooming",
+      "date": "2026-09-11",
+      "startTime": "2:00 PM",
+      "endTime": "3:30 PM",
       "category": "project",
       "color": "#3B82F6",
-      "description": "Goals for April and budget audit."
+      "description": "Prioritized weekly milestones, reviewed analytics tracking goals."
     },
     {
-      "id": "evt-21",
-      "title": "Outing",
-      "date": "2025-03-29",
-      "startTime": "4:00 PM",
-      "endTime": "8:00 PM",
-      "category": "social",
+      "id": "evt-live-8",
+      "title": "Morning Cardio & Outdoor Trail Run",
+      "date": "2026-09-13",
+      "startTime": "8:00 AM",
+      "endTime": "9:00 AM",
+      "category": "workout",
+      "color": "#22C55E",
+      "location": "Pine Hill Trail",
+      "description": "5km steady pace run in fresh air."
+    },
+    {
+      "id": "evt-live-9",
+      "title": "Read Book: Atomic Habits",
+      "date": "2026-09-13",
+      "startTime": "10:00 AM",
+      "endTime": "11:00 AM",
+      "category": "personal",
+      "color": "#F59E0B",
+      "description": "Chapter 6 & 7: The Role of Family and Friends in Shaping Habits."
+    },
+    {
+      "id": "evt-live-10",
+      "title": "Weekly Life Review & Strategy Plan",
+      "date": "2026-09-13",
+      "startTime": "5:00 PM",
+      "endTime": "6:30 PM",
+      "category": "personal",
       "color": "#7C5CFF",
-      "description": "City walk and museum visit."
+      "description": "Review KPI progress, set goals for next week, audit habit consistency."
+    },
+    {
+      "id": "evt-live-11",
+      "title": "Strength Training: Push Day",
+      "date": "2026-09-09",
+      "startTime": "7:00 AM",
+      "endTime": "8:15 AM",
+      "category": "workout",
+      "color": "#22C55E",
+      "description": "Chest, shoulders, triceps hypertrophy session."
+    },
+    {
+      "id": "evt-live-12",
+      "title": "Deep Work: Microservices Architecture",
+      "date": "2026-09-08",
+      "startTime": "10:00 AM",
+      "endTime": "1:00 PM",
+      "category": "study",
+      "color": "#3B82F6",
+      "description": "Event-driven message broker setup and Kafka concepts."
+    },
+    {
+      "id": "evt-live-13",
+      "title": "Movie Night with Friends",
+      "date": "2026-09-10",
+      "startTime": "8:00 PM",
+      "endTime": "10:30 PM",
+      "category": "entertainment",
+      "color": "#06B6D4",
+      "description": "Sci-Fi blockbuster cinema screening."
+    },
+    {
+      "id": "evt-live-14",
+      "title": "Leg Day & Heavy Squats",
+      "date": "2026-09-15",
+      "startTime": "7:00 AM",
+      "endTime": "8:30 AM",
+      "category": "workout",
+      "color": "#22C55E",
+      "description": "Squats, Romanian deadlifts, walking lunges, calves."
+    },
+    {
+      "id": "evt-live-15",
+      "title": "Cloud Architecture Certification Study",
+      "date": "2026-09-16",
+      "startTime": "6:30 PM",
+      "endTime": "8:30 PM",
+      "category": "study",
+      "color": "#7C5CFF",
+      "description": "Review IAM roles, Cloud Run containers, and VPC networks."
+    },
+    {
+      "id": "evt-live-16",
+      "title": "Quarterly Goal Alignment & Check-In",
+      "date": "2026-09-18",
+      "startTime": "4:00 PM",
+      "endTime": "5:30 PM",
+      "category": "personal",
+      "color": "#F59E0B",
+      "description": "Re-evaluate long term milestones and adjust active habit goals."
+    },
+    {
+      "id": "evt-live-17",
+      "title": "Full Body Mobility & Yoga Flow",
+      "date": "2026-09-20",
+      "startTime": "8:30 AM",
+      "endTime": "9:30 AM",
+      "category": "health",
+      "color": "#22C55E",
+      "description": "Hip openers, thoracic spine mobility, and breathwork."
+    },
+    {
+      "id": "evt-live-18",
+      "title": "Product Design Sprint Demo",
+      "date": "2026-09-22",
+      "startTime": "3:00 PM",
+      "endTime": "4:30 PM",
+      "category": "project",
+      "color": "#3B82F6",
+      "description": "Presentation of the new sprint deliverables and user feedback."
     }
   ],
   "goals": [
@@ -1379,44 +1365,50 @@
       "day": "Monday",
       "dayShort": "Mon",
       "xp": 180,
-      "heightPercent": 45
+      "heightPercent": 45,
+      "isToday": false
     },
     {
       "day": "Tuesday",
       "dayShort": "Tue",
       "xp": 260,
-      "heightPercent": 68
+      "heightPercent": 68,
+      "isToday": false
     },
     {
       "day": "Wednesday",
       "dayShort": "Wed",
       "xp": 210,
-      "heightPercent": 54
+      "heightPercent": 54,
+      "isToday": false
     },
     {
       "day": "Thursday",
       "dayShort": "Thu",
       "xp": 320,
       "heightPercent": 92,
-      "isToday": true
+      "isToday": false
     },
     {
       "day": "Friday",
       "dayShort": "Fri",
       "xp": 190,
-      "heightPercent": 48
+      "heightPercent": 48,
+      "isToday": false
     },
     {
       "day": "Saturday",
       "dayShort": "Sat",
       "xp": 140,
-      "heightPercent": 35
+      "heightPercent": 35,
+      "isToday": true
     },
     {
       "day": "Sunday",
       "dayShort": "Sun",
       "xp": 220,
-      "heightPercent": 58
+      "heightPercent": 58,
+      "isToday": false
     }
   ],
   "activityHistory": [
@@ -1616,5 +1608,64 @@
       }
     ]
   },
-  "lastUpdated": "2026-09-12T20:19:22.718Z"
+  "lastUpdated": "2026-09-12T23:06:22.407Z",
+  "aiAgents": [
+    {
+      "id": "chatgpt",
+      "name": "ChatGPT",
+      "status": "not_connected",
+      "selected": false,
+      "description": "Great for general productivity, explanations and daily task breakdown.",
+      "tags": [
+        "Fast",
+        "Versatile",
+        "Popular"
+      ],
+      "iconType": "chatgpt",
+      "modelTier": "GPT-4o (Omni)",
+      "verified": false,
+      "syncStatus": "ready",
+      "latencyMs": 185,
+      "lastSyncedAt": "2026-09-12T23:06:03.027Z",
+      "isEnvironmentKeyConfigured": false
+    },
+    {
+      "id": "claude",
+      "name": "Claude",
+      "status": "not_connected",
+      "selected": false,
+      "description": "Best for deep thinking, structured guidance and long-form reasoning.",
+      "tags": [
+        "Thoughtful",
+        "Detailed",
+        "Safe"
+      ],
+      "iconType": "claude",
+      "modelTier": "Claude 3.5 Sonnet",
+      "verified": false,
+      "syncStatus": "ready",
+      "latencyMs": 162,
+      "lastSyncedAt": "2026-09-12T23:06:03.027Z",
+      "isEnvironmentKeyConfigured": false
+    },
+    {
+      "id": "gemini",
+      "name": "Gemini",
+      "status": "not_connected",
+      "selected": false,
+      "description": "Best with Google ecosystem, real-time schedule alignment, and rapid planning.",
+      "tags": [
+        "Real-time",
+        "Integrated",
+        "Multimodal"
+      ],
+      "iconType": "gemini",
+      "modelTier": "Gemini 3.8 Flash",
+      "verified": false,
+      "syncStatus": "ready",
+      "latencyMs": 98,
+      "lastSyncedAt": "2026-09-12T23:06:03.027Z",
+      "isEnvironmentKeyConfigured": true
+    }
+  ]
 }

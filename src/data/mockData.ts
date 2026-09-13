@@ -489,3 +489,58 @@ export const initialTasks: TaskItem[] = [
     xpReward: 10
   }
 ];
+
+export const initialNotifications: import('../types').AppNotification[] = [
+  {
+    id: 'notif-1',
+    title: 'Google Calendar Connected',
+    description: 'Calendar events successfully synchronized. 4 new events detected.',
+    timeAgo: '10m ago',
+    timestamp: new Date(Date.now() - 10 * 60 * 1000).toISOString(),
+    read: false,
+    type: 'calendar',
+    iconName: 'Calendar',
+    actionLabel: 'View Calendar',
+  },
+  {
+    id: 'notif-2',
+    title: 'Level 12 Reached! 🎉',
+    description: 'Congratulations! You unlocked the Master of Discipline title and +150 MP.',
+    timeAgo: '1h ago',
+    timestamp: new Date(Date.now() - 60 * 60 * 1000).toISOString(),
+    read: false,
+    type: 'level',
+    iconName: 'Award',
+  },
+  {
+    id: 'notif-3',
+    title: 'Daily Quest Ready',
+    description: 'Solve 2 DSA problems is waiting for you today. +80 XP on completion.',
+    timeAgo: '3h ago',
+    timestamp: new Date(Date.now() - 3 * 3600 * 1000).toISOString(),
+    read: false,
+    type: 'quest',
+    iconName: 'Sparkles',
+    actionLabel: 'Start Quest',
+  },
+  {
+    id: 'notif-4',
+    title: 'Friend Quest Challenge',
+    description: 'Sarah Jenkins invited you to a 7-day deep focus study challenge.',
+    timeAgo: '5h ago',
+    timestamp: new Date(Date.now() - 5 * 3600 * 1000).toISOString(),
+    read: true,
+    type: 'friend',
+    iconName: 'UserPlus',
+  },
+  {
+    id: 'notif-5',
+    title: 'Streak Milestone: 12 Days',
+    description: 'Keep going! 2 more days to earn the 2-Week Unstoppable badge.',
+    timeAgo: '1d ago',
+    timestamp: new Date(Date.now() - 24 * 3600 * 1000).toISOString(),
+    read: true,
+    type: 'system',
+    iconName: 'CheckCircle2',
+  },
+];

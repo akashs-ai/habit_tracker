@@ -8,11 +8,17 @@ import {
   MessageSquare,
   ChevronRight,
   Sparkles,
+  LogOut,
+  User,
+  ShieldCheck,
+  CheckCircle2,
+  AlertCircle
 } from 'lucide-react';
-import { UserSettingsProfile, SettingsTabId } from '../../types';
+import { UserSettingsProfile, SettingsTabId, AuthUser } from '../../types';
 
 interface AccountSettingsProps {
   profile: UserSettingsProfile;
+  currentUser?: AuthUser | null;
   onOpenEditProfile: () => void;
   onOpenChangePassword: () => void;
   onOpenSecurity: () => void;
@@ -20,10 +26,13 @@ interface AccountSettingsProps {
   onOpenConnectedApps: () => void;
   onOpenFeedback: () => void;
   onOpenHelp: () => void;
+  onOpenAuthModal?: (screen: 'login' | 'signup' | 'guest_prompt') => void;
+  onLogout?: () => void;
 }
 
 export const AccountSettings: React.FC<AccountSettingsProps> = ({
   profile,
+  currentUser,
   onOpenEditProfile,
   onOpenChangePassword,
   onOpenSecurity,
@@ -31,11 +40,37 @@ export const AccountSettings: React.FC<AccountSettingsProps> = ({
   onOpenConnectedApps,
   onOpenFeedback,
   onOpenHelp,
+  onOpenAuthModal,
+  onLogout,
 }) => {
   return (
     <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
       {/* Main Column (8 cols on desktop) */}
       <div className="lg:col-span-8 space-y-6">
+        {/* Guest Mode Conversion Banner */}
+        {currentUser?.isGuest && onOpenAuthModal && (
+          <div className="p-5 rounded-2xl bg-gradient-to-r from-[#201B4B] via-[#1E1B4B] to-[#12192B] border border-[#6366F1]/40 shadow-lg flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+            <div className="flex items-start gap-3.5">
+              <div className="w-10 h-10 rounded-xl bg-[#6366F1]/20 border border-[#6366F1]/40 flex items-center justify-center shrink-0">
+                <Sparkles className="w-5 h-5 text-[#818CF8]" />
+              </div>
+              <div>
+                <h3 className="text-sm font-bold text-white">You are exploring in Guest Mode</h3>
+                <p className="text-xs text-[#94A3B8] mt-0.5 leading-relaxed">
+                  Convert your guest session to a permanent account so your habit progress, XP, and streaks are never lost.
+                </p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => onOpenAuthModal('signup')}
+              className="px-4 py-2 rounded-xl bg-[#6366F1] hover:bg-[#5254E2] text-xs font-semibold text-white transition-all shadow-md shadow-[#6366F1]/25 shrink-0 self-stretch sm:self-auto text-center"
+            >
+              Create Account to Save
+            </button>
+          </div>
+        )}
+
         {/* Profile Card */}
         <section className="bg-[#101722] border border-white/[0.08] rounded-2xl p-6 md:p-7 shadow-sm">
           {/* Card Header */}
@@ -342,6 +377,54 @@ export const AccountSettings: React.FC<AccountSettingsProps> = ({
             </div>
             <ChevronRight className="w-4 h-4 text-[#64748B] group-hover:text-[#F5F7FB] transition-colors" />
           </button>
+
+          {/* Item 5: Switch Account */}
+          {onOpenAuthModal && (
+            <button
+              type="button"
+              onClick={() => onOpenAuthModal('login')}
+              className="w-full p-4 flex items-center justify-between text-left hover:bg-white/[0.02] transition-colors group"
+            >
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 rounded-lg bg-[#141D2A] flex items-center justify-center text-[#818CF8]">
+                  <User className="w-4 h-4" />
+                </div>
+                <div>
+                  <h5 className="text-xs md:text-sm font-semibold text-[#F5F7FB] group-hover:text-[#818CF8] transition-colors">
+                    Switch account
+                  </h5>
+                  <p className="text-[11px] text-[#94A3B8]">
+                    Sign in with another profile
+                  </p>
+                </div>
+              </div>
+              <ChevronRight className="w-4 h-4 text-[#64748B] group-hover:text-[#F5F7FB] transition-colors" />
+            </button>
+          )}
+
+          {/* Item 6: Log Out */}
+          {onLogout && (
+            <button
+              type="button"
+              onClick={onLogout}
+              className="w-full p-4 flex items-center justify-between text-left hover:bg-[#EF4444]/10 transition-colors group"
+            >
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 rounded-lg bg-[#EF4444]/20 flex items-center justify-center text-[#EF4444]">
+                  <LogOut className="w-4 h-4" />
+                </div>
+                <div>
+                  <h5 className="text-xs md:text-sm font-semibold text-[#F87171] transition-colors">
+                    Log out
+                  </h5>
+                  <p className="text-[11px] text-[#94A3B8]">
+                    Sign out of your active session
+                  </p>
+                </div>
+              </div>
+              <ChevronRight className="w-4 h-4 text-[#EF4444]/60 group-hover:text-[#EF4444] transition-colors" />
+            </button>
+          )}
         </div>
       </div>
     </div>

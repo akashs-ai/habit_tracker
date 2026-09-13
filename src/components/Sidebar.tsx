@@ -15,6 +15,7 @@ import {
   ChevronRight,
   Sparkles
 } from 'lucide-react';
+import { AuthUser } from '../types';
 
 interface SidebarProps {
   activeTab: string;
@@ -22,6 +23,8 @@ interface SidebarProps {
   isDark: boolean;
   setIsDark: (dark: boolean) => void;
   userLevel: number;
+  currentUser?: AuthUser | null;
+  momentumPoints?: number;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
@@ -29,7 +32,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
   setActiveTab,
   isDark,
   setIsDark,
-  userLevel
+  userLevel,
+  currentUser,
+  momentumPoints = 4320,
 }) => {
   const primaryNavItems = [
     { id: 'dashboard', label: 'Home', icon: Home },
@@ -180,23 +185,32 @@ export const Sidebar: React.FC<SidebarProps> = ({
           onClick={() => setActiveTab('settings')}
           className="flex items-center justify-between p-2 rounded-xl hover:bg-[#F7F8FA] dark:hover:bg-[#18181B] cursor-pointer transition-colors"
         >
-          <div className="flex items-center gap-2.5">
+          <div className="flex items-center gap-2.5 min-w-0">
             <img 
-              src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop&q=80" 
-              alt="Alex Avatar" 
+              src={currentUser?.avatarUrl || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop&q=80"} 
+              alt={currentUser?.fullName || "Avatar"} 
               referrerPolicy="no-referrer"
-              className="w-8 h-8 rounded-full object-cover ring-2 ring-[#7C6CFF]/20" 
+              className="w-8 h-8 rounded-full object-cover ring-2 ring-[#7C6CFF]/20 shrink-0" 
             />
-            <div>
-              <p className="text-xs font-semibold text-[#111827] dark:text-[#FAFAFA] leading-tight">Alex</p>
+            <div className="min-w-0">
+              <div className="flex items-center gap-1.5">
+                <p className="text-xs font-semibold text-[#111827] dark:text-[#FAFAFA] leading-tight truncate">
+                  {currentUser?.fullName || (currentUser?.isGuest ? 'Guest' : 'Alex')}
+                </p>
+                {currentUser?.isGuest && (
+                  <span className="px-1.5 py-0.2 rounded text-[9px] font-semibold bg-[#F59E0B]/20 text-[#F59E0B]">
+                    GUEST
+                  </span>
+                )}
+              </div>
               <div className="flex items-center gap-1.5 text-[11px] text-[#6B7280] dark:text-[#9CA3AF]">
-                <span>Level {userLevel}</span>
+                <span>Lvl {userLevel}</span>
                 <span>•</span>
-                <span className="text-[#818CF8] font-semibold">4,320 MP</span>
+                <span className="text-[#818CF8] font-semibold">{momentumPoints.toLocaleString()} MP</span>
               </div>
             </div>
           </div>
-          <ChevronRight className="w-4 h-4 text-[#9CA3AF]" />
+          <ChevronRight className="w-4 h-4 text-[#9CA3AF] shrink-0" />
         </div>
 
         {/* Settings button */}

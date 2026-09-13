@@ -17,7 +17,10 @@ import {
   ExternalLink,
   Bot,
   AlertCircle,
-  RefreshCw
+  RefreshCw,
+  ShieldCheck,
+  ShieldAlert,
+  KeyRound
 } from 'lucide-react';
 import { CoachRobotAvatar } from './CoachRobotAvatar';
 import {
@@ -49,6 +52,7 @@ interface CoachChatWorkspaceProps {
   onSyncModels?: () => void;
   isSyncingModels?: boolean;
   lastSyncedTime?: string | null;
+  userEmail?: string;
 }
 
 export const CoachChatWorkspace: React.FC<CoachChatWorkspaceProps> = ({
@@ -66,6 +70,7 @@ export const CoachChatWorkspace: React.FC<CoachChatWorkspaceProps> = ({
   onSyncModels,
   isSyncingModels = false,
   lastSyncedTime,
+  userEmail = 'iitangaming18@gmail.com',
 }) => {
   const [activeTab, setActiveTab] = useState<'chat' | 'planner' | 'insights' | 'resources'>('chat');
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
@@ -99,16 +104,18 @@ export const CoachChatWorkspace: React.FC<CoachChatWorkspaceProps> = ({
   const activeAgent = agents.find((a) => a.id === selectedModelId) || agents[0] || {
     id: 'chatgpt',
     name: 'ChatGPT',
-    status: 'connected' as const,
+    status: 'not_connected' as const,
     selected: true,
     description: '',
     tags: [],
     iconType: 'chatgpt' as const,
     modelTier: 'GPT-4o (Omni)',
+    verified: false,
   };
 
-  const connectedAgents = agents.filter((a) => a.status === 'connected');
-  const notConnectedAgents = agents.filter((a) => a.status !== 'connected');
+  const isAgentVerified = activeAgent.status === 'connected' && activeAgent.verified === true;
+  const connectedVerifiedAgents = agents.filter((a) => a.status === 'connected' && a.verified === true);
+  const unverifiedOrDisconnectedAgents = agents.filter((a) => !(a.status === 'connected' && a.verified === true));
 
   const handleSend = () => {
     if (!inputText.trim() || isGenerating) return;
@@ -221,14 +228,23 @@ export const CoachChatWorkspace: React.FC<CoachChatWorkspaceProps> = ({
             <button
               type="button"
               onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-              className="h-8 px-3 rounded-xl bg-[#141D2A] hover:bg-[#1A2536] border border-white/10 text-xs text-[#F5F7FB] flex items-center gap-2 transition-colors cursor-pointer shadow-sm"
+              className={`h-8 px-3 rounded-xl border text-xs text-[#F5F7FB] flex items-center gap-2 transition-colors cursor-pointer shadow-sm ${
+                isAgentVerified
+                  ? 'bg-[#141D2A] hover:bg-[#1A2536] border-white/10'
+                  : 'bg-amber-950/20 hover:bg-amber-950/40 border-amber-500/30 text-amber-200'
+              }`}
               aria-label="Select AI Model"
             >
               {renderAgentLogo(activeAgent.iconType, 'w-4 h-4')}
-              <span className="font-semibold text-white truncate max-w-[140px]">
+              <span className="font-semibold text-white truncate max-w-[130px]">
                 {activeAgent.modelTier || activeAgent.name}
               </span>
-              <span className="w-1.5 h-1.5 rounded-full bg-[#22C55E]" />
+              <span
+                className={`w-2 h-2 rounded-full shrink-0 ${
+                  isAgentVerified ? 'bg-[#22C55E]' : 'bg-amber-400 animate-pulse'
+                }`}
+                title={isAgentVerified ? 'Verified & Connected' : 'Unverified / Not Connected'}
+              />
               <ChevronDown
                 className={`w-3.5 h-3.5 text-[#64748B] transition-transform duration-200 ${
                   isDropdownOpen ? 'rotate-180' : ''
@@ -245,7 +261,7 @@ export const CoachChatWorkspace: React.FC<CoachChatWorkspaceProps> = ({
                       Select AI Coach Agent
                     </p>
                     <p className="text-[11px] text-[#64748B] mt-0.5">
-                      Switch between your connected intelligence models
+                      Switch between verified intelligence models
                     </p>
                   </div>
                   {onSyncModels && (
@@ -261,72 +277,91 @@ export const CoachChatWorkspace: React.FC<CoachChatWorkspaceProps> = ({
                   )}
                 </div>
 
-                {/* Connected Agents */}
+                {/* Verified Connected Agents */}
                 <div className="space-y-1">
-                  <div className="px-3 py-1 text-[10px] font-semibold text-[#94A3B8] uppercase">
-                    Connected Models ({connectedAgents.length})
+                  <div className="px-3 py-1 text-[10px] font-semibold text-[#94A3B8] uppercase flex items-center justify-between">
+                    <span>Verified Models ({connectedVerifiedAgents.length})</span>
+                    <span className="text-[10px] text-emerald-400 font-medium">Ready to chat</span>
                   </div>
 
-                  {connectedAgents.map((agent) => {
-                    const isSelected = agent.id === activeAgent.id;
-                    return (
-                      <button
-                        key={agent.id}
-                        type="button"
-                        onClick={() => {
-                          onSelectModelId(agent.id);
-                          setIsDropdownOpen(false);
-                        }}
-                        className={`w-full p-2.5 rounded-xl flex items-center justify-between text-left transition-colors ${
-                          isSelected
-                            ? 'bg-[#6366F1]/15 border border-[#6366F1]/30 text-white'
-                            : 'hover:bg-white/5 text-[#F5F7FB]'
-                        }`}
-                      >
-                        <div className="flex items-center gap-2.5 min-w-0">
-                          {renderAgentLogo(agent.iconType, 'w-6 h-6')}
-                          <div className="min-w-0">
-                            <div className="flex items-center gap-1.5">
-                              <span className="text-xs font-bold text-white truncate">
-                                {agent.name}
-                              </span>
-                              <span className="text-[10px] px-1.5 py-0.2 rounded bg-emerald-500/20 text-emerald-400 font-medium">
-                                Active
-                              </span>
+                  {connectedVerifiedAgents.length === 0 ? (
+                    <div className="px-3 py-2 text-xs text-[#64748B] italic">
+                      No AI model verified yet. Connect an account below to chat.
+                    </div>
+                  ) : (
+                    connectedVerifiedAgents.map((agent) => {
+                      const isSelected = agent.id === activeAgent.id;
+                      return (
+                        <button
+                          key={agent.id}
+                          type="button"
+                          onClick={() => {
+                            onSelectModelId(agent.id);
+                            setIsDropdownOpen(false);
+                          }}
+                          className={`w-full p-2.5 rounded-xl flex items-center justify-between text-left transition-colors cursor-pointer ${
+                            isSelected
+                              ? 'bg-[#6366F1]/15 border border-[#6366F1]/30 text-white'
+                              : 'hover:bg-white/5 text-[#F5F7FB]'
+                          }`}
+                        >
+                          <div className="flex items-center gap-2.5 min-w-0">
+                            {renderAgentLogo(agent.iconType, 'w-6 h-6')}
+                            <div className="min-w-0">
+                              <div className="flex items-center gap-1.5">
+                                <span className="text-xs font-bold text-white truncate">
+                                  {agent.name}
+                                </span>
+                                <span className="text-[10px] px-1.5 py-0.2 rounded bg-emerald-500/20 text-emerald-400 font-medium flex items-center gap-0.5">
+                                  <ShieldCheck className="w-3 h-3 text-emerald-400 inline" />
+                                  Verified
+                                </span>
+                              </div>
+                              <p className="text-[11px] text-[#94A3B8] truncate">
+                                {agent.accountEmail || agent.modelTier || 'Active session'}
+                              </p>
                             </div>
-                            <p className="text-[11px] text-[#94A3B8] truncate">
-                              {agent.modelTier || agent.tags.join(', ')}
-                            </p>
                           </div>
-                        </div>
 
-                        {isSelected && (
-                          <div className="w-5 h-5 rounded-full bg-[#6366F1] flex items-center justify-center text-white shrink-0 ml-2">
-                            <Check className="w-3 h-3 stroke-[3]" />
-                          </div>
-                        )}
-                      </button>
-                    );
-                  })}
+                          {isSelected && (
+                            <div className="w-5 h-5 rounded-full bg-[#6366F1] flex items-center justify-center text-white shrink-0 ml-2">
+                              <Check className="w-3 h-3 stroke-[3]" />
+                            </div>
+                          )}
+                        </button>
+                      );
+                    })
+                  )}
                 </div>
 
-                {/* Not Connected Section */}
-                {notConnectedAgents.length > 0 && (
+                {/* Not Connected / Unverified Section */}
+                {unverifiedOrDisconnectedAgents.length > 0 && (
                   <div className="mt-2 pt-2 border-t border-white/6 space-y-1">
                     <div className="px-3 py-1 text-[10px] font-semibold text-[#64748B] uppercase">
-                      Available to Connect ({notConnectedAgents.length})
+                      Available to Connect ({unverifiedOrDisconnectedAgents.length})
                     </div>
-                    {notConnectedAgents.map((agent) => (
+                    {unverifiedOrDisconnectedAgents.map((agent) => (
                       <div
                         key={agent.id}
                         className="p-2.5 rounded-xl bg-white/[0.02] border border-white/4 flex items-center justify-between gap-2"
                       >
-                        <div className="flex items-center gap-2.5 min-w-0">
+                        <div
+                          className="flex items-center gap-2.5 min-w-0 flex-1 cursor-pointer"
+                          onClick={() => {
+                            onSelectModelId(agent.id);
+                            setIsDropdownOpen(false);
+                          }}
+                        >
                           {renderAgentLogo(agent.iconType, 'w-6 h-6 opacity-75')}
                           <div className="min-w-0">
-                            <p className="text-xs font-semibold text-[#94A3B8] truncate">
-                              {agent.name}
-                            </p>
+                            <div className="flex items-center gap-1.5">
+                              <p className="text-xs font-semibold text-[#94A3B8] truncate">
+                                {agent.name}
+                              </p>
+                              <span className="text-[9px] px-1 rounded bg-amber-500/15 text-amber-300 font-medium">
+                                Auth Req
+                              </span>
+                            </div>
                             <p className="text-[10px] text-[#64748B] truncate">
                               {agent.modelTier || agent.description}
                             </p>
@@ -338,7 +373,7 @@ export const CoachChatWorkspace: React.FC<CoachChatWorkspaceProps> = ({
                             setIsDropdownOpen(false);
                             onOpenConnectModal(agent);
                           }}
-                          className="px-2.5 py-1 rounded-lg bg-[#6366F1] hover:bg-[#5558E6] text-[11px] font-semibold text-white whitespace-nowrap transition-colors shrink-0 shadow-sm"
+                          className="px-2.5 py-1 rounded-lg bg-[#6366F1] hover:bg-[#5558E6] text-[11px] font-semibold text-white whitespace-nowrap transition-colors shrink-0 shadow-sm cursor-pointer"
                         >
                           + Connect
                         </button>
@@ -375,18 +410,70 @@ export const CoachChatWorkspace: React.FC<CoachChatWorkspaceProps> = ({
           {/* Active Model Subtitle Bar */}
           <div className="px-4 sm:px-6 py-2 bg-[#090E17] border-b border-white/4 flex items-center justify-between text-[11px] text-[#94A3B8]">
             <div className="flex items-center gap-2">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+              <span
+                className={`w-2 h-2 rounded-full ${
+                  isAgentVerified ? 'bg-emerald-400 animate-pulse' : 'bg-amber-400'
+                }`}
+              />
               <span>
                 Chatting with <strong className="text-[#F5F7FB]">{activeAgent.name}</strong> ({activeAgent.modelTier || 'Active Model'})
               </span>
+              {isAgentVerified ? (
+                <span className="hidden sm:inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-emerald-500/15 text-emerald-300 text-[10px] font-medium ml-1">
+                  <ShieldCheck className="w-3 h-3" />
+                  Verified ({activeAgent.accountEmail || userEmail})
+                </span>
+              ) : (
+                <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 text-[10px] font-medium ml-1">
+                  <AlertCircle className="w-3 h-3" />
+                  Login Required
+                </span>
+              )}
             </div>
-            <span className="text-[#64748B] hidden sm:inline">
-              Backed by LifeRPG Momentum Engine
-            </span>
+
+            {!isAgentVerified ? (
+              <button
+                type="button"
+                onClick={() => onOpenConnectModal(activeAgent)}
+                className="text-[#818CF8] hover:text-white font-medium flex items-center gap-1 cursor-pointer transition-colors text-xs"
+              >
+                <span>Connect & Verify →</span>
+              </button>
+            ) : (
+              <span className="text-[#64748B] hidden sm:inline">
+                Backed by LifeRPG Momentum Engine
+              </span>
+            )}
           </div>
 
           {/* Messages Scroll Area */}
           <div className="flex-1 p-4 sm:p-6 overflow-y-auto max-h-[440px] space-y-4">
+            {/* Unverified Model Warning Card */}
+            {!isAgentVerified && (
+              <div className="p-4 rounded-2xl bg-[#141D2A] border border-amber-500/30 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-lg animate-fadeIn">
+                <div className="flex items-center gap-3">
+                  <div className="p-2.5 rounded-xl bg-amber-500/15 text-amber-400 shrink-0">
+                    <ShieldAlert className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <p className="text-xs sm:text-sm font-semibold text-white">
+                      {activeAgent.name} Authentication & Verification Required
+                    </p>
+                    <p className="text-[11px] text-[#94A3B8] mt-0.5">
+                      Verify your account credentials with Google, Apple, Phone, or API key to unlock {activeAgent.name} chat coaching.
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => onOpenConnectModal(activeAgent)}
+                  className="px-4 py-2 rounded-xl bg-[#6366F1] hover:bg-[#5254E0] text-xs font-semibold text-white transition-all shrink-0 flex items-center gap-2 shadow-sm cursor-pointer whitespace-nowrap"
+                >
+                  <KeyRound className="w-3.5 h-3.5" />
+                  <span>Connect {activeAgent.name}</span>
+                </button>
+              </div>
+            )}
             {messages.map((msg) => {
               const isCoach = msg.sender === 'coach';
               const isActionAdded = addedRecommendationIds[msg.id];
@@ -508,28 +595,68 @@ export const CoachChatWorkspace: React.FC<CoachChatWorkspaceProps> = ({
 
           {/* Bottom Chat Input Bar */}
           <div className="p-3 sm:p-4 bg-[#0C121D] border-t border-white/6">
-            <div className="flex items-center gap-2 rounded-xl bg-[#141D2A] border border-white/8 px-3 py-1.5 focus-within:border-[#6366F1] transition-colors">
+            {!isAgentVerified && (
+              <div className="mb-2.5 px-3 py-2 rounded-xl bg-amber-500/10 border border-amber-500/20 text-xs text-amber-300 flex items-center justify-between gap-2">
+                <span className="flex items-center gap-2">
+                  <AlertCircle className="w-4 h-4 text-amber-400 shrink-0" />
+                  <span>
+                    Verify your account credentials before chatting with <strong>{activeAgent.name}</strong>.
+                  </span>
+                </span>
+                <button
+                  type="button"
+                  onClick={() => onOpenConnectModal(activeAgent)}
+                  className="font-bold underline hover:text-white cursor-pointer ml-2 shrink-0 text-amber-200"
+                >
+                  Verify Now →
+                </button>
+              </div>
+            )}
+
+            <div
+              className={`flex items-center gap-2 rounded-xl bg-[#141D2A] border px-3 py-1.5 transition-colors ${
+                isAgentVerified
+                  ? 'border-white/8 focus-within:border-[#6366F1]'
+                  : 'border-amber-500/30 bg-amber-950/10'
+              }`}
+            >
               <input
                 type="text"
                 value={inputText}
                 onChange={(e) => setInputText(e.target.value)}
                 onKeyDown={handleKeyDown}
-                placeholder={`Ask ${activeAgent.name} (${activeAgent.modelTier || 'AI Coach'})...`}
-                className="flex-1 bg-transparent text-xs sm:text-sm text-white placeholder-[#64748B] outline-none py-1.5"
+                disabled={!isAgentVerified}
+                placeholder={
+                  isAgentVerified
+                    ? `Ask ${activeAgent.name} (${activeAgent.modelTier || 'AI Coach'})...`
+                    : `Authenticate ${activeAgent.name} account to begin chatting...`
+                }
+                className="flex-1 bg-transparent text-xs sm:text-sm text-white placeholder-[#64748B] outline-none py-1.5 disabled:opacity-60 disabled:cursor-not-allowed"
               />
 
-              <button
-                type="button"
-                onClick={handleSend}
-                disabled={!inputText.trim() || isGenerating}
-                className="w-8 h-8 rounded-lg bg-[#6366F1] hover:bg-[#4F46E5] disabled:opacity-40 disabled:hover:bg-[#6366F1] flex items-center justify-center text-white transition-all shadow-sm shrink-0"
-              >
-                {isGenerating ? (
-                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                ) : (
-                  <Send className="w-3.5 h-3.5" />
-                )}
-              </button>
+              {isAgentVerified ? (
+                <button
+                  type="button"
+                  onClick={handleSend}
+                  disabled={!inputText.trim() || isGenerating}
+                  className="w-8 h-8 rounded-lg bg-[#6366F1] hover:bg-[#4F46E5] disabled:opacity-40 disabled:hover:bg-[#6366F1] flex items-center justify-center text-white transition-all shadow-sm shrink-0 cursor-pointer"
+                >
+                  {isGenerating ? (
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  ) : (
+                    <Send className="w-3.5 h-3.5" />
+                  )}
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => onOpenConnectModal(activeAgent)}
+                  className="px-3 py-1.5 rounded-lg bg-[#6366F1] hover:bg-[#4F46E5] text-xs font-semibold text-white flex items-center gap-1.5 transition-all shadow-sm shrink-0 cursor-pointer whitespace-nowrap"
+                >
+                  <KeyRound className="w-3.5 h-3.5" />
+                  <span>Connect Account</span>
+                </button>
+              )}
             </div>
           </div>
         </div>

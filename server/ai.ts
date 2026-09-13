@@ -29,8 +29,8 @@ export async function generateAIChatResponse(req: AIChatRequest): Promise<CoachC
     throw new Error(`AI Agent '${modelId}' does not exist.`);
   }
 
-  if (agent.status !== 'connected') {
-    throw new Error(`${agent.name} is not connected. Please connect and log in to ${agent.name} first in AI Integration or the dropdown menu.`);
+  if (agent.status !== 'connected' || !agent.verified) {
+    throw new Error(`${agent.name} is not verified. Please log in with your credentials and authenticate ${agent.name} first in AI Integration or the coach dropdown.`);
   }
 
   const appState = db.getState();

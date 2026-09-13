@@ -45,15 +45,24 @@ export const SettingsTabs: React.FC<SettingsTabsProps> = ({
               key={tab.id}
               id={`settings-tab-${tab.id}`}
               onClick={() => onSelectTab(tab.id)}
-              className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs sm:text-sm font-medium transition-all duration-150 whitespace-nowrap select-none ${
+              style={
                 isActive
-                  ? 'bg-gradient-to-r from-[#2B236F] to-[#3E32A0] text-white shadow-[0_2px_12px_rgba(99,102,241,0.25)] border border-[#6366F1]/40'
-                  : 'bg-[#101722] hover:bg-[#141D2A] text-[#94A3B8] hover:text-[#F5F7FB] border border-white/[0.06]'
+                  ? {
+                      backgroundColor: 'var(--accent-color)',
+                      borderColor: 'var(--accent-color)',
+                      boxShadow: '0 2px 14px var(--accent-glow)',
+                    }
+                  : undefined
+              }
+              className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs sm:text-sm font-medium transition-all duration-150 whitespace-nowrap select-none cursor-pointer ${
+                isActive
+                  ? 'text-white border'
+                  : 'bg-white dark:bg-[#101722] hover:bg-slate-100 dark:hover:bg-[#141D2A] text-slate-600 dark:text-[#94A3B8] hover:text-slate-900 dark:hover:text-[#F5F7FB] border border-slate-200 dark:border-white/[0.06]'
               }`}
             >
               <Icon
                 className={`w-3.5 h-3.5 sm:w-4 sm:h-4 ${
-                  isActive ? 'text-white' : 'text-[#7D8494]'
+                  isActive ? 'text-white' : 'text-slate-400 dark:text-[#7D8494]'
                 }`}
               />
               <span>{tab.label}</span>

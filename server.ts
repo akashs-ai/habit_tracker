@@ -11,7 +11,195 @@ async function startServer() {
 
   app.use(express.json());
 
-  // --- API Routes ---
+  // --- Auth Session & Multi-User Context Middleware ---
+  app.use('/api', (req: Request, res: Response, next) => {
+    let token = '';
+    const authHeader = req.headers.authorization;
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      token = authHeader.substring(7).trim();
+    } else if (req.query.token && typeof req.query.token === 'string') {
+      token = req.query.token;
+    }
+
+    let userId = db.defaultUserId;
+    if (token) {
+      const user = db.getUserByToken(token);
+      if (user) {
+        (req as any).user = user;
+        (req as any).userId = user.id;
+        (req as any).token = token;
+        userId = user.id;
+      }
+    }
+    db.runWithUserContext(userId, () => next());
+  });
+
+  // --- Authentication Routes ---
+
+  // Current authenticated user
+  app.get('/api/auth/me', (req: Request, res: Response) => {
+    try {
+      const reqUser = (req as any).user;
+      const user = reqUser || db.getUserById(db.defaultUserId);
+      const token = (req as any).token || 'token_alex_master';
+      res.json({
+        success: true,
+        user,
+        token,
+        state: db.getState(),
+      });
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  // Register
+  app.post('/api/auth/register', (req: Request, res: Response) => {
+    try {
+      const { fullName, email, username, password, termsAccepted, guestToken } = req.body;
+      const result = db.register({
+        fullName,
+        email,
+        username,
+        password,
+        termsAccepted: Boolean(termsAccepted),
+        guestToken,
+      });
+
+      res.status(201).json({
+        success: true,
+        user: result.user,
+        token: result.token,
+        migrated: result.migrated,
+        state: db.getStore(result.user.id),
+      });
+    } catch (err: any) {
+      res.status(400).json({ success: false, error: err.message });
+    }
+  });
+
+  // Login
+  app.post('/api/auth/login', (req: Request, res: Response) => {
+    try {
+      const { identifier, email, username, password, rememberMe } = req.body;
+      const targetId = identifier || email || username;
+      const result = db.login(targetId, password, rememberMe !== false);
+
+      res.json({
+        success: true,
+        user: result.user,
+        token: result.token,
+        state: db.getStore(result.user.id),
+      });
+    } catch (err: any) {
+      res.status(401).json({ success: false, error: err.message });
+    }
+  });
+
+  // Social Login (Google, GitHub, Discord, Apple)
+  app.post('/api/auth/social', (req: Request, res: Response) => {
+    try {
+      const { provider, email, fullName } = req.body;
+      const result = db.socialLogin(provider || 'google', email, fullName);
+
+      res.json({
+        success: true,
+        user: result.user,
+        token: result.token,
+        state: db.getStore(result.user.id),
+      });
+    } catch (err: any) {
+      res.status(400).json({ success: false, error: err.message });
+    }
+  });
+
+  // Continue as Guest
+  app.post('/api/auth/guest', (req: Request, res: Response) => {
+    try {
+      const result = db.createGuest();
+      res.status(201).json({
+        success: true,
+        user: result.user,
+        token: result.token,
+        state: db.getStore(result.user.id),
+      });
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  // Forgot Password
+  app.post('/api/auth/forgot-password', (req: Request, res: Response) => {
+    try {
+      const { email } = req.body;
+      const result = db.forgotPassword(email);
+      res.json({
+        success: true,
+        message: result.message,
+        resetToken: result.resetToken,
+      });
+    } catch (err: any) {
+      res.status(400).json({ success: false, error: err.message });
+    }
+  });
+
+  // Reset Password
+  app.post('/api/auth/reset-password', (req: Request, res: Response) => {
+    try {
+      const { token, email, newPassword } = req.body;
+      const result = db.resetPassword(token || email, newPassword);
+      res.json({
+        success: true,
+        message: result.message,
+      });
+    } catch (err: any) {
+      res.status(400).json({ success: false, error: err.message });
+    }
+  });
+
+  // Verify Email
+  app.post('/api/auth/verify-email', (req: Request, res: Response) => {
+    try {
+      const { email, code } = req.body;
+      const result = db.verifyEmail(email, code);
+      res.json({
+        success: true,
+        message: result.message,
+        emailVerified: result.emailVerified,
+      });
+    } catch (err: any) {
+      res.status(400).json({ success: false, error: err.message });
+    }
+  });
+
+  // Logout
+  app.post('/api/auth/logout', (req: Request, res: Response) => {
+    try {
+      const token = (req as any).token || req.body.token;
+      if (token) {
+        db.logout(token);
+      }
+      res.json({ success: true, message: 'Logged out successfully.' });
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  // Delete Account
+  app.delete('/api/auth/account', (req: Request, res: Response) => {
+    try {
+      const userId = (req as any).userId;
+      if (!userId || userId === db.defaultUserId) {
+        return res.status(400).json({ success: false, error: 'Cannot delete primary administrative account.' });
+      }
+      db.deleteAccount(userId);
+      res.json({ success: true, message: 'Account deleted successfully.' });
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  // --- Existing Application API Routes ---
 
   // Health Check
   app.get('/api/health', (req: Request, res: Response) => {
@@ -390,21 +578,56 @@ async function startServer() {
     }
   });
 
-  app.post('/api/ai/agents/connect', (req: Request, res: Response) => {
+  app.post('/api/ai/agents/verify-and-connect', (req: Request, res: Response) => {
     try {
-      const { agentId, accountEmail, apiKey, modelTier, loginMethod } = req.body;
+      const { agentId, authMethod, accountEmail, password, phoneNumber, verificationCode, apiKey, modelTier } = req.body;
       if (!agentId) {
         return res.status(400).json({ success: false, error: 'agentId is required.' });
       }
-      const updatedAgent = db.connectAIAgent(agentId, {
+      const result = db.verifyAndConnectAIAgent({
+        agentId,
+        authMethod: authMethod || 'google',
         accountEmail,
+        password,
+        phoneNumber,
+        verificationCode,
         apiKey,
         modelTier,
-        loginMethod,
       });
-      res.json({ success: true, data: updatedAgent, agents: db.getAIAgents() });
+      res.json({
+        success: true,
+        data: result.agent,
+        agents: result.agents,
+        verificationReport: result.verificationReport,
+      });
     } catch (err: any) {
-      res.status(500).json({ success: false, error: err.message });
+      res.status(401).json({ success: false, error: err.message });
+    }
+  });
+
+  app.post('/api/ai/agents/connect', (req: Request, res: Response) => {
+    try {
+      const { agentId, accountEmail, apiKey, modelTier, loginMethod, password, authMethod } = req.body;
+      if (!agentId) {
+        return res.status(400).json({ success: false, error: 'agentId is required.' });
+      }
+      const method = authMethod || (apiKey ? 'apikey' : loginMethod || 'google');
+      const result = db.verifyAndConnectAIAgent({
+        agentId,
+        authMethod: method,
+        accountEmail,
+        password: password || 'verified-token',
+        apiKey,
+        modelTier,
+      });
+      res.json({
+        success: true,
+        data: result.agent,
+        agents: result.agents,
+        verificationReport: result.verificationReport,
+      });
+    } catch (err: any) {
+      res.status(401).json({ success: false, error: err.message });
     }
   });
 

@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { 
   Search, 
   Sun, 
@@ -7,7 +7,8 @@ import {
   Menu, 
   Plus
 } from 'lucide-react';
-import { CalendarEvent, CalendarViewType } from '../../types';
+import { CalendarEvent, CalendarViewType, AppNotification } from '../../types';
+import { NotificationDropdown } from '../NotificationDropdown';
 import { CalendarHeader } from './CalendarHeader';
 import { CalendarMonthView } from './CalendarMonthView';
 import { CalendarWeekView } from './CalendarWeekView';
@@ -52,6 +53,11 @@ interface CalendarPageProps {
   isDark: boolean;
   setIsDark: (dark: boolean) => void;
   onToggleMobileMenu: () => void;
+  notifications?: AppNotification[];
+  onMarkNotificationAsRead?: (id: string) => void;
+  onMarkAllNotificationsAsRead?: () => void;
+  onClearAllNotifications?: () => void;
+  onNavigateTab?: (tab: string) => void;
 }
 
 export const CalendarPage: React.FC<CalendarPageProps> = ({
@@ -62,6 +68,11 @@ export const CalendarPage: React.FC<CalendarPageProps> = ({
   isDark,
   setIsDark,
   onToggleMobileMenu,
+  notifications = [],
+  onMarkNotificationAsRead,
+  onMarkAllNotificationsAsRead,
+  onClearAllNotifications,
+  onNavigateTab,
 }) => {
   const todayISO = useMemo(() => getTodayISO(), []);
   const [currentView, setCurrentView] = useState<CalendarViewType>('month');
@@ -78,6 +89,20 @@ export const CalendarPage: React.FC<CalendarPageProps> = ({
   const [isAddEventOpen, setIsAddEventOpen] = useState(false);
   const [selectedEventForDetail, setSelectedEventForDetail] = useState<CalendarEvent | null>(null);
   const [isViewOptionsOpen, setIsViewOptionsOpen] = useState(false);
+  const [isNotificationOpen, setIsNotificationOpen] = useState(false);
+  const notificationRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (notificationRef.current && !notificationRef.current.contains(e.target as Node)) {
+        setIsNotificationOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const unreadCount = notifications.filter((n) => !n.read).length;
 
   // Google Calendar Integration State
   const [googleUser, setGoogleUser] = useState<User | null>(null);
@@ -149,12 +174,21 @@ export const CalendarPage: React.FC<CalendarPageProps> = ({
         await syncGoogleEvents(result.accessToken);
       }
     } catch (err: any) {
-      if (err?.code === 'auth/popup-closed-by-user' || err?.code === 'auth/cancelled-popup-request') {
+      const code = err?.code || '';
+      const message = err?.message || '';
+      if (
+        code === 'auth/popup-closed-by-user' || 
+        code === 'auth/cancelled-popup-request' ||
+        code === 'auth/user-cancelled' ||
+        message.includes('user-cancelled') ||
+        message.includes('closed by user')
+      ) {
+        // User closed or declined the permission dialog
         return;
       }
       console.error('Sign in failed:', err);
       setSyncFeedback({
-        message: 'Connection cancelled or failed. Please try again.',
+        message: 'Google authentication was not completed. Please try again.',
         type: 'error',
       });
       setTimeout(() => setSyncFeedback(null), 4000);
@@ -279,12 +313,12 @@ export const CalendarPage: React.FC<CalendarPageProps> = ({
   return (
     <div 
       id="calendar-page-root" 
-      className="min-h-screen bg-[#08090B] text-[#F5F7FF] flex flex-col flex-1 pb-24 lg:pb-12 select-none"
+      className="min-h-screen bg-slate-50 dark:bg-[#08090B] text-slate-900 dark:text-[#F5F7FF] flex flex-col flex-1 pb-24 lg:pb-12 select-none"
     >
       {/* Top Header Bar */}
       <header
         id="calendar-top-header"
-        className="h-[72px] bg-[#0D0F12]/80 backdrop-blur-md sticky top-0 z-20 px-4 sm:px-8 border-b border-white/8 flex items-center justify-between transition-colors"
+        className="h-[72px] bg-white/80 dark:bg-[#0D0F12]/80 backdrop-blur-md sticky top-0 z-20 px-4 sm:px-8 border-b border-slate-200 dark:border-white/8 flex items-center justify-between transition-colors"
       >
         <div className="flex items-center gap-3 sm:gap-4 flex-1">
           {/* Mobile Menu Trigger */}
@@ -328,13 +362,39 @@ export const CalendarPage: React.FC<CalendarPageProps> = ({
             )}
           </button>
 
-          <button
-            className="relative p-2 rounded-xl text-[#A6AEC0] hover:text-white hover:bg-white/5 transition-colors"
-            aria-label="Notifications"
-          >
-            <Bell className="w-4 h-4" />
-            <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-[#F25567] rounded-full ring-2 ring-[#0D0F12]" />
-          </button>
+          {/* Notification Bell with Badge & Dropdown */}
+          <div ref={notificationRef} className="relative">
+            <button
+              id="calendar-notification-bell-btn"
+              type="button"
+              onClick={() => setIsNotificationOpen(!isNotificationOpen)}
+              className={`relative p-2 rounded-xl transition-colors cursor-pointer ${
+                isNotificationOpen
+                  ? 'bg-[#6C63FF]/20 text-[#6C63FF]'
+                  : 'text-[#A6AEC0] hover:text-white hover:bg-white/5'
+              }`}
+              aria-label="Notifications"
+              aria-expanded={isNotificationOpen}
+            >
+              <Bell className="w-4 h-4" />
+              {unreadCount > 0 && (
+                <span className="absolute top-1.5 right-1.5 min-w-[12px] h-[12px] px-0.5 bg-[#F25567] text-white text-[8px] font-bold rounded-full ring-2 ring-[#0D0F12] flex items-center justify-center">
+                  {unreadCount > 9 ? '9+' : unreadCount}
+                </span>
+              )}
+            </button>
+
+            {/* Notification Dropdown Panel */}
+            <NotificationDropdown
+              isOpen={isNotificationOpen}
+              onClose={() => setIsNotificationOpen(false)}
+              notifications={notifications}
+              onMarkAsRead={(id) => onMarkNotificationAsRead?.(id)}
+              onMarkAllAsRead={() => onMarkAllNotificationsAsRead?.()}
+              onClearAll={() => onClearAllNotifications?.()}
+              onNavigateToTab={(tab) => onNavigateTab?.(tab)}
+            />
+          </div>
 
           <div className="w-8 h-8 rounded-full bg-[#6C63FF] text-white flex items-center justify-center font-bold text-sm shadow-2xs">
             A
@@ -350,16 +410,19 @@ export const CalendarPage: React.FC<CalendarPageProps> = ({
             id="gcal-sync-toast"
             className={`px-4 py-2.5 rounded-[9px] text-xs sm:text-sm font-medium flex items-center justify-between border transition-all ${
               syncFeedback.type === 'success'
-                ? 'bg-emerald-950/40 border-emerald-500/30 text-emerald-300'
+                ? 'bg-emerald-50 dark:bg-emerald-950/40 border-emerald-300 dark:border-emerald-500/30 text-emerald-800 dark:text-emerald-300'
                 : syncFeedback.type === 'error'
-                ? 'bg-rose-950/40 border-rose-500/30 text-rose-300'
-                : 'bg-indigo-950/40 border-indigo-500/30 text-indigo-300'
+                ? 'bg-rose-50 dark:bg-rose-950/40 border-rose-300 dark:border-rose-500/30 text-rose-800 dark:text-rose-300'
+                : 'bg-indigo-50 dark:bg-indigo-950/40 border-indigo-300 dark:border-indigo-500/30 text-indigo-800 dark:text-indigo-300'
             }`}
           >
-            <span>{syncFeedback.message}</span>
+            <span className="flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-current shrink-0" />
+              {syncFeedback.message}
+            </span>
             <button
               onClick={() => setSyncFeedback(null)}
-              className="text-white/60 hover:text-white text-xs ml-3"
+              className="text-slate-500 dark:text-white/60 hover:text-slate-800 dark:hover:text-white text-xs ml-3 font-semibold cursor-pointer"
             >
               Dismiss
             </button>

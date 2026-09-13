@@ -16,11 +16,11 @@ import {
 } from '../../types';
 import {
   initialUserProfile,
-  initialAppearanceSettings,
   initialNotificationSettings,
   initialPreferenceSettings,
   initialSecuritySettings,
 } from '../../data/settingsMockData';
+import { getStoredAppearance, applyAppearanceToDOM } from '../../utils/appearanceManager';
 import { SettingsTabs } from './SettingsTabs';
 import { AccountSettings } from './AccountSettings';
 import { AppearanceSettings } from './AppearanceSettings';
@@ -38,17 +38,28 @@ import {
   DownloadDataModal,
 } from './SettingsModals';
 import { ToastSystem, ToastMessage } from './ToastSystem';
+import { AuthUser } from '../../types';
 
 interface SettingsPageProps {
   isDark: boolean;
   setIsDark: React.Dispatch<React.SetStateAction<boolean>>;
   onOpenMobileMenu?: () => void;
+  currentUser?: AuthUser | null;
+  onOpenAuthModal?: (screen: 'login' | 'signup' | 'guest_prompt') => void;
+  onLogout?: () => void;
+  appearance?: AppearanceSettingsType;
+  onUpdateAppearance?: (newSettings: Partial<AppearanceSettingsType>) => void;
 }
 
 export const SettingsPage: React.FC<SettingsPageProps> = ({
   isDark,
   setIsDark,
   onOpenMobileMenu,
+  currentUser,
+  onOpenAuthModal,
+  onLogout,
+  appearance: propAppearance,
+  onUpdateAppearance: propOnUpdateAppearance,
 }) => {
   // Navigation tab state
   const [activeTab, setActiveTab] = useState<SettingsTabId>('account');
@@ -56,7 +67,9 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
 
   // Core settings states
   const [profile, setProfile] = useState<UserSettingsProfile>(initialUserProfile);
-  const [appearance, setAppearance] = useState<AppearanceSettingsType>(initialAppearanceSettings);
+  const [localAppearance, setLocalAppearance] = useState<AppearanceSettingsType>(getStoredAppearance);
+  const appearance = propAppearance || localAppearance;
+
   const [notifications, setNotifications] = useState<NotificationSettingsType>(initialNotificationSettings);
   const [preferences, setPreferences] = useState<PreferenceSettingsType>(initialPreferenceSettings);
   const [security, setSecurity] = useState<SecuritySettingsType>(initialSecuritySettings);
@@ -93,8 +106,23 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
   };
 
   const handleUpdateAppearance = (newSettings: Partial<AppearanceSettingsType>) => {
-    setAppearance((prev) => ({ ...prev, ...newSettings }));
+    if (propOnUpdateAppearance) {
+      propOnUpdateAppearance(newSettings);
+    } else {
+      setLocalAppearance((prev) => {
+        const next = { ...prev, ...newSettings };
+        applyAppearanceToDOM(next);
+        return next;
+      });
+    }
     addToast('Appearance preferences saved.', 'success');
+  };
+
+  const handleHeaderThemeToggle = () => {
+    const nextDark = !isDark;
+    const nextTheme: 'light' | 'dark' = nextDark ? 'dark' : 'light';
+    handleUpdateAppearance({ theme: nextTheme });
+    setIsDark(nextDark);
   };
 
   const handleToggleNotification = (key: keyof NotificationSettingsType) => {
@@ -152,15 +180,15 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
   };
 
   return (
-    <div className="flex-1 min-h-screen bg-[#070B14] text-[#F8FAFF] pb-24 lg:pb-12">
+    <div className="flex-1 min-h-screen bg-[#F8FAFC] dark:bg-[#070B14] text-slate-900 dark:text-[#F8FAFF] pb-24 lg:pb-12 transition-colors">
       {/* Top Navigation Header */}
-      <header className="sticky top-0 z-30 bg-[#070B14]/85 backdrop-blur-md border-b border-white/[0.06] px-4 sm:px-8 py-3.5 flex items-center justify-between gap-4">
+      <header className="sticky top-0 z-30 bg-white/90 dark:bg-[#070B14]/85 backdrop-blur-md border-b border-slate-200 dark:border-white/[0.06] px-4 sm:px-8 py-3.5 flex items-center justify-between gap-4 transition-colors">
         <div className="flex items-center gap-3 flex-1 max-w-lg">
           {onOpenMobileMenu && (
             <button
               type="button"
               onClick={onOpenMobileMenu}
-              className="lg:hidden p-2 rounded-xl text-[#9AA7BD] hover:text-[#F8FAFF] hover:bg-white/[0.06] transition-colors"
+              className="lg:hidden p-2 rounded-xl text-slate-500 dark:text-[#9AA7BD] hover:text-slate-900 dark:hover:text-[#F8FAFF] hover:bg-slate-100 dark:hover:bg-white/[0.06] transition-colors cursor-pointer"
             >
               <Menu className="w-5 h-5" />
             </button>
@@ -168,15 +196,16 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
 
           {/* Search bar */}
           <div className="relative w-full">
-            <Search className="w-4 h-4 text-[#6F7C93] absolute left-3.5 top-1/2 -translate-y-1/2" />
+            <Search className="w-4 h-4 text-slate-400 dark:text-[#6F7C93] absolute left-3.5 top-1/2 -translate-y-1/2" />
             <input
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Search anything... (e.g. how to stay consistent?)"
-              className="w-full bg-[#101827] border border-white/[0.08] rounded-xl pl-9 pr-12 py-2 text-xs md:text-sm text-[#F8FAFF] placeholder-[#6F7C93] focus:outline-none focus:border-[#6C63FF] focus:ring-1 focus:ring-[#6C63FF] transition-all"
+              className="w-full bg-slate-100 dark:bg-[#101827] border border-slate-200 dark:border-white/[0.08] rounded-xl pl-9 pr-12 py-2 text-xs md:text-sm text-slate-900 dark:text-[#F8FAFF] placeholder-slate-400 dark:placeholder-[#6F7C93] focus:outline-none transition-all"
+              style={{ '--tw-ring-color': 'var(--accent-color)' } as React.CSSProperties}
             />
-            <kbd className="hidden sm:inline-flex items-center gap-0.5 px-1.5 py-0.5 text-[10px] font-mono text-[#6F7C93] bg-[#141D2E] border border-white/10 rounded absolute right-3 top-1/2 -translate-y-1/2">
+            <kbd className="hidden sm:inline-flex items-center gap-0.5 px-1.5 py-0.5 text-[10px] font-mono text-slate-500 dark:text-[#6F7C93] bg-white dark:bg-[#141D2E] border border-slate-200 dark:border-white/10 rounded absolute right-3 top-1/2 -translate-y-1/2">
               ⌘ K
             </kbd>
           </div>
@@ -187,8 +216,8 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
           {/* Theme Toggle Button */}
           <button
             type="button"
-            onClick={() => setIsDark(!isDark)}
-            className="p-2 rounded-xl bg-[#101827] border border-white/[0.08] text-[#9AA7BD] hover:text-[#F8FAFF] transition-colors"
+            onClick={handleHeaderThemeToggle}
+            className="p-2 rounded-xl bg-slate-100 dark:bg-[#101827] border border-slate-200 dark:border-white/[0.08] text-slate-600 dark:text-[#9AA7BD] hover:text-slate-900 dark:hover:text-[#F8FAFF] transition-colors cursor-pointer"
             title="Toggle theme"
           >
             {isDark ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
@@ -197,7 +226,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
           {/* Notification Bell */}
           <button
             type="button"
-            className="relative p-2 rounded-xl bg-[#101827] border border-white/[0.08] text-[#9AA7BD] hover:text-[#F8FAFF] transition-colors"
+            className="relative p-2 rounded-xl bg-slate-100 dark:bg-[#101827] border border-slate-200 dark:border-white/[0.08] text-slate-600 dark:text-[#9AA7BD] hover:text-slate-900 dark:hover:text-[#F8FAFF] transition-colors cursor-pointer"
             title="Notifications"
           >
             <Bell className="w-4 h-4" />
@@ -211,7 +240,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
               setActiveTab('account');
               setShowSecurityView(false);
             }}
-            className="w-8 h-8 rounded-xl bg-gradient-to-tr from-[#6C63FF] to-[#8B7CFF] flex items-center justify-center text-white text-xs font-bold shadow-xs hover:opacity-90 transition-opacity"
+            className="w-8 h-8 rounded-xl bg-gradient-to-tr from-[#6C63FF] to-[#8B7CFF] flex items-center justify-center text-white text-xs font-bold shadow-xs hover:opacity-90 transition-opacity cursor-pointer"
           >
             A
           </button>
@@ -223,17 +252,17 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
         {/* Page Title & Quote Row */}
         <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
           <div>
-            <h1 className="text-2xl sm:text-[32px] font-bold text-[#F8FAFF] tracking-tight leading-tight">
+            <h1 className="text-2xl sm:text-[32px] font-bold text-slate-900 dark:text-[#F8FAFF] tracking-tight leading-tight">
               Settings
             </h1>
-            <p className="text-xs sm:text-sm text-[#9AA7BD] mt-1">
+            <p className="text-xs sm:text-sm text-slate-500 dark:text-[#9AA7BD] mt-1">
               Manage your account, preferences, and everything else.
             </p>
           </div>
 
           {/* Optional quote matching Figma reference screenshot */}
           <div className="hidden md:block text-right">
-            <p className="text-xs italic text-[#9AA7BD]/90 font-serif tracking-wide">
+            <p className="text-xs italic text-slate-400 dark:text-[#9AA7BD]/90 font-serif tracking-wide">
               “A better you,
               <br />
               starts with the right settings.”
@@ -265,6 +294,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
               {activeTab === 'account' && (
                 <AccountSettings
                   profile={profile}
+                  currentUser={currentUser}
                   onOpenEditProfile={() => setIsEditProfileOpen(true)}
                   onOpenChangePassword={() => setIsChangePasswordOpen(true)}
                   onOpenSecurity={() => setShowSecurityView(true)}
@@ -276,6 +306,8 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
                   onOpenHelp={() =>
                     addToast('Support documentation opened in help drawer.', 'success')
                   }
+                  onOpenAuthModal={onOpenAuthModal}
+                  onLogout={onLogout}
                 />
               )}
 

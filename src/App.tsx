@@ -18,7 +18,8 @@ import {
   leaderboardFriends, 
   initialGoals, 
   initialNotes,
-  initialTasks
+  initialTasks,
+  initialNotifications
 } from './data/mockData';
 import { initialCalendarEvents } from './data/calendarMockData';
 import { initialGoalsData } from './data/goalsMockData';
@@ -39,7 +40,8 @@ import {
   RewardItem,
   RewardBadge,
   CollectionItem,
-  AIIntegrationModel
+  AIIntegrationModel,
+  AppNotification
 } from './types';
 import { Sparkles, X } from 'lucide-react';
 import { TasksPage } from './components/tasks/TasksPage';
@@ -51,14 +53,33 @@ import { AnalyticsPage } from './components/analytics/AnalyticsPage';
 import { AiCoachPage } from './components/aicoach/AiCoachPage';
 import { AiIntegrationPage } from './components/aiintegration/AiIntegrationPage';
 import { SettingsPage } from './components/settings/SettingsPage';
+import { LandingWelcomePage } from './components/auth/LandingWelcomePage';
+import { AuthModal } from './components/auth/AuthModal';
+import { GuestBanner } from './components/auth/GuestBanner';
+import { LevelUpModal } from './components/effects/LevelUpModal';
 import { api, BackendState } from './services/api';
+import { AuthUser, AuthScreenType, AppearanceSettings as AppearanceSettingsType } from './types';
+import { getStoredAppearance, applyAppearanceToDOM } from './utils/appearanceManager';
 
 export default function App() {
   const [activeTab, setActiveTab] = useState('dashboard');
-  const [isDark, setIsDark] = useState(true);
+  const [appearance, setAppearance] = useState<AppearanceSettingsType>(getStoredAppearance);
+  const [isDark, setIsDark] = useState(() => {
+    const initial = getStoredAppearance();
+    if (initial.theme === 'dark') return true;
+    if (initial.theme === 'light') return false;
+    return typeof window !== 'undefined' && window.matchMedia('(prefers-color-scheme: dark)').matches;
+  });
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [activeQuestFilter, setActiveQuestFilter] = useState<QuestCategory>('all');
+
+  // Authentication States
+  const [currentUser, setCurrentUser] = useState<AuthUser | null>(null);
+  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
+  const [authModalScreen, setAuthModalScreen] = useState<AuthScreenType>('login');
+  const [isGuestBannerDismissed, setIsGuestBannerDismissed] = useState(false);
+  const [showLandingWelcome, setShowLandingWelcome] = useState(false);
 
   // Core Synchronized Data States
   const [user, setUser] = useState(initialUserProfile);
@@ -73,11 +94,29 @@ export default function App() {
   const [rewards, setRewards] = useState<RewardItem[]>(initialFeaturedRewards);
   const [badges, setBadges] = useState<RewardBadge[]>(initialBadges);
   const [collection, setCollection] = useState<CollectionItem[]>(initialCollectionItems);
+  const [notifications, setNotifications] = useState<AppNotification[]>(initialNotifications);
+
+  // Notification action handlers
+  const handleMarkNotificationAsRead = (id: string) => {
+    setNotifications((prev) =>
+      prev.map((n) => (n.id === id ? { ...n, read: true } : n))
+    );
+  };
+
+  const handleMarkAllNotificationsAsRead = () => {
+    setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
+  };
+
+  const handleClearAllNotifications = () => {
+    setNotifications([]);
+  };
 
   // Modals
   const [isAddQuestOpen, setIsAddQuestOpen] = useState(false);
   const [isAddGoalOpen, setIsAddGoalOpen] = useState(false);
   const [isAddNoteOpen, setIsAddNoteOpen] = useState(false);
+  const [isLevelUpOpen, setIsLevelUpOpen] = useState(false);
+  const [levelUpLevel, setLevelUpLevel] = useState(2);
 
   // AI Agent Models Synchronized State
   const [aiAgents, setAiAgents] = useState<AIIntegrationModel[]>([]);
@@ -136,13 +175,14 @@ export default function App() {
 
   const handleConnectAISubmit = async (
     agentId: string,
-    details: { accountEmail?: string; apiKey?: string; modelTier?: string; loginMethod?: string }
+    details: any
   ) => {
     try {
-      const res = await api.connectAIAgent(agentId, details);
+      const res = await api.verifyAndConnectAIAgent(agentId, details);
       setAiAgents(res.agents);
     } catch (err) {
-      console.error('Failed to connect AI agent:', err);
+      console.error('Failed to verify and connect AI agent:', err);
+      throw err;
     }
   };
 
@@ -155,10 +195,54 @@ export default function App() {
     }
   };
 
-  // Initial load: fetch authoritative state from backend
+  // Auth Action Handlers
+  const handleOpenAuth = (screen: AuthScreenType = 'login') => {
+    setAuthModalScreen(screen);
+    setIsAuthModalOpen(true);
+  };
+
+  const handleAuthSuccess = async (authUser: AuthUser, _token: string) => {
+    setCurrentUser(authUser);
+    setShowLandingWelcome(false);
+    try {
+      const state = await api.getState();
+      syncFromBackend(state);
+    } catch (err) {
+      console.warn('Sync state after auth:', err);
+    }
+  };
+
+  const handleLogout = async () => {
+    try {
+      await api.logout();
+    } catch (err) {
+      console.warn('Logout error:', err);
+    }
+    setCurrentUser(null);
+    setShowLandingWelcome(true);
+  };
+
+  // Initial load: fetch authoritative user & state from backend
   useEffect(() => {
     let isMounted = true;
-    const fetchState = async () => {
+    const fetchInitialData = async () => {
+      // 1. Check current authenticated user session
+      try {
+        const meRes = await api.getMe();
+        if (isMounted && meRes.user) {
+          setCurrentUser(meRes.user);
+        } else {
+          // If no token exists, bootstrap a demo member session so preview is immediately lively
+          const demoRes = await api.login({ identifier: 'alex.das@gmail.com', password: 'Adventurer123!' });
+          if (isMounted && demoRes.user) {
+            setCurrentUser(demoRes.user);
+          }
+        }
+      } catch (err) {
+        console.warn('Auth check error, fallback to guest session:', err);
+      }
+
+      // 2. Authoritative state load
       try {
         const state = await api.getState();
         if (isMounted && state) {
@@ -168,7 +252,7 @@ export default function App() {
         console.warn('Backend not ready yet, using initialized local state:', err);
       }
 
-      // Initial AI agents load
+      // 3. Initial AI agents load
       try {
         const agents = await api.getAIAgents();
         if (isMounted && agents && agents.length > 0) {
@@ -178,18 +262,66 @@ export default function App() {
         console.warn('AI agents initial load fallback:', err);
       }
     };
-    fetchState();
+
+    fetchInitialData();
     return () => {
       isMounted = false;
     };
   }, []);
 
-  // Synchronize dark mode class to html document
+  // Handle updating appearance (theme, accent color, interface density, motion)
+  const handleUpdateAppearance = (newSettings: Partial<AppearanceSettingsType>) => {
+    setAppearance((prev) => {
+      const next = { ...prev, ...newSettings };
+      applyAppearanceToDOM(next);
+      if (next.theme === 'dark') {
+        setIsDark(true);
+      } else if (next.theme === 'light') {
+        setIsDark(false);
+      } else if (typeof window !== 'undefined') {
+        setIsDark(window.matchMedia('(prefers-color-scheme: dark)').matches);
+      }
+      return next;
+    });
+  };
+
+  // Synchronize initial appearance and handle system theme updates
   useEffect(() => {
+    applyAppearanceToDOM(appearance);
+
+    const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+    const handleSystemThemeChange = (e: MediaQueryListEvent) => {
+      const current = getStoredAppearance();
+      if (current.theme === 'system') {
+        setIsDark(e.matches);
+        applyAppearanceToDOM({ ...current, theme: 'system' });
+      }
+    };
+
+    mediaQuery.addEventListener('change', handleSystemThemeChange);
+    return () => mediaQuery.removeEventListener('change', handleSystemThemeChange);
+  }, []);
+
+  // Synchronize dark mode class to html document and body
+  useEffect(() => {
+    const root = document.documentElement;
+    const body = document.body;
     if (isDark) {
-      document.documentElement.classList.add('dark');
+      root.classList.add('dark');
+      root.classList.remove('light');
+      body?.classList.add('dark');
+      body?.classList.remove('light');
+      root.setAttribute('data-theme', 'dark');
+      body?.setAttribute('data-theme', 'dark');
+      root.style.colorScheme = 'dark';
     } else {
-      document.documentElement.classList.remove('dark');
+      root.classList.remove('dark');
+      root.classList.add('light');
+      body?.classList.remove('dark');
+      body?.classList.add('light');
+      root.setAttribute('data-theme', 'light');
+      body?.setAttribute('data-theme', 'light');
+      root.style.colorScheme = 'light';
     }
   }, [isDark]);
 
@@ -257,6 +389,8 @@ export default function App() {
         newLevel += 1;
         newXp = newXp - nextLevelXp;
         nextLevelXp += 200;
+        setLevelUpLevel(newLevel);
+        setIsLevelUpOpen(true);
       } else if (newXp < 0) {
         newXp = 0;
       }
@@ -355,11 +489,29 @@ export default function App() {
       prev.map((t) => (t.id === taskId ? { ...t, completed: isNowCompleted } : t))
     );
 
-    setUser((prevUser) => ({
-      ...prevUser,
-      currentXp: Math.max(0, prevUser.currentXp + xpChange),
-      totalPoints: Math.max(0, prevUser.totalPoints + xpChange),
-    }));
+    setUser((prevUser) => {
+      let newXp = prevUser.currentXp + xpChange;
+      let newLevel = prevUser.level;
+      let nextLevelXp = prevUser.nextLevelXp;
+
+      if (newXp >= nextLevelXp) {
+        newLevel += 1;
+        newXp = newXp - nextLevelXp;
+        nextLevelXp += 200;
+        setLevelUpLevel(newLevel);
+        setIsLevelUpOpen(true);
+      } else if (newXp < 0) {
+        newXp = 0;
+      }
+
+      return {
+        ...prevUser,
+        currentXp: newXp,
+        level: newLevel,
+        nextLevelXp,
+        totalPoints: Math.max(0, prevUser.totalPoints + xpChange),
+      };
+    });
 
     if (isNowCompleted) {
       setXpToast({
@@ -533,50 +685,75 @@ export default function App() {
   };
 
   return (
-    <div className={`min-h-screen flex bg-[#08090B] text-[#F5F7FF] font-sans transition-colors duration-200`}>
-      
-      {/* Desktop Sidebar (hidden on screens < 1024px) */}
-      <div className="hidden lg:block shrink-0">
-        <Sidebar
-          activeTab={activeTab}
-          setActiveTab={setActiveTab}
-          isDark={isDark}
-          setIsDark={setIsDark}
-          userLevel={user.level}
-        />
-      </div>
-
-      {/* Mobile Drawer Overlay */}
-      {isMobileMenuOpen && (
-        <div className="lg:hidden fixed inset-0 z-50 flex">
-          <div
-            className="fixed inset-0 bg-black/60 backdrop-blur-xs transition-opacity"
-            onClick={() => setIsMobileMenuOpen(false)}
+    <div className={`min-h-screen flex bg-[#F8FAFC] text-slate-900 dark:bg-[#08090B] dark:text-[#F5F7FF] font-sans transition-colors duration-200`}>
+      {/* Full-screen Landing Welcome View if user logged out or requests landing */}
+      {showLandingWelcome ? (
+        <div className="flex-1 w-full min-h-screen">
+          <LandingWelcomePage
+            onOpenLogin={() => handleOpenAuth('login')}
+            onOpenSignUp={() => handleOpenAuth('signup')}
+            onContinueAsGuest={() => handleOpenAuth('guest_prompt')}
+            onDirectExplore={() => setShowLandingWelcome(false)}
           />
-          <div className="relative z-50 w-72 max-w-[80vw] h-full bg-[#111318] shadow-2xl flex flex-col justify-between border-r border-white/8">
-            <div className="p-3 flex justify-end">
-              <button
-                onClick={() => setIsMobileMenuOpen(false)}
-                className="p-1 rounded-lg text-gray-400 hover:bg-white/5"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-            <div className="flex-1 overflow-y-auto">
-              <Sidebar
-                activeTab={activeTab}
-                setActiveTab={(tab) => {
-                  setActiveTab(tab);
-                  setIsMobileMenuOpen(false);
-                }}
-                isDark={isDark}
-                setIsDark={setIsDark}
-                userLevel={user.level}
-              />
-            </div>
-          </div>
         </div>
-      )}
+      ) : (
+        <>
+          {/* Desktop Sidebar (hidden on screens < 1024px) */}
+          <div className="hidden lg:block shrink-0">
+            <Sidebar
+              activeTab={activeTab}
+              setActiveTab={setActiveTab}
+              isDark={isDark}
+              setIsDark={setIsDark}
+              userLevel={user.level}
+              currentUser={currentUser}
+              momentumPoints={(user as any).momentumPoints ?? 4320}
+            />
+          </div>
+
+          {/* Mobile Drawer Overlay */}
+          {isMobileMenuOpen && (
+            <div className="lg:hidden fixed inset-0 z-50 flex">
+              <div
+                className="fixed inset-0 bg-black/60 backdrop-blur-xs transition-opacity"
+                onClick={() => setIsMobileMenuOpen(false)}
+              />
+              <div className="relative z-50 w-72 max-w-[80vw] h-full bg-white dark:bg-[#111318] shadow-2xl flex flex-col justify-between border-r border-slate-200 dark:border-white/8">
+                <div className="p-3 flex justify-end">
+                  <button
+                    onClick={() => setIsMobileMenuOpen(false)}
+                    className="p-1 rounded-lg text-gray-400 hover:bg-white/5"
+                  >
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
+                <div className="flex-1 overflow-y-auto">
+                  <Sidebar
+                    activeTab={activeTab}
+                    setActiveTab={(tab) => {
+                      setActiveTab(tab);
+                      setIsMobileMenuOpen(false);
+                    }}
+                    isDark={isDark}
+                    setIsDark={setIsDark}
+                    userLevel={user.level}
+                    currentUser={currentUser}
+                    momentumPoints={(user as any).momentumPoints ?? 4320}
+                  />
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Main Layout Area with optional Guest Banner */}
+          <div className="flex-1 flex flex-col min-w-0">
+            {/* Guest notification banner */}
+            {currentUser?.isGuest && !isGuestBannerDismissed && (
+              <GuestBanner
+                onOpenSignUp={() => handleOpenAuth('signup')}
+                onDismiss={() => setIsGuestBannerDismissed(true)}
+              />
+            )}
 
       {/* Main Content Area: Switch between Settings, AI Integration, AI Coach, Analytics, Rewards, Friends, Goals, Calendar, Tasks, and Dashboard */}
       {activeTab === 'settings' ? (
@@ -584,6 +761,11 @@ export default function App() {
           isDark={isDark}
           setIsDark={setIsDark}
           onOpenMobileMenu={() => setIsMobileMenuOpen(true)}
+          currentUser={currentUser}
+          onOpenAuthModal={handleOpenAuth}
+          onLogout={handleLogout}
+          appearance={appearance}
+          onUpdateAppearance={handleUpdateAppearance}
         />
       ) : activeTab === 'ai-integration' ? (
         <AiIntegrationPage
@@ -597,6 +779,7 @@ export default function App() {
           onSyncModels={handleSyncAIModels}
           isSyncing={isSyncingAI}
           lastSyncedTime={aiLastSyncedTime}
+          userEmail={user.email || 'iitangaming18@gmail.com'}
         />
       ) : activeTab === 'ai-coach' ? (
         <AiCoachPage
@@ -609,6 +792,7 @@ export default function App() {
           onSyncModels={handleSyncAIModels}
           isSyncingModels={isSyncingAI}
           lastSyncedTime={aiLastSyncedTime}
+          userEmail={user.email || 'iitangaming18@gmail.com'}
           onAddTaskToToday={(taskTitle) => {
             handleAddTask({
               title: taskTitle,
@@ -676,6 +860,11 @@ export default function App() {
           isDark={isDark}
           setIsDark={setIsDark}
           onToggleMobileMenu={() => setIsMobileMenuOpen(true)}
+          notifications={notifications}
+          onMarkNotificationAsRead={handleMarkNotificationAsRead}
+          onMarkAllNotificationsAsRead={handleMarkAllNotificationsAsRead}
+          onClearAllNotifications={handleClearAllNotifications}
+          onNavigateTab={setActiveTab}
         />
       ) : activeTab === 'tasks' ? (
         <TasksPage
@@ -687,6 +876,11 @@ export default function App() {
           isDark={isDark}
           setIsDark={setIsDark}
           onToggleMobileMenu={() => setIsMobileMenuOpen(true)}
+          notifications={notifications}
+          onMarkNotificationAsRead={handleMarkNotificationAsRead}
+          onMarkAllNotificationsAsRead={handleMarkAllNotificationsAsRead}
+          onClearAllNotifications={handleClearAllNotifications}
+          onNavigateTab={setActiveTab}
         />
       ) : (
         <div className="flex-1 flex flex-col min-w-0 pb-24 lg:pb-12">
@@ -695,6 +889,15 @@ export default function App() {
             onToggleMobileMenu={() => setIsMobileMenuOpen(true)}
             searchQuery={searchQuery}
             setSearchQuery={setSearchQuery}
+            currentUser={currentUser}
+            onOpenAuthModal={handleOpenAuth}
+            onLogout={handleLogout}
+            onNavigateToSettings={() => setActiveTab('settings')}
+            notifications={notifications}
+            onMarkNotificationAsRead={handleMarkNotificationAsRead}
+            onMarkAllNotificationsAsRead={handleMarkAllNotificationsAsRead}
+            onClearAllNotifications={handleClearAllNotifications}
+            onNavigateTab={setActiveTab}
           />
 
           {/* Page Container */}
@@ -704,8 +907,8 @@ export default function App() {
               
               {/* Left Main Column: Hero, Quests, Analytics Bento, Goals */}
               <div className="lg:col-span-8 xl:col-span-9 flex flex-col gap-8">
-                {/* 1. Hero & Bento Stats */}
-                <HeroBanner user={user} />
+                {/* 1. Hero & Bento Stats Carousel */}
+                <HeroBanner user={user} onNavigateTab={setActiveTab} />
 
                 {/* 2. Today's Quests */}
                 <TodayQuests
@@ -742,6 +945,17 @@ export default function App() {
           </main>
         </div>
       )}
+          </div>
+        </>
+      )}
+
+      {/* Auth Modal Flow */}
+      <AuthModal
+        isOpen={isAuthModalOpen}
+        onClose={() => setIsAuthModalOpen(false)}
+        initialScreen={authModalScreen}
+        onAuthSuccess={handleAuthSuccess}
+      />
 
       {/* Floating XP Gain Feedback Toast */}
       {xpToast && (
@@ -776,6 +990,13 @@ export default function App() {
         isOpen={isAddNoteOpen}
         onClose={() => setIsAddNoteOpen(false)}
         onAddNote={handleAddNote}
+      />
+
+      {/* Level Up Celebratory Modal */}
+      <LevelUpModal
+        isOpen={isLevelUpOpen}
+        onClose={() => setIsLevelUpOpen(false)}
+        newLevel={levelUpLevel}
       />
 
       {/* Mobile Bottom Navigation Bar (< lg screens) */}

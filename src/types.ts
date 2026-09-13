@@ -444,6 +444,33 @@ export interface AIIntegrationModel {
   verifiedAt?: string;
   authMethod?: 'google' | 'apple' | 'phone' | 'email' | 'apikey';
   authProviderName?: string;
+  sessionToken?: string;
+}
+
+export interface AIAgentVerifyPayload {
+  agentId: string;
+  authMethod: 'google' | 'apple' | 'phone' | 'email' | 'apikey';
+  accountEmail?: string;
+  password?: string;
+  phoneNumber?: string;
+  verificationCode?: string;
+  apiKey?: string;
+  modelTier?: string;
+}
+
+export interface AIVerificationResult {
+  success: boolean;
+  agent: AIIntegrationModel;
+  agents: AIIntegrationModel[];
+  verificationReport?: {
+    verified: boolean;
+    provider: string;
+    verifiedAccount: string;
+    authMethod: string;
+    timestamp: string;
+    sessionToken: string;
+  };
+  error?: string;
 }
 
 export interface CalendarIntegrationState {
@@ -504,5 +531,48 @@ export interface SecuritySettings {
   twoFactorAuth: boolean;
   loginAlerts: boolean;
   lastPasswordChange: string;
+}
+
+export interface AuthUser {
+  id: string;
+  email: string;
+  username: string;
+  fullName: string;
+  avatarUrl: string;
+  timezone?: string;
+  locale?: string;
+  isGuest: boolean;
+  emailVerified: boolean;
+  createdAt: string;
+  lastSeenAt?: string;
+}
+
+export interface AuthSession {
+  token: string;
+  user: AuthUser;
+}
+
+export type AuthScreenType =
+  | 'landing'
+  | 'login'
+  | 'signup'
+  | 'forgot_password'
+  | 'reset_password'
+  | 'verify_email'
+  | 'guest_prompt';
+
+export type NotificationType = 'quest' | 'task' | 'level' | 'calendar' | 'friend' | 'system';
+
+export interface AppNotification {
+  id: string;
+  title: string;
+  description: string;
+  timeAgo: string;
+  timestamp: string;
+  read: boolean;
+  type: NotificationType;
+  actionUrl?: string;
+  actionLabel?: string;
+  iconName?: 'Sparkles' | 'CheckCircle2' | 'Calendar' | 'Award' | 'UserPlus' | 'Bell';
 }
 
