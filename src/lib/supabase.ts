@@ -1,7 +1,18 @@
 import { createClient, SupabaseClient, RealtimeChannel } from '@supabase/supabase-js';
 
-const supabaseUrl: string = (import.meta as any).env?.VITE_SUPABASE_URL || '';
-const supabaseAnonKey: string = (import.meta as any).env?.VITE_SUPABASE_ANON_KEY || '';
+const env = (import.meta as any).env || {};
+const supabaseUrl: string = (
+  env.VITE_SUPABASE_URL ||
+  env.SUPABASE_URL ||
+  ''
+).trim();
+
+const supabaseAnonKey: string = (
+  env.VITE_SUPABASE_PUBLISHABLE_KEY ||
+  env.VITE_SUPABASE_ANON_KEY ||
+  env.SUPABASE_ANON_KEY ||
+  ''
+).trim();
 
 let supabaseInstance: SupabaseClient | null = null;
 

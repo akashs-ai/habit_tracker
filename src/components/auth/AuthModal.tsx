@@ -19,6 +19,7 @@ import {
 } from 'lucide-react';
 import { AuthSplitView } from './AuthSplitView';
 import { AuthUser, AuthScreenType } from '../../types';
+import { api } from '../../services/api';
 
 interface AuthModalProps {
   isOpen: boolean;
@@ -87,14 +88,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch('/api/auth/guest', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-      });
-      const data = await res.json();
-      if (!res.ok || !data.success) {
-        throw new Error(data.error || 'Failed to create guest session');
-      }
+      const data = await api.continueAsGuest();
       onAuthSuccess(data.user, data.token);
       onClose();
     } catch (err: any) {
@@ -114,15 +108,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch('/api/auth/forgot-password', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: resetEmail.trim() }),
-      });
-      const data = await res.json();
-      if (!res.ok || !data.success) {
-        throw new Error(data.error || 'Failed to send reset email');
-      }
+      const data = await api.forgotPassword(resetEmail.trim());
       setTempResetToken(data.resetToken || '');
       setResetSent(true);
       setSuccessNotice('Password reset link generated! You can now choose your new password.');
@@ -152,19 +138,11 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 
     setLoading(true);
     try {
-      const res = await fetch('/api/auth/reset-password', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          email: resetEmail,
-          token: tempResetToken,
-          newPassword,
-        }),
+      await api.resetPassword({
+        email: resetEmail,
+        token: tempResetToken,
+        newPassword,
       });
-      const data = await res.json();
-      if (!res.ok || !data.success) {
-        throw new Error(data.error || 'Failed to reset password');
-      }
       setSuccessNotice('Password updated successfully! Please sign in with your new password.');
       setTimeout(() => {
         setScreen('login');
@@ -181,15 +159,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch('/api/auth/verify-email', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: verifyEmailAddress }),
-      });
-      const data = await res.json();
-      if (!res.ok || !data.success) {
-        throw new Error(data.error || 'Verification failed');
-      }
+      await api.verifyEmail({ email: verifyEmailAddress });
       setSuccessNotice('Your email has been successfully verified!');
       setTimeout(() => {
         setScreen('welcome_onboarding');

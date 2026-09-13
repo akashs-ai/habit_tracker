@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import { MountainArt } from './MountainArt';
 import { AuthUser } from '../../types';
+import { api } from '../../services/api';
 
 interface AuthSplitViewProps {
   initialTab?: 'login' | 'signup';
@@ -70,19 +71,11 @@ export const AuthSplitView: React.FC<AuthSplitViewProps> = ({
 
     setLoading(true);
     try {
-      const res = await fetch('/api/auth/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          identifier: loginIdentifier.trim(),
-          password: loginPassword,
-          rememberMe,
-        }),
+      const data = await api.login({
+        identifier: loginIdentifier.trim(),
+        password: loginPassword,
+        rememberMe,
       });
-      const data = await res.json();
-      if (!res.ok || !data.success) {
-        throw new Error(data.error || 'Failed to sign in');
-      }
       onSuccess(data.user, data.token);
     } catch (err: any) {
       setError(err.message || 'Login failed. Please check your credentials.');
@@ -119,21 +112,13 @@ export const AuthSplitView: React.FC<AuthSplitViewProps> = ({
 
     setLoading(true);
     try {
-      const res = await fetch('/api/auth/register', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          fullName: signupFullName.trim(),
-          email: signupEmail.trim(),
-          username: signupUsername.trim(),
-          password: signupPassword,
-          termsAccepted: true,
-        }),
+      const data = await api.register({
+        fullName: signupFullName.trim(),
+        email: signupEmail.trim(),
+        username: signupUsername.trim(),
+        password: signupPassword,
+        termsAccepted: true,
       });
-      const data = await res.json();
-      if (!res.ok || !data.success) {
-        throw new Error(data.error || 'Registration failed');
-      }
       onSuccess(data.user, data.token);
     } catch (err: any) {
       setError(err.message || 'Registration failed. Please try again.');
@@ -146,20 +131,14 @@ export const AuthSplitView: React.FC<AuthSplitViewProps> = ({
     setError(null);
     setLoading(true);
     try {
-      const res = await fetch('/api/auth/social', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          provider,
-          email: provider === 'google' ? 'iitangaming18@gmail.com' : undefined,
-          fullName: provider === 'google' ? 'Alex Das' : undefined,
-        }),
+      const data = await api.socialLogin({
+        provider,
+        email: provider === 'google' ? 'iitangaming18@gmail.com' : undefined,
+        fullName: provider === 'google' ? 'Alex Das' : undefined,
       });
-      const data = await res.json();
-      if (!res.ok || !data.success) {
-        throw new Error(data.error || `Failed to sign in with ${provider}`);
+      if (data?.user && data?.token) {
+        onSuccess(data.user, data.token);
       }
-      onSuccess(data.user, data.token);
     } catch (err: any) {
       setError(err.message || `Social login with ${provider} failed.`);
     } finally {
