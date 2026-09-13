@@ -154,16 +154,20 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     }
   };
 
-  // Handle Email Verification Simulation
+  // Handle Email Verification Check
   const handleConfirmVerifyEmail = async () => {
     setLoading(true);
     setError(null);
     try {
-      await api.verifyEmail({ email: verifyEmailAddress });
-      setSuccessNotice('Your email has been successfully verified!');
-      setTimeout(() => {
-        setScreen('welcome_onboarding');
-      }, 1000);
+      const res = await api.verifyEmail({ email: verifyEmailAddress });
+      if (res.emailVerified) {
+        setSuccessNotice('Your email has been successfully verified!');
+        setTimeout(() => {
+          setScreen('welcome_onboarding');
+        }, 1000);
+      } else {
+        setError(res.message || 'Please check your email and click the confirmation link to complete verification.');
+      }
     } catch (err: any) {
       setError(err.message || 'Verification failed.');
     } finally {
@@ -596,9 +600,14 @@ export const AuthModal: React.FC<AuthModalProps> = ({
             <button
               type="button"
               disabled={resendCountdown > 0}
-              onClick={() => {
+              onClick={async () => {
                 setResendCountdown(60);
-                setSuccessNotice('A new verification email has been dispatched.');
+                try {
+                  await api.resendVerificationEmail(verifyEmailAddress);
+                  setSuccessNotice('A new verification email has been dispatched.');
+                } catch (e: any) {
+                  setError(e.message || 'Could not resend verification email.');
+                }
               }}
               className="w-full h-11 rounded-xl bg-[#141D2E] hover:bg-[#1A253A] border border-white/10 text-white text-xs sm:text-sm font-medium transition-all disabled:opacity-50"
             >

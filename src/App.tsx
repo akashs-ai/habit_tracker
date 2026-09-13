@@ -58,10 +58,10 @@ import { LandingWelcomePage } from './components/auth/LandingWelcomePage';
 import { AuthModal } from './components/auth/AuthModal';
 import { GuestBanner } from './components/auth/GuestBanner';
 import { LevelUpModal } from './components/effects/LevelUpModal';
-import { api, BackendState } from './services/api';
+import { api, BackendState, supabaseUserToAuthUser, setStoredAuthToken } from './services/api';
 import { AuthUser, AuthScreenType, AppearanceSettings as AppearanceSettingsType } from './types';
 import { getStoredAppearance, applyAppearanceToDOM } from './utils/appearanceManager';
-import { subscribeToUserTable, isSupabaseConfigured } from './lib/supabase';
+import { subscribeToUserTable, isSupabaseConfigured, getSupabase } from './lib/supabase';
 
 export default function App() {
   const [activeTab, setActiveTab] = useState('dashboard');
@@ -227,24 +227,53 @@ export default function App() {
   // Initial load: fetch authoritative user & state from backend
   useEffect(() => {
     let isMounted = true;
+
+    // 1. Listen to Supabase auth events (email verification callback, sign-in, sign-out)
+    let authUnsubscribe: (() => void) | null = null;
+    if (isSupabaseConfigured()) {
+      const sb = getSupabase();
+      if (sb) {
+        const { data: authListener } = sb.auth.onAuthStateChange(async (event, session) => {
+          if (!isMounted) return;
+          if (session?.user) {
+            let profile: any = null;
+            try {
+              const { data: p } = await sb.from('profiles').select('*').eq('id', session.user.id).maybeSingle();
+              profile = p;
+            } catch (e) {
+              // ignore
+            }
+            const authUser = supabaseUserToAuthUser(session.user, profile);
+            setCurrentUser(authUser);
+            setStoredAuthToken(session.access_token);
+            setShowLandingWelcome(false);
+            setIsAuthModalOpen(false);
+
+            // Clean up verification tokens/code from URL bar without page reload
+            if (typeof window !== 'undefined' && (window.location.hash.includes('access_token') || window.location.search.includes('code='))) {
+              window.history.replaceState(null, '', window.location.pathname);
+            }
+          } else if (event === 'SIGNED_OUT') {
+            setCurrentUser(null);
+            setStoredAuthToken(null);
+          }
+        });
+        authUnsubscribe = () => authListener.subscription.unsubscribe();
+      }
+    }
+
     const fetchInitialData = async () => {
-      // 1. Check current authenticated user session
+      // 2. Check current authenticated user session
       try {
         const meRes = await api.getMe();
-        if (isMounted && meRes.user) {
+        if (isMounted && meRes?.user) {
           setCurrentUser(meRes.user);
-        } else {
-          // If no token exists, bootstrap a demo member session so preview is immediately lively
-          const demoRes = await api.login({ identifier: 'alex.das@gmail.com', password: 'Adventurer123!' });
-          if (isMounted && demoRes.user) {
-            setCurrentUser(demoRes.user);
-          }
         }
       } catch (err) {
-        console.warn('Auth check error, fallback to guest session:', err);
+        // No active session initially; waiting for sign-in or guest exploration
       }
 
-      // 2. Authoritative state load
+      // 3. Authoritative state load
       try {
         const state = await api.getState();
         if (isMounted && state) {
@@ -254,7 +283,7 @@ export default function App() {
         console.warn('Backend not ready yet, using initialized local state:', err);
       }
 
-      // 3. Initial AI agents load
+      // 4. Initial AI agents load
       try {
         const agents = await api.getAIAgents();
         if (isMounted && agents && agents.length > 0) {
@@ -268,6 +297,7 @@ export default function App() {
     fetchInitialData();
     return () => {
       isMounted = false;
+      if (authUnsubscribe) authUnsubscribe();
     };
   }, []);
 
