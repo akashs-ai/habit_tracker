@@ -89,45 +89,90 @@ function clearLocalGuestSession(): void {
 }
 
 /**
- * Robust, safe JSON parser that verifies the response format before parsing.
+ * Robust, safe JSON parser that verifies response.ok, HTTP status, and content format before parsing.
  * Prevents "Unexpected token 'T', "The page c"... is not valid JSON" errors
- * when endpoints return HTML (e.g. 404 from Vercel/proxies).
+ * when endpoints return HTML (e.g. 404/500 from Vercel/proxies or SPA fallback rewrites).
  */
 export async function safeResponseJson<T = any>(
   res: Response,
   fallbackMessage = 'Request failed'
 ): Promise<T> {
+  const status = res.status;
   const contentType = res.headers.get('content-type') || '';
-  const text = await res.text();
-  const trimmed = text.trim();
+  const url = typeof res.url === 'string' ? res.url : '';
 
-  // If Content-Type indicates JSON or content starts with JSON bracket/brace
-  if (contentType.includes('application/json') || trimmed.startsWith('{') || trimmed.startsWith('[')) {
-    try {
-      const parsed = JSON.parse(text);
-      if (!res.ok) {
-        throw new Error(parsed.error || parsed.message || `${fallbackMessage} (Status ${res.status})`);
-      }
-      return parsed as T;
-    } catch (parseErr: any) {
-      if (parseErr.message && !parseErr.message.includes('Unexpected token')) {
-        throw parseErr;
-      }
-    }
-  }
-
-  // Not JSON (e.g. Vercel 404 HTML "The page could not be found")
-  if (res.status === 404) {
+  // Read response body as raw text first
+  let rawText = '';
+  try {
+    rawText = await res.text();
+  } catch (textErr: any) {
     throw new Error(
-      `Endpoint not found (HTTP 404): ${res.url || 'API route'}. Client authentication handles this operation directly.`
+      `${fallbackMessage} (HTTP ${status}): Failed to read server response (${textErr.message || 'Stream error'})`
     );
   }
 
+  const trimmed = rawText.trim();
+  const isHtml =
+    contentType.includes('text/html') ||
+    trimmed.startsWith('<!') ||
+    trimmed.toLowerCase().startsWith('<html') ||
+    trimmed.toLowerCase().startsWith('<head') ||
+    trimmed.toLowerCase().startsWith('<body') ||
+    trimmed.startsWith('The page could not be found');
+
+  // 1. Response is NOT OK (HTTP error 4xx / 5xx)
   if (!res.ok) {
-    throw new Error(`${fallbackMessage} (HTTP ${res.status}): ${trimmed.slice(0, 100) || 'Non-JSON server response'}`);
+    // 404 Not Found error handling (e.g. missing API endpoints on static hosting)
+    if (status === 404) {
+      throw new Error(
+        `Endpoint not found (HTTP 404): ${url || 'Requested API endpoint is unavailable'}`
+      );
+    }
+
+    // If server returned structured JSON error
+    if (!isHtml && (contentType.includes('application/json') || trimmed.startsWith('{') || trimmed.startsWith('['))) {
+      try {
+        const parsed = JSON.parse(trimmed);
+        const errMessage = parsed?.error || parsed?.message || `${fallbackMessage} (Status ${status})`;
+        throw new Error(errMessage);
+      } catch (parseErr: any) {
+        if (parseErr.message && !parseErr.message.includes('Unexpected token')) {
+          throw parseErr;
+        }
+      }
+    }
+
+    // Non-JSON / HTML error (e.g. 500 error page or proxy gateway error)
+    const cleanExcerpt = isHtml
+      ? trimmed.replace(/<[^>]*>?/gm, ' ').replace(/\s+/g, ' ').trim().slice(0, 120)
+      : trimmed.slice(0, 120);
+
+    throw new Error(
+      `${fallbackMessage} (HTTP ${status})${cleanExcerpt ? `: ${cleanExcerpt}` : ''}`
+    );
   }
 
-  throw new Error(`Expected JSON server response, but received: ${trimmed.slice(0, 100)}`);
+  // 2. Response IS OK (HTTP status 200–299)
+  // Empty response (e.g. 204 No Content)
+  if (status === 204 || trimmed.length === 0) {
+    return {} as T;
+  }
+
+  // Detect unexpected HTML responses (e.g. SPA rewrites returning index.html for missing routes with 200 OK)
+  if (isHtml) {
+    throw new Error(
+      `${fallbackMessage}: Expected JSON server response, but received HTML (Status ${status}). The API route may not be implemented on this server.`
+    );
+  }
+
+  // Parse valid JSON safely
+  try {
+    return JSON.parse(trimmed) as T;
+  } catch (err: any) {
+    throw new Error(
+      `${fallbackMessage}: Failed to parse JSON response (${err.message || 'SyntaxError'}). Received: ${trimmed.slice(0, 80)}`
+    );
+  }
 }
 
 export function supabaseUserToAuthUser(sbUser: any, profile?: any): AuthUser {

@@ -111,9 +111,17 @@ async function startServer() {
           });
           if (restRes.ok) {
             restStatus = 'connected_ok_200';
-            const spec = (await restRes.json()) as any;
-            const paths = Object.keys(spec.paths || {}).map((p) => p.replace(/^\//, ''));
-            remoteTablesDetected = paths.filter((p) => p && p !== '/');
+            try {
+              const ct = restRes.headers.get('content-type') || '';
+              const text = await restRes.text();
+              if ((ct.includes('application/json') || text.trim().startsWith('{')) && !text.trim().startsWith('<')) {
+                const spec = JSON.parse(text) as any;
+                const paths = Object.keys(spec.paths || {}).map((p) => p.replace(/^\//, ''));
+                remoteTablesDetected = paths.filter((p) => p && p !== '/');
+              }
+            } catch {
+              // Ignore non-fatal parse error during status check
+            }
           } else {
             restStatus = `status_${restRes.status}`;
           }
@@ -1021,6 +1029,14 @@ async function startServer() {
     } catch (err: any) {
       res.status(400).json({ success: false, error: err.message });
     }
+  });
+
+  // API 404 handler - prevents unhandled /api/* requests from falling through to HTML SPA fallback
+  app.all('/api/*', (req: Request, res: Response) => {
+    res.status(404).json({
+      success: false,
+      error: `API route not found: ${req.method} ${req.originalUrl || req.url}`,
+    });
   });
 
   // Vite middleware for development

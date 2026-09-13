@@ -9,6 +9,7 @@ import {
 } from 'firebase/auth';
 import firebaseConfig from '../../firebase-applet-config.json';
 import { CalendarEvent, EventCategory, CalendarPermissionLevel } from '../types';
+import { safeResponseJson } from './api';
 
 export const CALENDAR_READONLY_SCOPE = 'https://www.googleapis.com/auth/calendar.readonly';
 export const CALENDAR_EVENTS_SCOPE = 'https://www.googleapis.com/auth/calendar.events';
@@ -194,12 +195,7 @@ export async function fetchGoogleCalendarEvents(token: string): Promise<Calendar
     },
   });
 
-  if (!res.ok) {
-    const errorText = await res.text();
-    throw new Error(`Google Calendar API error (${res.status}): ${errorText}`);
-  }
-
-  const data = await res.json();
+  const data = await safeResponseJson(res, 'Google Calendar API error');
   const items = data.items || [];
 
   return items.map((item: any): CalendarEvent => {
@@ -286,12 +282,7 @@ export async function createGoogleCalendarEvent(
     body: JSON.stringify(body),
   });
 
-  if (!res.ok) {
-    const errText = await res.text();
-    throw new Error(`Google Calendar create error (${res.status}): ${errText}`);
-  }
-
-  const item = await res.json();
+  const item = await safeResponseJson(res, 'Google Calendar create error');
   const cat = event.category || detectCategory(item.summary || '', item.description);
   return {
     id: `gcal-${item.id}`,
@@ -346,12 +337,7 @@ export async function updateGoogleCalendarEvent(
     body: JSON.stringify(body),
   });
 
-  if (!res.ok) {
-    const errText = await res.text();
-    throw new Error(`Google Calendar update error (${res.status}): ${errText}`);
-  }
-
-  const item = await res.json();
+  const item = await safeResponseJson(res, 'Google Calendar update error');
   const cat = updates.category || detectCategory(item.summary || '', item.description);
   return {
     id: `gcal-${item.id}`,
@@ -387,8 +373,7 @@ export async function deleteGoogleCalendarEvent(
   });
 
   if (!res.ok && res.status !== 404) {
-    const errText = await res.text();
-    throw new Error(`Google Calendar delete error (${res.status}): ${errText}`);
+    await safeResponseJson(res, 'Google Calendar delete error');
   }
 
   return true;
