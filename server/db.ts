@@ -791,6 +791,48 @@ class LifeRpgDatabase {
     return this.getUserById(session.userId);
   }
 
+  public getOrCreateSupabaseUser(payload: {
+    id: string;
+    email: string;
+    username: string;
+    fullName: string;
+    avatarUrl?: string;
+    isGuest?: boolean;
+  }): UserAccount {
+    let user = this.getUserById(payload.id);
+    if (!user) {
+      let cleanUsername = payload.username.trim().toLowerCase().replace(/[^a-z0-9_.]/g, '');
+      if (!cleanUsername) cleanUsername = `hero_${payload.id.substring(0, 6)}`;
+      let finalUsername = cleanUsername;
+      let counter = 1;
+      while (this.users.some(u => u.id !== payload.id && u.username.toLowerCase() === finalUsername.toLowerCase())) {
+        finalUsername = `${cleanUsername}${counter++}`;
+      }
+
+      user = {
+        id: payload.id,
+        email: payload.email || `${finalUsername}@supabase.user`,
+        username: finalUsername,
+        fullName: payload.fullName || 'Adventurer',
+        avatarUrl: payload.avatarUrl || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80',
+        timezone: 'America/Los_Angeles',
+        locale: 'en-US',
+        isGuest: Boolean(payload.isGuest),
+        emailVerified: true,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        lastSeenAt: new Date().toISOString(),
+      };
+      this.users.push(user);
+      this.saveUsers();
+    }
+    // Pre-warm user store to ensure data isolation
+    if (!this.userStores[payload.id]) {
+      this.userStores[payload.id] = this.loadUserStore(payload.id);
+    }
+    return user;
+  }
+
   public updateUserProfile(
     updates: { avatarUrl?: string; displayName?: string; username?: string; bio?: string },
     userId?: string

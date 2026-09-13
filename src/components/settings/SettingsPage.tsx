@@ -38,13 +38,15 @@ import {
   DownloadDataModal,
 } from './SettingsModals';
 import { ToastSystem, ToastMessage } from './ToastSystem';
-import { AuthUser } from '../../types';
+import { AuthUser, UserProfile } from '../../types';
+import { formatMemberSince } from '../../utils/dateUtils';
 
 interface SettingsPageProps {
   isDark: boolean;
   setIsDark: React.Dispatch<React.SetStateAction<boolean>>;
   onOpenMobileMenu?: () => void;
   currentUser?: AuthUser | null;
+  userProgression?: UserProfile;
   onOpenAuthModal?: (screen: 'login' | 'signup' | 'guest_prompt') => void;
   onLogout?: () => void;
   appearance?: AppearanceSettingsType;
@@ -57,6 +59,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
   setIsDark,
   onOpenMobileMenu,
   currentUser,
+  userProgression,
   onOpenAuthModal,
   onLogout,
   appearance: propAppearance,
@@ -68,16 +71,25 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
   const [showSecurityView, setShowSecurityView] = useState<boolean>(false);
 
   // Core settings states
-  const [profile, setProfile] = useState<UserSettingsProfile>(() => ({
-    ...initialUserProfile,
-    avatarUrl:
-      currentUser?.avatarUrl ||
-      (typeof window !== 'undefined' ? localStorage.getItem('liferpg_user_avatar') : null) ||
-      initialUserProfile.avatarUrl,
-    displayName: currentUser?.fullName || initialUserProfile.displayName,
-    email: currentUser?.email || initialUserProfile.email,
-    username: currentUser?.username || initialUserProfile.username,
-  }));
+  const [profile, setProfile] = useState<UserSettingsProfile>(() => {
+    const memberSinceStr = currentUser?.createdAt
+      ? formatMemberSince(currentUser.createdAt)
+      : (currentUser ? formatMemberSince(new Date().toISOString()) : formatMemberSince(new Date().toISOString()));
+
+    return {
+      ...initialUserProfile,
+      avatarUrl:
+        currentUser?.avatarUrl ||
+        (typeof window !== 'undefined' ? localStorage.getItem('liferpg_user_avatar') : null) ||
+        initialUserProfile.avatarUrl,
+      displayName: currentUser?.fullName || initialUserProfile.displayName,
+      email: currentUser?.email || initialUserProfile.email,
+      username: currentUser?.username || initialUserProfile.username,
+      memberSince: memberSinceStr,
+      level: userProgression?.level ?? (currentUser?.isGuest ? 1 : initialUserProfile.level),
+      mp: userProgression?.momentumPoints ?? userProgression?.totalPoints ?? (currentUser?.isGuest ? 50 : initialUserProfile.mp),
+    };
+  });
 
   useEffect(() => {
     if (currentUser) {
@@ -86,6 +98,9 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
         displayName: currentUser.fullName || prev.displayName,
         email: currentUser.email || prev.email,
         username: currentUser.username || prev.username,
+        memberSince: currentUser.createdAt
+          ? formatMemberSince(currentUser.createdAt)
+          : prev.memberSince,
         avatarUrl:
           currentUser.avatarUrl ||
           (typeof window !== 'undefined' ? localStorage.getItem('liferpg_user_avatar') : null) ||
@@ -93,6 +108,16 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
       }));
     }
   }, [currentUser]);
+
+  useEffect(() => {
+    if (userProgression) {
+      setProfile((prev) => ({
+        ...prev,
+        level: userProgression.level ?? prev.level,
+        mp: userProgression.momentumPoints ?? userProgression.totalPoints ?? prev.mp,
+      }));
+    }
+  }, [userProgression]);
 
   const [localAppearance, setLocalAppearance] = useState<AppearanceSettingsType>(getStoredAppearance);
   const appearance = propAppearance || localAppearance;

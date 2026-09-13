@@ -16,6 +16,7 @@ import {
   Camera,
 } from 'lucide-react';
 import { UserSettingsProfile, SettingsTabId, AuthUser } from '../../types';
+import { formatMemberSince } from '../../utils/dateUtils';
 
 interface AccountSettingsProps {
   profile: UserSettingsProfile;
@@ -44,6 +45,13 @@ export const AccountSettings: React.FC<AccountSettingsProps> = ({
   onOpenAuthModal,
   onLogout,
 }) => {
+  // Determine accurate member since date from authenticated account createdAt or profile
+  const memberSinceDisplay = currentUser?.createdAt
+    ? formatMemberSince(currentUser.createdAt)
+    : (profile.memberSince && profile.memberSince !== 'Jan 15, 2024'
+        ? profile.memberSince
+        : formatMemberSince(new Date().toISOString()));
+
   return (
     <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
       {/* Main Column (8 cols on desktop) */}
@@ -151,7 +159,7 @@ export const AccountSettings: React.FC<AccountSettingsProps> = ({
                   Member since
                 </span>
                 <span className="text-slate-900 dark:text-[#F5F7FB] font-medium">
-                  {profile.memberSince}
+                  {memberSinceDisplay}
                 </span>
               </div>
 

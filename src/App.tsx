@@ -61,6 +61,7 @@ import { LevelUpModal } from './components/effects/LevelUpModal';
 import { api, BackendState } from './services/api';
 import { AuthUser, AuthScreenType, AppearanceSettings as AppearanceSettingsType } from './types';
 import { getStoredAppearance, applyAppearanceToDOM } from './utils/appearanceManager';
+import { subscribeToUserTable, isSupabaseConfigured } from './lib/supabase';
 
 export default function App() {
   const [activeTab, setActiveTab] = useState('dashboard');
@@ -269,6 +270,37 @@ export default function App() {
       isMounted = false;
     };
   }, []);
+
+  // Real-time synchronization when Supabase is configured
+  useEffect(() => {
+    if (!currentUser?.id || !isSupabaseConfigured()) return;
+    const channels = [
+      subscribeToUserTable(currentUser.id, {
+        table: 'habits',
+        onInsert: () => api.getState().then(syncFromBackend).catch(console.warn),
+        onUpdate: () => api.getState().then(syncFromBackend).catch(console.warn),
+        onDelete: () => api.getState().then(syncFromBackend).catch(console.warn),
+      }),
+      subscribeToUserTable(currentUser.id, {
+        table: 'tasks',
+        onInsert: () => api.getState().then(syncFromBackend).catch(console.warn),
+        onUpdate: () => api.getState().then(syncFromBackend).catch(console.warn),
+        onDelete: () => api.getState().then(syncFromBackend).catch(console.warn),
+      }),
+      subscribeToUserTable(currentUser.id, {
+        table: 'notifications',
+        onInsert: (newNotif: any) => {
+          if (newNotif) {
+            setNotifications((prev) => [newNotif, ...prev]);
+          }
+        },
+      }),
+    ];
+
+    return () => {
+      channels.forEach((ch) => ch?.unsubscribe());
+    };
+  }, [currentUser?.id]);
 
   // Handle updating appearance (theme, accent color, interface density, motion)
   const handleUpdateAppearance = (newSettings: Partial<AppearanceSettingsType>) => {
@@ -708,6 +740,7 @@ export default function App() {
           locale: 'en-US',
           isGuest: false,
           emailVerified: true,
+          createdAt: new Date().toISOString(),
         };
       }
       return {
@@ -833,6 +866,7 @@ export default function App() {
           setIsDark={handleToggleTheme}
           onOpenMobileMenu={() => setIsMobileMenuOpen(true)}
           currentUser={currentUser}
+          userProgression={user}
           onOpenAuthModal={handleOpenAuth}
           onLogout={handleLogout}
           appearance={appearance}

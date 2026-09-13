@@ -12,7 +12,7 @@ export const initialUserProfile: UserSettingsProfile = {
   email: 'alex.das@gmail.com',
   bio: 'Discipline today, a stronger you tomorrow.',
   avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200&auto=format&fit=crop&q=80',
-  memberSince: 'Jan 15, 2024',
+  memberSince: 'Today',
   level: 12,
   mp: 4320,
 };

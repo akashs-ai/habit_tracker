@@ -22,6 +22,7 @@ import {
   CalendarIntegrationState,
   CalendarPermissionLevel
 } from '../types';
+import { getSupabase, isSupabaseConfigured } from '../lib/supabase';
 
 export function getStoredAuthToken(): string | null {
   try {
@@ -44,7 +45,21 @@ export function setStoredAuthToken(token: string | null): void {
 }
 
 export async function authFetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
-  const token = getStoredAuthToken();
+  let token = getStoredAuthToken();
+  if (isSupabaseConfigured()) {
+    try {
+      const sb = getSupabase();
+      if (sb) {
+        const { data } = await sb.auth.getSession();
+        if (data?.session?.access_token) {
+          token = data.session.access_token;
+        }
+      }
+    } catch (e) {
+      // ignore
+    }
+  }
+
   const headers = new Headers(init?.headers || {});
   if (token && !headers.has('Authorization')) {
     headers.set('Authorization', `Bearer ${token}`);
@@ -217,6 +232,10 @@ export const api = {
 
   async logout(): Promise<void> {
     try {
+      if (isSupabaseConfigured()) {
+        const sb = getSupabase();
+        if (sb) await sb.auth.signOut();
+      }
       await authFetch('/api/auth/logout', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },

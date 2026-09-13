@@ -750,3 +750,43 @@ export function createLiveAnchoredEvents(todayStr?: string): CalendarEvent[] {
     },
   ];
 }
+
+/**
+ * Formats a user account creation timestamp into a clean "Member since" date string.
+ * If the user joined today, displays e.g. "Sep 13, 2026 (Today)".
+ * For previous dates, displays e.g. "Sep 13, 2026" or "Jan 15, 2025".
+ */
+export function formatMemberSince(dateStr?: string | null): string {
+  if (!dateStr) {
+    const today = new Date();
+    return today.toLocaleDateString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric',
+    });
+  }
+
+  const d = new Date(dateStr);
+  if (isNaN(d.getTime())) {
+    const today = new Date();
+    return today.toLocaleDateString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric',
+    });
+  }
+
+  const formatted = d.toLocaleDateString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+  });
+
+  const now = new Date();
+  const isSameDay =
+    d.getFullYear() === now.getFullYear() &&
+    d.getMonth() === now.getMonth() &&
+    d.getDate() === now.getDate();
+
+  return isSameDay ? `${formatted} (Today)` : formatted;
+}
