@@ -8,6 +8,8 @@ export interface TeamMember {
   instagram: string;
   github: string;
   skills: string[];
+  profileImage?: string;
+  bannerImage?: string;
 }
 
 export const TEAM_MEMBERS: TeamMember[] = [
@@ -41,8 +43,19 @@ export const TEAM_MEMBERS: TeamMember[] = [
     bio: 'Specializing in end-to-end full-stack engineering, performance optimization, and gamification mechanics.',
     linkedin: 'https://www.linkedin.com/in/shubham-si-4b3051370?utm_source=share_via&utm_content=profile&utm_medium=member_android',
     instagram: 'https://www.instagram.com/shubham_12.s?stkn=ZHZpa3V0emNtaGs=',
-    github: 'https://github.com/shubham07sipm-netizen',
+    github: 'https://github.com/shubhamsi503',
     skills: ['Full-Stack Engineering', 'Gamification', 'State Management', 'React', 'DevOps']
+  },
+  {
+    id: 'akash-samanta',
+    name: 'Akash Samanta',
+    role: 'Full-stack Developer',
+    initials: 'AS',
+    bio: 'Building scalable full-stack web applications, intuitive user interfaces, and robust systems.',
+    linkedin: 'https://www.linkedin.com/in/akash-samanta-ai18?utm_source=share_via&utm_content=profile&utm_medium=member_android',
+    instagram: 'https://www.instagram.com/wzz.ashuu_?stkn=c2E4OWh5YnczMWVw',
+    github: 'https://github.com/akashs-ai',
+    skills: ['React', 'Node.js', 'TypeScript', 'Full-Stack Architecture', 'APIs']
   }
 ];
 
