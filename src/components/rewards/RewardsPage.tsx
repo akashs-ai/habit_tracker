@@ -300,10 +300,10 @@ export const RewardsPage: React.FC<RewardsPageProps> = ({
           momentumPoints={momentumPoints}
           pointsThisWeek={pointsThisWeek}
           streakDays={streakDays}
-          weeklyConsistency={initialWeeklyConsistency}
-          level={initialLevel}
-          currentXP={initialXP}
-          maxXP={initialMaxXP}
+          weeklyConsistency={weeklyConsistency}
+          level={level}
+          currentXP={currentXP}
+          maxXP={maxXP}
           onOpenPointsDetail={() => showToast(`Balance: ${momentumPoints.toLocaleString()} Momentum Points (+${pointsThisWeek} this week)`)}
         />
 

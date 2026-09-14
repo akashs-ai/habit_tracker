@@ -1,8 +1,9 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Search, Bell, Menu, LogIn, LogOut, User, Sparkles, ChevronDown, Compass, Settings, Volume2, VolumeX } from 'lucide-react';
+import { Search, Bell, Menu, LogIn, LogOut, User, Sparkles, ChevronDown, Compass, Settings, Volume2, VolumeX, Flame, CheckCircle2, AlertCircle } from 'lucide-react';
 import { AuthUser, AppNotification } from '../types';
 import { soundFx } from '../utils/audioFx';
 import { NotificationDropdown } from './NotificationDropdown';
+import { verifyCurrentAuthUserStreak } from '../services/supabaseData';
 
 interface HeaderProps {
   onToggleMobileMenu?: () => void;
@@ -44,6 +45,29 @@ export const Header: React.FC<HeaderProps> = ({
     setIsMuted(nextMuted);
     if (!nextMuted) {
       soundFx.playCheckmark();
+    }
+  };
+
+  const [isVerifyingStreak, setIsVerifyingStreak] = useState(false);
+  const [streakVerificationResult, setStreakVerificationResult] = useState<{
+    rpcStreak?: number;
+    profileStreak?: number;
+    match?: boolean;
+    referenceDate?: string;
+    error?: string;
+  } | null>(null);
+
+  const handleRunStreakVerification = async () => {
+    setIsVerifyingStreak(true);
+    setStreakVerificationResult(null);
+    try {
+      const res = await verifyCurrentAuthUserStreak();
+      setStreakVerificationResult(res);
+      console.log('✅ Manual Streak Verification Result:', res);
+    } catch (err: any) {
+      setStreakVerificationResult({ error: err?.message || 'Verification failed' });
+    } finally {
+      setIsVerifyingStreak(false);
     }
   };
 
@@ -242,6 +266,63 @@ export const Header: React.FC<HeaderProps> = ({
                     <Settings className="w-4 h-4 text-[#94A3B8]" />
                     <span>Account Settings</span>
                   </button>
+                )}
+
+                {/* Manual Streak Verification Trigger */}
+                <button
+                  type="button"
+                  id="header-verify-streak-btn"
+                  onClick={handleRunStreakVerification}
+                  disabled={isVerifyingStreak}
+                  className="w-full px-4 py-2 text-left text-xs text-[#F97316] hover:bg-[#F97316]/10 flex items-center justify-between gap-2.5 transition-colors"
+                >
+                  <div className="flex items-center gap-2.5">
+                    <Flame className={`w-4 h-4 text-[#F97316] ${isVerifyingStreak ? 'animate-bounce' : ''}`} />
+                    <span>{isVerifyingStreak ? 'Calculating streak...' : 'Verify DB Streak (RPC)'}</span>
+                  </div>
+                  {streakVerificationResult && (
+                    <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${
+                      streakVerificationResult.error
+                        ? 'bg-red-500/20 text-red-400'
+                        : streakVerificationResult.match
+                        ? 'bg-emerald-500/20 text-emerald-400'
+                        : 'bg-amber-500/20 text-amber-400'
+                    }`}>
+                      {streakVerificationResult.error ? 'Error' : `${streakVerificationResult.rpcStreak}d`}
+                    </span>
+                  )}
+                </button>
+
+                {/* Streak Verification Result Details */}
+                {streakVerificationResult && (
+                  <div className="mx-3 my-1 p-2.5 rounded-xl bg-black/40 border border-white/10 text-[11px] leading-relaxed">
+                    {streakVerificationResult.error ? (
+                      <div className="flex items-start gap-1.5 text-red-400">
+                        <AlertCircle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
+                        <span>{streakVerificationResult.error}</span>
+                      </div>
+                    ) : (
+                      <div className="flex flex-col gap-1 text-slate-300">
+                        <div className="flex items-center justify-between">
+                          <span className="text-slate-400">Postgres RPC:</span>
+                          <span className="font-bold text-amber-400">{streakVerificationResult.rpcStreak} days</span>
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <span className="text-slate-400">Profiles table:</span>
+                          <span className="font-bold text-emerald-400">{streakVerificationResult.profileStreak ?? 'N/A'} days</span>
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <span className="text-slate-400">Sync status:</span>
+                          <span className={`font-semibold ${streakVerificationResult.match ? 'text-emerald-400' : 'text-amber-400'}`}>
+                            {streakVerificationResult.match ? '✓ In Lockstep' : 'Mismatch'}
+                          </span>
+                        </div>
+                        <div className="text-[10px] text-slate-500 mt-0.5 text-right">
+                          Date: {streakVerificationResult.referenceDate}
+                        </div>
+                      </div>
+                    )}
+                  </div>
                 )}
 
                 {onOpenAuthModal && (

@@ -838,3 +838,74 @@ export async function createUserHabitInSupabase(
     isStarted: meta.isStarted,
   };
 }
+
+/**
+ * Temporary verification helper to manually test public.calculate_user_streak() in Supabase
+ */
+export async function verifyCurrentAuthUserStreak(customDate?: string): Promise<{
+  success: boolean;
+  userId?: string;
+  referenceDate: string;
+  rpcStreak?: number;
+  profileStreak?: number;
+  match?: boolean;
+  error?: string;
+}> {
+  const sb = getSupabase();
+  const { data: authData } = await sb.auth.getSession();
+  const session = authData?.session;
+
+  if (!session?.user?.id) {
+    return {
+      success: false,
+      referenceDate: customDate || getLiveTodayISO(),
+      error: 'No authenticated user session found in Supabase.',
+    };
+  }
+
+  const userId = session.user.id;
+  const targetDate = customDate || getLiveTodayISO();
+
+  try {
+    // 1. Call calculate_user_streak directly via RPC
+    const { data: rpcVal, error: rpcErr } = await sb.rpc('calculate_user_streak', {
+      p_user_id: userId,
+      p_today: targetDate,
+    });
+
+    if (rpcErr) {
+      return {
+        success: false,
+        userId,
+        referenceDate: targetDate,
+        error: `RPC call failed: ${rpcErr.message}`,
+      };
+    }
+
+    // 2. Fetch current profile value from profiles table
+    const { data: profileRow, error: profileErr } = await sb
+      .from('profiles')
+      .select('streak_days')
+      .eq('id', userId)
+      .single();
+
+    const profileStreak = profileRow?.streak_days ?? 0;
+    const rpcStreak = typeof rpcVal === 'number' ? rpcVal : 0;
+
+    return {
+      success: true,
+      userId,
+      referenceDate: targetDate,
+      rpcStreak,
+      profileStreak: profileErr ? undefined : profileStreak,
+      match: profileErr ? undefined : rpcStreak === profileStreak,
+    };
+  } catch (err: any) {
+    return {
+      success: false,
+      userId,
+      referenceDate: targetDate,
+      error: err?.message || 'Unknown error during streak verification',
+    };
+  }
+}
