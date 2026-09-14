@@ -18,6 +18,7 @@ import {
   initialCoachPrompts,
   initialChatMessages,
 } from '../../data/aiCoachMockData';
+import { initialAIModels } from '../../data/aiIntegrationMockData';
 import { CoachChatMessage, CoachPromptOption, AIIntegrationModel } from '../../types';
 import { api } from '../../services/api';
 
@@ -54,8 +55,8 @@ export const AiCoachPage: React.FC<AiCoachPageProps> = ({
   const [activeDetailModal, setActiveDetailModal] = useState<string | null>(null);
 
   // Multi-Agent State
-  const [localAgents, setLocalAgents] = useState<AIIntegrationModel[]>([]);
-  const agents = propAgents || localAgents;
+  const [localAgents, setLocalAgents] = useState<AIIntegrationModel[]>(initialAIModels);
+  const agents = propAgents && propAgents.length > 0 ? propAgents : localAgents;
 
   const [selectedModelId, setSelectedModelId] = useState<string>('chatgpt');
   const [connectingAgent, setConnectingAgent] = useState<AIIntegrationModel | null>(null);

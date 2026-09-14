@@ -63,6 +63,7 @@ import { api, BackendState, supabaseUserToAuthUser, setStoredAuthToken } from '.
 import { AuthUser, AuthScreenType, AppearanceSettings as AppearanceSettingsType } from './types';
 import { getStoredAppearance, applyAppearanceToDOM } from './utils/appearanceManager';
 import { subscribeToUserTable, isSupabaseConfigured, getSupabase } from './lib/supabase';
+import { initialAIModels } from './data/aiIntegrationMockData';
 
 export default function App() {
   const [activeTab, setActiveTab] = useState('dashboard');
@@ -139,7 +140,7 @@ export default function App() {
   const [levelUpLevel, setLevelUpLevel] = useState(2);
 
   // AI Agent Models Synchronized State
-  const [aiAgents, setAiAgents] = useState<AIIntegrationModel[]>([]);
+  const [aiAgents, setAiAgents] = useState<AIIntegrationModel[]>(initialAIModels);
   const [isSyncingAI, setIsSyncingAI] = useState(false);
   const [aiLastSyncedTime, setAiLastSyncedTime] = useState<string | null>(null);
 
@@ -160,7 +161,7 @@ export default function App() {
     if (data.notes) setNotes(data.notes);
     if (data.attributes) setAttributes(data.attributes);
     if (data.weeklyData) setWeeklyData(data.weeklyData);
-    if (data.aiAgents) setAiAgents(data.aiAgents);
+    if (data.aiAgents && data.aiAgents.length > 0) setAiAgents(data.aiAgents);
   };
 
   const handleSyncAIModels = async () => {

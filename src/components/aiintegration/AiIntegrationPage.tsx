@@ -53,7 +53,7 @@ export const AiIntegrationPage: React.FC<AiIntegrationPageProps> = ({
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [localModels, setLocalModels] = useState<AIIntegrationModel[]>(initialAIModels);
-  const models = propModels || localModels;
+  const models = propModels && propModels.length > 0 ? propModels : localModels;
 
   const [calendarState, setCalendarState] = useState<CalendarIntegrationState>(
     initialCalendarIntegration
@@ -72,7 +72,7 @@ export const AiIntegrationPage: React.FC<AiIntegrationPageProps> = ({
   // Load AI agents and calendar integration from backend on mount
   useEffect(() => {
     let isMounted = true;
-    if (!propModels) {
+    if (!propModels || propModels.length === 0) {
       api.getAIAgents()
         .then((loaded) => {
           if (!isMounted) return;
