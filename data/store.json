@@ -2,14 +2,15 @@
   "user": {
     "name": "Alex Das",
     "level": 12,
-    "currentXp": 870,
+    "currentXp": 840,
     "nextLevelXp": 1200,
     "streakDays": 12,
-    "totalPoints": 932,
-    "questsDoneThisWeek": 8,
-    "momentumPoints": 3595,
-    "pointsThisWeek": 315,
-    "weeklyConsistency": 92
+    "totalPoints": 902,
+    "questsDoneThisWeek": 7,
+    "momentumPoints": 3570,
+    "pointsThisWeek": 765,
+    "weeklyConsistency": 92,
+    "avatarUrl": "https://utebwqwnpadkbgxgbbcf.supabase.co/storage/v1/object/public/avatars/28aedc97-d79b-4331-bcbe-d8ec2ea40b17/avatar-1789402903800.png"
   },
   "quests": [
     {
@@ -31,7 +32,7 @@
       "durationMinutes": 20,
       "xpReward": 30,
       "attribute": "Strength",
-      "completed": true,
+      "completed": false,
       "isStarted": false
     },
     {
@@ -106,7 +107,7 @@
       "id": "task-2",
       "title": "Go for a short walk",
       "description": "Take a 20-minute break outside to get fresh air.",
-      "completed": true,
+      "completed": false,
       "viewCategory": "today",
       "dueText": "Today, 6:00 PM",
       "labels": [
@@ -1369,7 +1370,7 @@
       "id": "attr-3",
       "name": "Strength",
       "level": 6,
-      "percentage": 43,
+      "percentage": 40,
       "color": "#EA580C",
       "bgLight": "#FFEDD5",
       "iconName": "BicepsFlexed"
@@ -1390,7 +1391,7 @@
       "dayShort": "Mon",
       "xp": 180,
       "heightPercent": 45,
-      "isToday": false
+      "isToday": true
     },
     {
       "day": "Tuesday",
@@ -1432,7 +1433,7 @@
       "dayShort": "Sun",
       "xp": 220,
       "heightPercent": 58,
-      "isToday": true
+      "isToday": false
     }
   ],
   "activityHistory": [
@@ -1547,6 +1548,13 @@
       "tasksCompleted": 0,
       "xpEarned": 90,
       "momentumPointsEarned": 75
+    },
+    {
+      "date": "2026-09-14",
+      "habitsCompleted": 0,
+      "tasksCompleted": 0,
+      "xpEarned": 640,
+      "momentumPointsEarned": 450
     }
   ],
   "termsPolicy": {
@@ -1639,7 +1647,7 @@
       }
     ]
   },
-  "lastUpdated": "2026-09-13T01:14:21.181Z",
+  "lastUpdated": "2026-09-14T16:21:44.347Z",
   "aiAgents": [
     {
       "id": "chatgpt",
@@ -1698,7 +1706,7 @@
       "syncStatus": "ready",
       "latencyMs": 98,
       "lastSyncedAt": "2026-09-12T23:06:03.027Z",
-      "isEnvironmentKeyConfigured": false
+      "isEnvironmentKeyConfigured": true
     }
   ],
   "calendarIntegration": {

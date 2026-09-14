@@ -735,6 +735,183 @@ END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
 -- ============================================================================
+-- 10. DATABASE-DRIVEN STREAK CALCULATION ENGINE
+-- ============================================================================
+
+-- Calculate overall user consistency streak across all habit completions
+CREATE OR REPLACE FUNCTION public.calculate_user_streak(
+  p_user_id UUID,
+  p_today DATE DEFAULT CURRENT_DATE
+)
+RETURNS INT AS $$
+DECLARE
+  v_streak INT := 0;
+  v_expected_date DATE;
+  v_rec RECORD;
+BEGIN
+  -- Iterate through distinct habit completion dates on or before p_today, latest first
+  FOR v_rec IN
+    SELECT DISTINCT completed_date
+    FROM public.habit_completions
+    WHERE user_id = p_user_id
+      AND completed_date <= p_today
+    ORDER BY completed_date DESC
+  LOOP
+    IF v_streak = 0 THEN
+      -- First record: completion must be either today or yesterday
+      IF v_rec.completed_date = p_today THEN
+        v_streak := 1;
+        v_expected_date := p_today - 1;
+      ELSIF v_rec.completed_date = p_today - 1 THEN
+        v_streak := 1;
+        v_expected_date := p_today - 2;
+      ELSE
+        -- Completed more than 1 day ago: streak is broken
+        RETURN 0;
+      END IF;
+    ELSE
+      -- Subsequent consecutive days
+      IF v_rec.completed_date = v_expected_date THEN
+        v_streak := v_streak + 1;
+        v_expected_date := v_expected_date - 1;
+      ELSE
+        EXIT;
+      END IF;
+    END IF;
+  END LOOP;
+
+  RETURN v_streak;
+END;
+$$ LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path = public;
+
+-- Calculate individual habit consistency streak
+CREATE OR REPLACE FUNCTION public.calculate_habit_streak(
+  p_habit_id UUID,
+  p_today DATE DEFAULT CURRENT_DATE
+)
+RETURNS INT AS $$
+DECLARE
+  v_streak INT := 0;
+  v_expected_date DATE;
+  v_rec RECORD;
+BEGIN
+  FOR v_rec IN
+    SELECT DISTINCT completed_date
+    FROM public.habit_completions
+    WHERE habit_id = p_habit_id
+      AND completed_date <= p_today
+    ORDER BY completed_date DESC
+  LOOP
+    IF v_streak = 0 THEN
+      IF v_rec.completed_date = p_today THEN
+        v_streak := 1;
+        v_expected_date := p_today - 1;
+      ELSIF v_rec.completed_date = p_today - 1 THEN
+        v_streak := 1;
+        v_expected_date := p_today - 2;
+      ELSE
+        RETURN 0;
+      END IF;
+    ELSE
+      IF v_rec.completed_date = v_expected_date THEN
+        v_streak := v_streak + 1;
+        v_expected_date := v_expected_date - 1;
+      ELSE
+        EXIT;
+      END IF;
+    END IF;
+  END LOOP;
+
+  RETURN v_streak;
+END;
+$$ LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path = public;
+
+-- Automatic streak sync trigger on completion insert or delete
+CREATE OR REPLACE FUNCTION public.trg_sync_habit_completion_streak()
+RETURNS TRIGGER AS $$
+DECLARE
+  v_user_id UUID;
+  v_habit_id UUID;
+  v_event_date DATE;
+  v_max_user_date DATE;
+  v_max_habit_date DATE;
+  v_user_ref_date DATE;
+  v_habit_ref_date DATE;
+  v_user_streak INT;
+  v_habit_streak INT;
+  v_best_streak INT;
+BEGIN
+  IF (TG_OP = 'DELETE') THEN
+    v_user_id := OLD.user_id;
+    v_habit_id := OLD.habit_id;
+    v_event_date := OLD.completed_date;
+  ELSE
+    v_user_id := NEW.user_id;
+    v_habit_id := NEW.habit_id;
+    v_event_date := NEW.completed_date;
+  END IF;
+
+  -- Determine user reference date: whichever is latest between the mutated date and remaining completions
+  SELECT MAX(completed_date) INTO v_max_user_date
+  FROM public.habit_completions
+  WHERE user_id = v_user_id;
+
+  v_user_ref_date := GREATEST(v_event_date, COALESCE(v_max_user_date, v_event_date));
+
+  -- 1. Calculate & update overall user streak in public.profiles
+  v_user_streak := public.calculate_user_streak(v_user_id, v_user_ref_date);
+  UPDATE public.profiles
+  SET streak_days = v_user_streak,
+      updated_at = now()
+  WHERE id = v_user_id;
+
+  -- Determine habit reference date: whichever is latest between the mutated date and remaining completions for this habit
+  SELECT MAX(completed_date) INTO v_max_habit_date
+  FROM public.habit_completions
+  WHERE habit_id = v_habit_id;
+
+  v_habit_ref_date := GREATEST(v_event_date, COALESCE(v_max_habit_date, v_event_date));
+
+  -- 2. Calculate & update individual habit streak in public.habits
+  v_habit_streak := public.calculate_habit_streak(v_habit_id, v_habit_ref_date);
+  
+  SELECT best_streak INTO v_best_streak
+  FROM public.habits
+  WHERE id = v_habit_id;
+
+  -- Best streak is monotonic; it never decrements when a habit is uncompleted
+  IF v_habit_streak > COALESCE(v_best_streak, 0) THEN
+    v_best_streak := v_habit_streak;
+  END IF;
+
+  UPDATE public.habits
+  SET streak = v_habit_streak,
+      best_streak = COALESCE(v_best_streak, 0),
+      updated_at = now()
+  WHERE id = v_habit_id;
+
+  RETURN NULL;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
+
+DROP TRIGGER IF EXISTS on_habit_completion_streak ON public.habit_completions;
+CREATE TRIGGER on_habit_completion_streak
+  AFTER INSERT OR DELETE ON public.habit_completions
+  FOR EACH ROW EXECUTE FUNCTION public.trg_sync_habit_completion_streak();
+
+-- Safe backfill: synchronizes streak_days on existing user profiles
+DO $$
+DECLARE
+  v_p RECORD;
+BEGIN
+  FOR v_p IN SELECT id FROM public.profiles LOOP
+    UPDATE public.profiles
+    SET streak_days = public.calculate_user_streak(v_p.id, CURRENT_DATE)
+    WHERE id = v_p.id;
+  END LOOP;
+END $$;
+
+-- ============================================================================
 -- SUPABASE REALTIME REPLICATION PUBLICATION
 -- Enable live synchronization for collaborative and cross-device features
 -- ============================================================================
@@ -745,3 +922,13 @@ ALTER PUBLICATION supabase_realtime ADD TABLE public.notifications;
 ALTER PUBLICATION supabase_realtime ADD TABLE public.friend_requests;
 ALTER PUBLICATION supabase_realtime ADD TABLE public.friendships;
 ALTER PUBLICATION supabase_realtime ADD TABLE public.challenge_participants;
+
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_publication_tables 
+    WHERE pubname = 'supabase_realtime' AND tablename = 'profiles'
+  ) THEN
+    ALTER PUBLICATION supabase_realtime ADD TABLE public.profiles;
+  END IF;
+END $$;

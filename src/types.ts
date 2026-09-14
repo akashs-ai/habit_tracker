@@ -62,11 +62,15 @@ export interface QuickNote {
 
 export interface UserProfile {
   name: string;
+  displayName?: string;
+  username?: string;
   level: number;
   currentXp: number;
   nextLevelXp: number;
   streakDays: number;
+  streak?: number;
   totalPoints: number;
+  momentumPoints?: number;
   questsDoneThisWeek: number;
   xp?: number;
   avatarUrl?: string;

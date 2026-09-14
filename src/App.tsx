@@ -154,7 +154,11 @@ export default function App() {
     if (data.quests) setQuests(data.quests);
     if (data.tasks) setTasks(data.tasks);
     if (data.calendarEvents) setCalendarEvents(data.calendarEvents);
-    if (data.detailedGoals) setDetailedGoals(data.detailedGoals);
+    if (data.goals) {
+      setDetailedGoals(data.goals);
+    } else if (data.detailedGoals) {
+      setDetailedGoals(data.detailedGoals);
+    }
     if (data.rewards) setRewards(data.rewards);
     if (data.badges) setBadges(data.badges);
     if (data.collection) setCollection(data.collection);
@@ -357,6 +361,16 @@ export default function App() {
         onDelete: () => api.getState().then(syncFromBackend).catch(console.warn),
       }),
       subscribeToUserTable(currentUser.id, {
+        table: 'habit_completions',
+        onInsert: () => api.getState().then(syncFromBackend).catch(console.warn),
+        onDelete: () => api.getState().then(syncFromBackend).catch(console.warn),
+      }),
+      subscribeToUserTable(currentUser.id, {
+        table: 'profiles',
+        filter: `id=eq.${currentUser.id}`,
+        onUpdate: () => api.getState().then(syncFromBackend).catch(console.warn),
+      }),
+      subscribeToUserTable(currentUser.id, {
         table: 'tasks',
         onInsert: () => api.getState().then(syncFromBackend).catch(console.warn),
         onUpdate: () => api.getState().then(syncFromBackend).catch(console.warn),
@@ -490,6 +504,9 @@ export default function App() {
     const isNowCompleted = !target.completed;
     const xpChange = isNowCompleted ? target.xpReward : -target.xpReward;
 
+    const previousQuests = [...quests];
+    const previousUser = { ...user };
+
     setQuests((prev) =>
       prev.map((q) => (q.id === questId ? { ...q, completed: isNowCompleted } : q))
     );
@@ -534,8 +551,11 @@ export default function App() {
     try {
       const res = await api.toggleQuest(questId);
       if (res.state) syncFromBackend(res.state);
-    } catch (err) {
+    } catch (err: any) {
       console.error('Quest toggle backend error:', err);
+      setQuests(previousQuests);
+      setUser(previousUser);
+      setVerifiedBannerMessage(`Failed to update habit: ${err?.message || 'Database error'}`);
     }
   };
 
@@ -551,8 +571,10 @@ export default function App() {
     try {
       const res = await api.addQuest(newQuestData);
       if (res.state) syncFromBackend(res.state);
-    } catch (err) {
+    } catch (err: any) {
       console.error('Add quest error:', err);
+      setQuests((prev) => prev.filter((q) => q.id !== optimisticQuest.id));
+      setVerifiedBannerMessage(`Failed to create habit: ${err?.message || 'Database error'}`);
     }
   };
 
@@ -598,6 +620,9 @@ export default function App() {
     const xpReward = target.xpReward || 15;
     const xpChange = isNowCompleted ? xpReward : -xpReward;
 
+    const previousTasks = [...tasks];
+    const previousUser = { ...user };
+
     // Optimistic UI updates
     setTasks((prev) =>
       prev.map((t) => (t.id === taskId ? { ...t, completed: isNowCompleted } : t))
@@ -640,8 +665,12 @@ export default function App() {
     try {
       const res = await api.toggleTask(taskId);
       if (res.state) syncFromBackend(res.state);
-    } catch (err) {
+    } catch (err: any) {
       console.error('Task toggle backend error:', err);
+      // Revert optimistic state
+      setTasks(previousTasks);
+      setUser(previousUser);
+      setVerifiedBannerMessage(`Failed to update task: ${err?.message || 'Database error'}`);
     }
   };
 
@@ -657,6 +686,7 @@ export default function App() {
         : localToday),
     };
 
+    const previousTasks = [...tasks];
     const optimisticTask: TaskItem = {
       id: `task-${Date.now()}`,
       ...taskWithClientDate,
@@ -666,28 +696,36 @@ export default function App() {
     try {
       const res = await api.addTask(taskWithClientDate);
       if (res.state) syncFromBackend(res.state);
-    } catch (err) {
+    } catch (err: any) {
       console.error('Add task error:', err);
+      setTasks(previousTasks);
+      setVerifiedBannerMessage(`Failed to create task: ${err?.message || 'Database error'}`);
     }
   };
 
   const handleUpdateTask = async (updatedTask: TaskItem) => {
+    const previousTasks = [...tasks];
     setTasks((prev) => prev.map((t) => (t.id === updatedTask.id ? updatedTask : t)));
     try {
       const res = await api.updateTask(updatedTask);
       if (res.state) syncFromBackend(res.state);
-    } catch (err) {
+    } catch (err: any) {
       console.error('Update task error:', err);
+      setTasks(previousTasks);
+      setVerifiedBannerMessage(`Failed to save task: ${err?.message || 'Database error'}`);
     }
   };
 
   const handleDeleteTask = async (taskId: string) => {
+    const previousTasks = [...tasks];
     setTasks((prev) => prev.filter((t) => t.id !== taskId));
     try {
       const res = await api.deleteTask(taskId);
       if (res.state) syncFromBackend(res.state);
-    } catch (err) {
+    } catch (err: any) {
       console.error('Delete task error:', err);
+      setTasks(previousTasks);
+      setVerifiedBannerMessage(`Failed to delete task: ${err?.message || 'Database error'}`);
     }
   };
 
@@ -800,6 +838,9 @@ export default function App() {
 
   // User Profile Update Handler (Avatar photo change, name, bio)
   const handleUpdateUserProfile = async (updated: Partial<UserSettingsProfile>) => {
+    const previousCurrentUser = currentUser;
+    const previousUser = { ...user };
+
     // 1. Immediately update currentUser state for Header, Sidebar, and Account views
     setCurrentUser((prev) => {
       if (!prev) {
@@ -854,8 +895,11 @@ export default function App() {
       if (res.state) {
         syncFromBackend(res.state);
       }
-    } catch (err) {
+    } catch (err: any) {
       console.warn('Backend profile sync note:', err);
+      setCurrentUser(previousCurrentUser);
+      setUser(previousUser);
+      setVerifiedBannerMessage(`Failed to update profile: ${err?.message || 'Database error'}`);
     }
   };
 

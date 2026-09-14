@@ -4,7 +4,7 @@ import { createServer as createViteServer } from 'vite';
 import { db } from './server/db';
 import { REWARD_TERMS_POLICY } from './server/terms';
 import { generateAIChatResponse } from './server/ai';
-import { verifySupabaseToken } from './server/supabase';
+import { verifySupabaseToken, getServerSupabase } from './server/supabase';
 
 async function startServer() {
   const app = express();
@@ -391,11 +391,25 @@ async function startServer() {
     }
   });
 
-  app.patch('/api/user/profile', (req: Request, res: Response) => {
+  app.patch('/api/user/profile', async (req: Request, res: Response) => {
     try {
       const userId = (req as any).user?.id;
       const { avatarUrl, displayName, username, bio } = req.body;
       const result = db.updateUserProfile({ avatarUrl, displayName, username, bio }, userId);
+
+      // Mirror to Supabase profiles table if authenticated Supabase user
+      const serverSb = getServerSupabase();
+      if (serverSb && userId && !userId.startsWith('guest-')) {
+        const patch: Record<string, any> = { updated_at: new Date().toISOString() };
+        if (displayName) patch.display_name = displayName;
+        if (username) patch.username = username;
+        if (bio !== undefined) patch.bio = bio;
+        if (avatarUrl) patch.avatar_url = avatarUrl;
+        Promise.resolve(serverSb.from('profiles').update(patch).eq('id', userId)).catch((e) => {
+          console.warn('Background Supabase profile update error:', e);
+        });
+      }
+
       res.json({
         success: true,
         data: result.user,
@@ -407,11 +421,24 @@ async function startServer() {
     }
   });
 
-  app.post('/api/user/profile', (req: Request, res: Response) => {
+  app.post('/api/user/profile', async (req: Request, res: Response) => {
     try {
       const userId = (req as any).user?.id;
       const { avatarUrl, displayName, username, bio } = req.body;
       const result = db.updateUserProfile({ avatarUrl, displayName, username, bio }, userId);
+
+      const serverSb = getServerSupabase();
+      if (serverSb && userId && !userId.startsWith('guest-')) {
+        const patch: Record<string, any> = { updated_at: new Date().toISOString() };
+        if (displayName) patch.display_name = displayName;
+        if (username) patch.username = username;
+        if (bio !== undefined) patch.bio = bio;
+        if (avatarUrl) patch.avatar_url = avatarUrl;
+        Promise.resolve(serverSb.from('profiles').update(patch).eq('id', userId)).catch((e) => {
+          console.warn('Background Supabase profile update error:', e);
+        });
+      }
+
       res.json({
         success: true,
         data: result.user,
@@ -419,6 +446,65 @@ async function startServer() {
         state: db.getState(),
       });
     } catch (err: any) {
+      res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  app.post('/api/user/avatar', async (req: Request, res: Response) => {
+    try {
+      const authUser = (req as any).user;
+      const targetUserId = req.body.userId || authUser?.id;
+      const avatarBase64 = req.body.avatarBase64;
+      
+      if (!avatarBase64 || typeof avatarBase64 !== 'string') {
+        return res.status(400).json({ success: false, error: 'avatarBase64 string is required.' });
+      }
+
+      const match = avatarBase64.match(/^data:([A-Za-z-+\/]+);base64,(.+)$/);
+      if (!match) {
+        return res.status(400).json({ success: false, error: 'Invalid base64 image data URI format.' });
+      }
+
+      const mimeType = match[1];
+      const buffer = Buffer.from(match[2], 'base64');
+      if (buffer.length > 5 * 1024 * 1024) {
+        return res.status(400).json({ success: false, error: 'Image exceeds 5MB size limit.' });
+      }
+
+      const ext = mimeType.split('/')[1] || 'png';
+      const fileName = `${targetUserId || 'anon'}/avatar-${Date.now()}.${ext}`;
+
+      const serverSb = getServerSupabase();
+      if (!serverSb) {
+        return res.status(500).json({ success: false, error: 'Supabase storage is not configured on server.' });
+      }
+
+      const { data, error } = await serverSb.storage.from('avatars').upload(fileName, buffer, {
+        contentType: mimeType,
+        upsert: true,
+      });
+
+      if (error || !data) {
+        return res.status(500).json({ success: false, error: error?.message || 'Storage upload failed' });
+      }
+
+      const { data: pubData } = serverSb.storage.from('avatars').getPublicUrl(fileName);
+      const publicUrl = pubData.publicUrl;
+
+      // Update public.profiles if user ID exists
+      if (targetUserId) {
+        await serverSb.from('profiles').update({
+          avatar_url: publicUrl,
+          updated_at: new Date().toISOString(),
+        }).eq('id', targetUserId);
+
+        // Update local DB cache as well
+        db.updateUserProfile({ avatarUrl: publicUrl }, targetUserId);
+      }
+
+      return res.json({ success: true, avatarUrl: publicUrl });
+    } catch (err: any) {
+      console.error('Error handling avatar upload:', err);
       res.status(500).json({ success: false, error: err.message });
     }
   });
@@ -468,24 +554,60 @@ async function startServer() {
     }
   });
 
-  app.post('/api/tasks', (req: Request, res: Response) => {
+  app.post('/api/tasks', async (req: Request, res: Response) => {
     try {
       const { title } = req.body;
       if (!title || !title.trim()) {
         return res.status(400).json({ success: false, error: 'Task title is required.' });
       }
       const task = db.addTask(req.body);
+      const userId = (req as any).user?.id;
+      const serverSb = getServerSupabase();
+      if (serverSb && userId && !userId.startsWith('guest-')) {
+        Promise.resolve(serverSb.from('tasks').insert({
+          user_id: userId,
+          title: title.trim(),
+          description: JSON.stringify({
+            description: req.body.description || '',
+            labels: req.body.labels || ['General'],
+            xpReward: req.body.xpReward || 15,
+            subtasks: req.body.subtasks || [],
+            notes: req.body.notes || '',
+            dueText: req.body.dueText || 'Today',
+            viewCategory: req.body.viewCategory || 'today',
+          }),
+          category: (req.body.labels?.[0] || 'work').toLowerCase(),
+          priority: ['low', 'medium', 'high', 'urgent'].includes(req.body.priority) ? req.body.priority : 'medium',
+          due_date: req.body.dueDate ? new Date(req.body.dueDate).toISOString() : null,
+          completed: Boolean(req.body.completed),
+        })).catch((e) => console.warn('Supabase task insert note:', e));
+      }
       res.status(201).json({ success: true, data: task, state: db.getState() });
     } catch (err: any) {
       res.status(500).json({ success: false, error: err.message });
     }
   });
 
-  app.put('/api/tasks/:id', (req: Request, res: Response) => {
+  app.put('/api/tasks/:id', async (req: Request, res: Response) => {
     try {
       const updated = db.updateTask({ ...req.body, id: req.params.id });
       if (!updated) {
         return res.status(404).json({ success: false, error: 'Task not found.' });
+      }
+      const userId = (req as any).user?.id;
+      const serverSb = getServerSupabase();
+      if (serverSb && userId && !userId.startsWith('guest-')) {
+        const payload: Record<string, any> = { updated_at: new Date().toISOString() };
+        if (req.body.title) payload.title = req.body.title.trim();
+        if (req.body.completed !== undefined) {
+          payload.completed = Boolean(req.body.completed);
+          payload.completed_at = req.body.completed ? new Date().toISOString() : null;
+        }
+        if (req.body.priority && ['low', 'medium', 'high', 'urgent'].includes(req.body.priority)) {
+          payload.priority = req.body.priority;
+        }
+        if (req.body.dueDate) payload.due_date = new Date(req.body.dueDate).toISOString();
+        Promise.resolve(serverSb.from('tasks').update(payload).eq('id', req.params.id).eq('user_id', userId)).catch(() => {});
       }
       res.json({ success: true, data: updated, state: db.getState() });
     } catch (err: any) {
@@ -493,9 +615,14 @@ async function startServer() {
     }
   });
 
-  app.delete('/api/tasks/:id', (req: Request, res: Response) => {
+  app.delete('/api/tasks/:id', async (req: Request, res: Response) => {
     try {
       const ok = db.deleteTask(req.params.id);
+      const userId = (req as any).user?.id;
+      const serverSb = getServerSupabase();
+      if (serverSb && userId && !userId.startsWith('guest-')) {
+        Promise.resolve(serverSb.from('tasks').delete().eq('id', req.params.id).eq('user_id', userId)).catch(() => {});
+      }
       if (!ok) {
         return res.status(404).json({ success: false, error: 'Task not found.' });
       }
@@ -505,11 +632,20 @@ async function startServer() {
     }
   });
 
-  app.post('/api/tasks/:id/toggle', (req: Request, res: Response) => {
+  app.post('/api/tasks/:id/toggle', async (req: Request, res: Response) => {
     try {
       const updated = db.toggleTask(req.params.id);
       if (!updated) {
         return res.status(404).json({ success: false, error: 'Task not found.' });
+      }
+      const userId = (req as any).user?.id;
+      const serverSb = getServerSupabase();
+      if (serverSb && userId && !userId.startsWith('guest-')) {
+        Promise.resolve(serverSb.from('tasks').update({
+          completed: updated.completed,
+          completed_at: updated.completed ? new Date().toISOString() : null,
+          updated_at: new Date().toISOString(),
+        }).eq('id', req.params.id).eq('user_id', userId)).catch(() => {});
       }
       res.json({ success: true, data: updated, state: db.getState() });
     } catch (err: any) {

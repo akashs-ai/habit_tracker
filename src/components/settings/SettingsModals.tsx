@@ -15,9 +15,11 @@ import {
   Check,
   AlertCircle,
   ExternalLink,
+  Loader2,
 } from 'lucide-react';
 import { UserSettingsProfile } from '../../types';
 import { mockSessions } from '../../data/settingsMockData';
+import { api } from '../../services/api';
 
 // -------------------------------------------------------------
 // Google Drive & Image URL Formatter Helper
@@ -134,6 +136,7 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({
   const [activeTab, setActiveTab] = useState<'upload' | 'drive' | 'presets'>('upload');
   const [driveUrl, setDriveUrl] = useState('');
   const [isLoadingDrive, setIsLoadingDrive] = useState(false);
+  const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
   const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -147,6 +150,7 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({
       setFeedback(null);
       setDriveUrl('');
       setActiveTab('upload');
+      setIsUploadingPhoto(false);
     }
   }, [isOpen, profile]);
 
@@ -161,12 +165,26 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({
       setFeedback({ type: 'error', message: 'Image size exceeds 10MB limit. Please select a smaller photo.' });
       return;
     }
+    setIsUploadingPhoto(true);
+    setFeedback(null);
     try {
-      const compressedDataUrl = await compressImage(file, 400, 0.85);
-      setAvatarUrl(compressedDataUrl);
-      setFeedback({ type: 'success', message: 'Photo loaded from your gallery!' });
-    } catch (err: any) {
-      setFeedback({ type: 'error', message: 'Could not process the selected image.' });
+      // 1. Upload to Supabase Storage
+      const uploadedUrl = await api.uploadAvatar(file);
+      if (uploadedUrl) {
+        setAvatarUrl(uploadedUrl);
+        setFeedback({ type: 'success', message: 'Photo uploaded to cloud storage! Click "Save changes" below to confirm.' });
+      }
+    } catch (uploadErr: any) {
+      console.warn('Direct cloud upload fallback to local compressed image:', uploadErr);
+      try {
+        const compressedDataUrl = await compressImage(file, 400, 0.85);
+        setAvatarUrl(compressedDataUrl);
+        setFeedback({ type: 'success', message: 'Photo loaded! Click "Save changes" below to confirm.' });
+      } catch (err: any) {
+        setFeedback({ type: 'error', message: 'Could not process the selected image.' });
+      }
+    } finally {
+      setIsUploadingPhoto(false);
     }
   };
 
@@ -305,11 +323,18 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({
                   referrerPolicy="no-referrer"
                   className="w-20 h-20 sm:w-24 sm:h-24 rounded-full object-cover"
                 />
-                <div className="absolute inset-0 rounded-full bg-black/50 backdrop-blur-[1px] flex flex-col items-center justify-center text-white opacity-0 group-hover:opacity-100 transition-opacity">
-                  <Camera className="w-6 h-6 mb-1 text-[#F5F7FB]" />
-                  <span className="text-[10px] font-semibold text-white/90">Change</span>
-                </div>
-                {isDragging && (
+                {isUploadingPhoto ? (
+                  <div className="absolute inset-0 rounded-full bg-black/60 flex flex-col items-center justify-center text-white">
+                    <Loader2 className="w-5 h-5 animate-spin text-[#818CF8] mb-1" />
+                    <span className="text-[9px] font-semibold text-white/90">Uploading...</span>
+                  </div>
+                ) : (
+                  <div className="absolute inset-0 rounded-full bg-black/50 backdrop-blur-[1px] flex flex-col items-center justify-center text-white opacity-0 group-hover:opacity-100 transition-opacity">
+                    <Camera className="w-6 h-6 mb-1 text-[#F5F7FB]" />
+                    <span className="text-[10px] font-semibold text-white/90">Change</span>
+                  </div>
+                )}
+                {isDragging && !isUploadingPhoto && (
                   <div className="absolute inset-0 rounded-full bg-[#6366F1]/80 flex items-center justify-center text-white text-[10px] font-bold tracking-wide">
                     Drop Here
                   </div>

@@ -299,7 +299,7 @@ export const RewardsPage: React.FC<RewardsPageProps> = ({
         <RewardsHeroBanner
           momentumPoints={momentumPoints}
           pointsThisWeek={pointsThisWeek}
-          streakDays={initialStreakDays}
+          streakDays={streakDays}
           weeklyConsistency={initialWeeklyConsistency}
           level={initialLevel}
           currentXP={initialXP}
