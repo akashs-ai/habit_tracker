@@ -419,6 +419,8 @@ export const TasksPage: React.FC<TasksPageProps> = ({
           <div className="flex-1 w-full min-w-0 flex flex-col gap-3">
             {/* Quick Add Task Composer */}
             <TaskComposer
+              isOpen={isComposerOpen}
+              onOpenChange={setIsComposerOpen}
               onAddTask={onAddTask}
               defaultCategory={activeView === 'upcoming' ? 'upcoming' : 'today'}
             />
@@ -475,21 +477,8 @@ export const TasksPage: React.FC<TasksPageProps> = ({
       {/* Floating Mobile Action Button '+' (matching mobile 390x844 view in image) */}
       <button
         id="mobile-fab-add-task"
-        onClick={() => {
-          const quickTitle = window.prompt('Quick Add Task:');
-          if (quickTitle) {
-            onAddTask({
-              title: quickTitle,
-              completed: false,
-              viewCategory: 'today',
-              dueText: 'Today',
-              labels: ['Personal'],
-              priority: 'low',
-              xpReward: 10
-            });
-          }
-        }}
-        className="lg:hidden fixed bottom-20 right-6 w-12 h-12 rounded-full bg-[#6366F1] text-white flex items-center justify-center shadow-lg hover:scale-105 active:scale-95 transition-all z-30"
+        onClick={() => setIsComposerOpen(true)}
+        className="lg:hidden fixed bottom-20 right-6 w-12 h-12 rounded-full bg-[#6366F1] text-white flex items-center justify-center shadow-lg hover:scale-105 active:scale-95 transition-all z-30 cursor-pointer"
         aria-label="Add new task"
       >
         <Plus className="w-6 h-6" />

@@ -15,6 +15,8 @@ import { getTodayISO, addDaysISO } from '../../utils/dateUtils';
 interface TaskComposerProps {
   onAddTask: (task: Omit<TaskItem, 'id'>) => void;
   defaultCategory?: 'today' | 'upcoming' | 'overdue' | 'someday';
+  isOpen?: boolean;
+  onOpenChange?: (open: boolean) => void;
 }
 
 const PRESET_TAGS = [
@@ -31,9 +33,18 @@ const PRESET_TAGS = [
 
 export const TaskComposer: React.FC<TaskComposerProps> = ({
   onAddTask,
-  defaultCategory = 'today'
+  defaultCategory = 'today',
+  isOpen,
+  onOpenChange
 }) => {
-  const [isFocused, setIsFocused] = useState(false);
+  const [internalFocused, setInternalFocused] = useState(false);
+  const isFocused = isOpen !== undefined ? isOpen : internalFocused;
+
+  const setIsFocused = (val: boolean) => {
+    setInternalFocused(val);
+    onOpenChange?.(val);
+  };
+
   const [title, setTitle] = useState('');
   const [dueText, setDueText] = useState('Today');
   const [priority, setPriority] = useState<TaskPriority>('low');
@@ -46,6 +57,16 @@ export const TaskComposer: React.FC<TaskComposerProps> = ({
   const [showDateMenu, setShowDateMenu] = useState(false);
 
   const inputRef = useRef<HTMLInputElement>(null);
+
+  // Focus input automatically whenever composer opens
+  useEffect(() => {
+    if (isFocused) {
+      setTimeout(() => {
+        inputRef.current?.focus();
+        inputRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }, 50);
+    }
+  }, [isFocused]);
 
   // Parse natural language or handle slash commands
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -153,7 +174,7 @@ export const TaskComposer: React.FC<TaskComposerProps> = ({
   };
 
   return (
-    <div className="relative mb-4">
+    <div id="tasks-composer-wrapper" className="relative mb-4">
       {!isFocused ? (
         // Unfocused single-line bar
         <div
@@ -177,6 +198,7 @@ export const TaskComposer: React.FC<TaskComposerProps> = ({
       ) : (
         // Focused composer state
         <form
+          id="active-task-composer-form"
           onSubmit={handleSubmit}
           className="bg-white dark:bg-[#121214] border-2 border-[#6366F1]/60 dark:border-[#6366F1]/50 rounded-2xl p-4 shadow-md transition-all animate-in fade-in zoom-in-98 duration-150 relative"
         >
@@ -184,6 +206,7 @@ export const TaskComposer: React.FC<TaskComposerProps> = ({
           <div className="relative">
             <input
               ref={inputRef}
+              id="active-task-title-input"
               type="text"
               value={title}
               onChange={handleInputChange}
