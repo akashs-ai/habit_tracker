@@ -5,7 +5,8 @@ import {
   Moon, 
   Bell, 
   Menu, 
-  Plus
+  Plus,
+  Calendar
 } from 'lucide-react';
 import { CalendarEvent, CalendarViewType, AppNotification } from '../../types';
 import { NotificationDropdown } from '../NotificationDropdown';
@@ -41,7 +42,9 @@ import {
   initAuth, 
   googleSignIn, 
   googleSignOut, 
-  fetchGoogleCalendarEvents 
+  fetchGoogleCalendarEvents,
+  connectDemoCalendar,
+  GoogleCalendarUser,
 } from '../../services/googleCalendar';
 import { User } from 'firebase/auth';
 
@@ -105,10 +108,11 @@ export const CalendarPage: React.FC<CalendarPageProps> = ({
   const unreadCount = notifications.filter((n) => !n.read).length;
 
   // Google Calendar Integration State
-  const [googleUser, setGoogleUser] = useState<User | null>(null);
+  const [googleUser, setGoogleUser] = useState<GoogleCalendarUser | User | null>(null);
   const [googleToken, setGoogleToken] = useState<string | null>(null);
   const [isConnectingGoogle, setIsConnectingGoogle] = useState(false);
   const [isSyncingGoogle, setIsSyncingGoogle] = useState(false);
+  const [showUnauthorizedDomainModal, setShowUnauthorizedDomainModal] = useState(false);
   const [syncFeedback, setSyncFeedback] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
 
   React.useEffect(() => {
@@ -149,7 +153,7 @@ export const CalendarPage: React.FC<CalendarPageProps> = ({
       });
       setTimeout(() => setSyncFeedback(null), 4000);
     } catch (err: any) {
-      console.error('Google Calendar sync error:', err);
+      console.warn('Google Calendar sync issue:', err);
       setSyncFeedback({
         message: 'Unable to sync Google Calendar events. Please reconnect.',
         type: 'error',
@@ -186,7 +190,18 @@ export const CalendarPage: React.FC<CalendarPageProps> = ({
         // User closed or declined the permission dialog
         return;
       }
-      console.error('Sign in failed:', err);
+
+      // Check specifically for unauthorized-domain error
+      if (
+        code === 'auth/unauthorized-domain' ||
+        message.includes('auth/unauthorized-domain') ||
+        err?.name === 'UnauthorizedDomainError'
+      ) {
+        setShowUnauthorizedDomainModal(true);
+        return;
+      }
+
+      console.warn('Sign in issue:', err);
       setSyncFeedback({
         message: 'Google authentication was not completed. Please try again.',
         type: 'error',
@@ -195,6 +210,18 @@ export const CalendarPage: React.FC<CalendarPageProps> = ({
     } finally {
       setIsConnectingGoogle(false);
     }
+  };
+
+  const handleConnectDemo = async () => {
+    setShowUnauthorizedDomainModal(false);
+    const demoResult = connectDemoCalendar();
+    setGoogleUser(demoResult.user);
+    setGoogleToken(demoResult.accessToken);
+    setSyncFeedback({
+      message: 'Connected with Demo Calendar! Syncing sample events...',
+      type: 'info',
+    });
+    await syncGoogleEvents(demoResult.accessToken);
   };
 
   const handleDisconnectGoogleCalendar = async () => {
@@ -636,6 +663,69 @@ export const CalendarPage: React.FC<CalendarPageProps> = ({
         onAddEvent={() => setIsAddEventOpen(true)}
         onGoToToday={handleGoToToday}
       />
+
+      {/* Unauthorized Domain Modal */}
+      {showUnauthorizedDomainModal && (
+        <div
+          id="unauthorized-domain-modal"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200"
+        >
+          <div className="bg-[#181920] border border-white/10 rounded-2xl max-w-lg w-full p-6 shadow-2xl space-y-5 text-[#F5F7FF]">
+            <div className="flex items-start justify-between gap-3">
+              <div className="w-10 h-10 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400 shrink-0">
+                <Calendar className="w-5 h-5" />
+              </div>
+              <div className="flex-1">
+                <h3 className="text-lg font-semibold text-white">Google Calendar Authorization</h3>
+                <p className="text-xs text-white/60 mt-1">Domain authorization requirement detected</p>
+              </div>
+              <button
+                id="btn-close-domain-modal"
+                onClick={() => setShowUnauthorizedDomainModal(false)}
+                className="text-white/40 hover:text-white p-1 rounded-lg transition-colors text-sm"
+              >
+                ✕
+              </button>
+            </div>
+
+            <p className="text-sm text-white/80 leading-relaxed">
+              The preview domain (<code className="px-1.5 py-0.5 rounded bg-white/10 text-amber-300 font-mono text-xs">{typeof window !== 'undefined' ? window.location.hostname : 'run.app'}</code>) is not listed under Firebase Authentication&apos;s authorized domains.
+            </p>
+
+            <div className="p-3.5 rounded-xl bg-white/5 border border-white/8 text-xs text-white/70 space-y-2">
+              <div className="font-medium text-white/90">Option A: Connect with Demo Calendar (Instant)</div>
+              <p className="text-white/60">
+                Populates your schedule with realistic demo events immediately so you can test all features without domain restrictions.
+              </p>
+            </div>
+
+            <div className="p-3.5 rounded-xl bg-white/5 border border-white/8 text-xs text-white/70 space-y-2">
+              <div className="font-medium text-white/90">Option B: Whitelist domain in Firebase Console</div>
+              <ol className="list-decimal list-inside space-y-1 text-white/60">
+                <li>Open Firebase Console &gt; Authentication &gt; Settings &gt; Authorized domains</li>
+                <li>Add <span className="font-mono text-white/90">{typeof window !== 'undefined' ? window.location.hostname : 'current domain'}</span></li>
+              </ol>
+            </div>
+
+            <div className="flex items-center justify-end gap-3 pt-2">
+              <button
+                id="btn-domain-cancel"
+                onClick={() => setShowUnauthorizedDomainModal(false)}
+                className="px-4 py-2 rounded-xl text-sm font-medium text-white/60 hover:text-white hover:bg-white/5 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                id="btn-connect-demo-calendar"
+                onClick={handleConnectDemo}
+                className="px-4 py-2 rounded-xl text-sm font-semibold bg-[#6C63FF] hover:bg-[#7B73FF] text-white shadow-md transition-all active:scale-95"
+              >
+                Connect Demo Calendar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

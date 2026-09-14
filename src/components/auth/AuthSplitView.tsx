@@ -14,6 +14,7 @@ import {
   X
 } from 'lucide-react';
 import { MountainArt } from './MountainArt';
+import { TermsPrivacyModal } from './TermsPrivacyModal';
 import { AuthUser } from '../../types';
 import { api } from '../../services/api';
 
@@ -49,6 +50,10 @@ export const AuthSplitView: React.FC<AuthSplitViewProps> = ({
   const [signupPassword, setSignupPassword] = useState('');
   const [showSignupPassword, setShowSignupPassword] = useState(false);
   const [termsAccepted, setTermsAccepted] = useState(false);
+
+  // Terms & Privacy modal state
+  const [termsModalOpen, setTermsModalOpen] = useState(false);
+  const [termsModalTab, setTermsModalTab] = useState<'terms' | 'privacy'>('terms');
 
   // UI state
   const [loading, setLoading] = useState(false);
@@ -89,33 +94,57 @@ export const AuthSplitView: React.FC<AuthSplitViewProps> = ({
     setError(null);
     setNotice(null);
 
-    if (!signupFullName.trim()) {
+    const trimmedFullName = signupFullName.trim();
+    if (!trimmedFullName) {
       setError('Please enter your full name.');
       return;
     }
-    if (!signupEmail.trim() || !signupEmail.includes('@')) {
-      setError('Please enter a valid email address.');
+    if (trimmedFullName.length < 2) {
+      setError('Full name must be at least 2 characters.');
       return;
     }
-    if (!signupUsername.trim() || signupUsername.length < 3) {
-      setError('Username must be at least 3 characters.');
+    if (trimmedFullName.length > 70) {
+      setError('Full name cannot exceed 70 characters.');
       return;
     }
+
+    const trimmedEmail = signupEmail.trim();
+    const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+    if (!trimmedEmail || !emailRegex.test(trimmedEmail)) {
+      setError('Please enter a valid email address (e.g. name@example.com).');
+      return;
+    }
+
+    const trimmedUsername = signupUsername.trim();
+    if (!trimmedUsername) {
+      setError('Please choose a username.');
+      return;
+    }
+    if (trimmedUsername.length < 3 || trimmedUsername.length > 20) {
+      setError('Username must be between 3 and 20 characters.');
+      return;
+    }
+    if (!/^[a-zA-Z0-9_]+$/.test(trimmedUsername)) {
+      setError('Username can only contain letters, numbers, and underscores.');
+      return;
+    }
+
     if (!signupPassword || signupPassword.length < 8) {
       setError('Password must be at least 8 characters long.');
       return;
     }
+
     if (!termsAccepted) {
-      setError('You must accept the Terms of Service to continue.');
+      setError('You must agree to the Terms of Service and Privacy Policy to create an account.');
       return;
     }
 
     setLoading(true);
     try {
       const data = await api.register({
-        fullName: signupFullName.trim(),
-        email: signupEmail.trim(),
-        username: signupUsername.trim(),
+        fullName: trimmedFullName,
+        email: trimmedEmail,
+        username: trimmedUsername,
         password: signupPassword,
         termsAccepted: true,
       });
@@ -452,8 +481,32 @@ export const AuthSplitView: React.FC<AuthSplitViewProps> = ({
                     className="mt-0.5 w-3.5 h-3.5 rounded bg-[#0A0F1D] border-white/20 text-[#6366F1] focus:ring-0 cursor-pointer"
                   />
                   <span>
-                    I agree to the <span className="text-[#818CF8] hover:underline">Terms of Service</span> and{' '}
-                    <span className="text-[#818CF8] hover:underline">Privacy Policy</span>
+                    I agree to the{' '}
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        setTermsModalTab('terms');
+                        setTermsModalOpen(true);
+                      }}
+                      className="text-[#818CF8] hover:underline font-medium inline"
+                    >
+                      Terms of Service
+                    </button>{' '}
+                    and{' '}
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        setTermsModalTab('privacy');
+                        setTermsModalOpen(true);
+                      }}
+                      className="text-[#818CF8] hover:underline font-medium inline"
+                    >
+                      Privacy Policy
+                    </button>
                   </span>
                 </label>
               </div>
@@ -593,6 +646,13 @@ export const AuthSplitView: React.FC<AuthSplitViewProps> = ({
           </button>
         </div>
       </div>
+
+      {/* Terms and Privacy Modal */}
+      <TermsPrivacyModal
+        isOpen={termsModalOpen}
+        onClose={() => setTermsModalOpen(false)}
+        initialTab={termsModalTab}
+      />
     </div>
   );
 };

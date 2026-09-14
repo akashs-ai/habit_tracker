@@ -15,7 +15,9 @@ import {
   Eye, 
   EyeOff, 
   PartyPopper,
-  Compass
+  Compass,
+  ExternalLink,
+  RefreshCw
 } from 'lucide-react';
 import { AuthSplitView } from './AuthSplitView';
 import { AuthUser, AuthScreenType } from '../../types';
@@ -49,13 +51,24 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 
   // Verification state
   const [verifyEmailAddress, setVerifyEmailAddress] = useState('iitangaming18@gmail.com');
-  const [resendCountdown, setResendCountdown] = useState(48);
+  const [resendCountdown, setResendCountdown] = useState(0);
+  const [resendLoading, setResendLoading] = useState(false);
 
   // Common UI state
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [successNotice, setSuccessNotice] = useState<string | null>(null);
   const [recentlyCreatedUser, setRecentlyCreatedUser] = useState<AuthUser | null>(null);
+
+  const getEmailProviderLink = (email: string) => {
+    const domain = email.split('@')[1]?.toLowerCase();
+    if (!domain) return null;
+    if (domain.includes('gmail')) return { name: 'Open Gmail', url: 'https://mail.google.com' };
+    if (domain.includes('outlook') || domain.includes('hotmail') || domain.includes('live')) return { name: 'Open Outlook', url: 'https://outlook.live.com' };
+    if (domain.includes('yahoo')) return { name: 'Open Yahoo Mail', url: 'https://mail.yahoo.com' };
+    if (domain.includes('icloud')) return { name: 'Open iCloud Mail', url: 'https://www.icloud.com/mail' };
+    return null;
+  };
 
   useEffect(() => {
     setScreen(initialScreen);
@@ -158,20 +171,52 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   const handleConfirmVerifyEmail = async () => {
     setLoading(true);
     setError(null);
+    setSuccessNotice(null);
     try {
       const res = await api.verifyEmail({ email: verifyEmailAddress });
       if (res.emailVerified) {
-        setSuccessNotice('Your email has been successfully verified!');
+        setSuccessNotice('Your email has been verified successfully! Preparing your account...');
+        try {
+          const me = await api.getMe();
+          onAuthSuccess(me.user, me.token);
+        } catch {
+          if (recentlyCreatedUser) {
+            onAuthSuccess({ ...recentlyCreatedUser, emailVerified: true }, 'verified');
+          }
+        }
         setTimeout(() => {
           setScreen('welcome_onboarding');
-        }, 1000);
+        }, 1200);
       } else {
-        setError(res.message || 'Please check your email and click the confirmation link to complete verification.');
+        setError(res.message || 'We have not detected your verification yet. Please click the link in your email.');
       }
     } catch (err: any) {
-      setError(err.message || 'Verification failed.');
+      setError(err.message || 'Verification check failed.');
     } finally {
       setLoading(false);
+    }
+  };
+
+  // Handle Resend Email with Supabase API and rate limit handling
+  const handleResendEmail = async () => {
+    if (resendCountdown > 0 || resendLoading) return;
+    setError(null);
+    setSuccessNotice(null);
+    setResendLoading(true);
+    try {
+      const res = await api.resendVerificationEmail(verifyEmailAddress);
+      setResendCountdown(60);
+      setSuccessNotice(res.message || 'A new verification link has been sent to your email.');
+    } catch (e: any) {
+      const msg = e.message || 'Could not resend verification email.';
+      setError(msg);
+      if (msg.toLowerCase().includes('rate limit')) {
+        setResendCountdown(60);
+      } else {
+        setResendCountdown(10);
+      }
+    } finally {
+      setResendLoading(false);
     }
   };
 
@@ -183,14 +228,21 @@ export const AuthModal: React.FC<AuthModalProps> = ({
           isModal={true}
           initialTab={screen === 'signup' ? 'signup' : 'login'}
           onSuccess={(user, token) => {
+            // Strict Gatekeeping: Unverified accounts MUST NOT access the dashboard
+            if (!user.emailVerified && !user.isGuest) {
+              setRecentlyCreatedUser(user);
+              setVerifyEmailAddress(user.email);
+              setResendCountdown(60);
+              setError(null);
+              setSuccessNotice(null);
+              setScreen('verify_email');
+              return;
+            }
+
+            // Only verified or guest users proceed
             setRecentlyCreatedUser(user);
             onAuthSuccess(user, token);
-            if (!user.emailVerified && !user.isGuest) {
-              setVerifyEmailAddress(user.email);
-              setScreen('verify_email');
-            } else {
-              setScreen('welcome_onboarding');
-            }
+            setScreen('welcome_onboarding');
           }}
           onForgotPassword={() => setScreen('forgot_password')}
           onContinueAsGuest={() => setScreen('guest_prompt')}
@@ -555,12 +607,14 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 
           <h3 className="text-xl sm:text-2xl font-bold tracking-tight">Check your email</h3>
           <p className="mt-2 text-xs sm:text-sm text-[#94A3B8] leading-relaxed">
-            We&apos;ve sent a verification link to{' '}
-            <span className="text-white font-medium">{verifyEmailAddress}</span>
+            We sent a verification link to
           </p>
+          <div className="mt-1.5 inline-block px-3.5 py-1 rounded-full bg-[#0A0F1D] border border-white/10 text-xs sm:text-sm text-white font-medium max-w-full truncate">
+            {verifyEmailAddress}
+          </div>
 
-          <p className="mt-3 text-xs text-[#64748B]">
-            Please check your inbox (and spam folder) and click the link to verify your account.
+          <p className="mt-3 text-xs text-[#94A3B8] leading-relaxed">
+            Click the link in the message to activate your account and start your LifeRPG adventure.
           </p>
 
           {error && (
@@ -578,56 +632,86 @@ export const AuthModal: React.FC<AuthModalProps> = ({
           )}
 
           <div className="mt-6 space-y-3">
+            {/* Direct Webmail Link if known provider */}
+            {(() => {
+              const provider = getEmailProviderLink(verifyEmailAddress);
+              if (!provider) return null;
+              return (
+                <a
+                  href={provider.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="w-full h-11 rounded-xl bg-[#6366F1] hover:bg-[#5254E2] active:scale-[0.99] text-white text-xs sm:text-sm font-semibold tracking-wide shadow-md shadow-[#6366F1]/25 transition-all flex items-center justify-center gap-2"
+                >
+                  <span>{provider.name}</span>
+                  <ExternalLink className="w-4 h-4" />
+                </a>
+              );
+            })()}
+
+            {/* Check status button */}
             <button
               type="button"
               onClick={handleConfirmVerifyEmail}
               disabled={loading}
-              className="w-full h-11 rounded-xl bg-[#6366F1] hover:bg-[#5254E2] active:scale-[0.99] text-white text-xs sm:text-sm font-semibold tracking-wide shadow-md shadow-[#6366F1]/25 transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+              className={`w-full h-11 rounded-xl ${
+                getEmailProviderLink(verifyEmailAddress)
+                  ? 'bg-[#141D2E] hover:bg-[#1A253A] border border-white/10 text-white'
+                  : 'bg-[#6366F1] hover:bg-[#5254E2] text-white shadow-md shadow-[#6366F1]/25'
+              } active:scale-[0.99] text-xs sm:text-sm font-semibold tracking-wide transition-all flex items-center justify-center gap-2 disabled:opacity-50`}
             >
               {loading ? (
                 <>
                   <Loader2 className="w-4 h-4 animate-spin" />
-                  <span>Verifying account...</span>
+                  <span>Checking verification status...</span>
                 </>
               ) : (
                 <>
-                  <span>Verify Account Now</span>
-                  <ArrowRight className="w-4 h-4" />
+                  <RefreshCw className="w-4 h-4 text-[#818CF8]" />
+                  <span>I&apos;ve clicked the verification link</span>
                 </>
               )}
             </button>
 
+            {/* Resend button */}
             <button
               type="button"
-              disabled={resendCountdown > 0}
-              onClick={async () => {
-                setResendCountdown(60);
-                try {
-                  await api.resendVerificationEmail(verifyEmailAddress);
-                  setSuccessNotice('A new verification email has been dispatched.');
-                } catch (e: any) {
-                  setError(e.message || 'Could not resend verification email.');
-                }
-              }}
-              className="w-full h-11 rounded-xl bg-[#141D2E] hover:bg-[#1A253A] border border-white/10 text-white text-xs sm:text-sm font-medium transition-all disabled:opacity-50"
+              disabled={resendCountdown > 0 || resendLoading}
+              onClick={handleResendEmail}
+              className="w-full h-11 rounded-xl bg-[#0A0F1D] hover:bg-[#141D2E] border border-white/10 text-white text-xs sm:text-sm font-medium transition-all disabled:opacity-50 flex items-center justify-center gap-2"
             >
-              {resendCountdown > 0
-                ? `Resend email (0:${resendCountdown < 10 ? '0' : ''}${resendCountdown})`
-                : 'Resend email'}
+              {resendLoading ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  <span>Sending email...</span>
+                </>
+              ) : resendCountdown > 0 ? (
+                `Resend email (0:${resendCountdown < 10 ? '0' : ''}${resendCountdown})`
+              ) : (
+                'Resend verification email'
+              )}
             </button>
           </div>
 
           <div className="mt-6 pt-4 border-t border-white/10 flex items-center justify-between text-xs text-[#94A3B8]">
             <button
               type="button"
-              onClick={() => setScreen('signup')}
+              onClick={() => {
+                setError(null);
+                setSuccessNotice(null);
+                setScreen('signup');
+              }}
               className="hover:text-white transition-colors"
             >
               Change email
             </button>
             <button
               type="button"
-              onClick={() => setScreen('login')}
+              onClick={() => {
+                setError(null);
+                setSuccessNotice(null);
+                setScreen('login');
+              }}
               className="hover:text-white transition-colors flex items-center gap-1"
             >
               <ArrowLeft className="w-3 h-3" />

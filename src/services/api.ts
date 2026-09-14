@@ -321,6 +321,14 @@ export const api = {
           const { data: sessionData } = await sb.auth.getSession();
           if (sessionData?.session?.user) {
             const sbUser = sessionData.session.user;
+            const isEmailVerified = Boolean(sbUser.email_confirmed_at);
+            const isAnonymous = Boolean(sbUser.is_anonymous || sbUser.user_metadata?.is_anonymous);
+
+            // If user is neither anonymous/guest nor email verified, do not allow authenticated session
+            if (!isEmailVerified && !isAnonymous) {
+              throw new Error('Email not verified. Please verify your email first.');
+            }
+
             let profile: any = null;
             try {
               const { data: p } = await sb.from('profiles').select('*').eq('id', sbUser.id).maybeSingle();
@@ -330,6 +338,7 @@ export const api = {
             }
 
             const authUser = supabaseUserToAuthUser(sbUser, profile);
+            authUser.emailVerified = isEmailVerified;
             const token = sessionData.session.access_token;
             setStoredAuthToken(token);
             return {
@@ -339,7 +348,10 @@ export const api = {
             };
           }
         }
-      } catch (sbErr) {
+      } catch (sbErr: any) {
+        if (sbErr?.message?.includes('Email not verified')) {
+          throw sbErr;
+        }
         console.warn('Supabase getSession error:', sbErr);
       }
     }
@@ -370,6 +382,24 @@ export const api = {
     if (isSupabaseConfigured()) {
       const sb = getSupabase();
       if (sb) {
+        // Check username uniqueness before proceeding
+        try {
+          const { data: existingProfile } = await sb
+            .from('profiles')
+            .select('id')
+            .ilike('username', payload.username.trim())
+            .maybeSingle();
+
+          if (existingProfile) {
+            throw new Error('This username is already taken. Please choose another username.');
+          }
+        } catch (checkErr: any) {
+          if (checkErr.message?.includes('already taken')) {
+            throw checkErr;
+          }
+          // Non-blocking if table or network is initializing
+        }
+
         const { data, error } = await sb.auth.signUp({
           email: payload.email.trim(),
           password: payload.password,
@@ -383,35 +413,51 @@ export const api = {
         });
 
         if (error) {
+          const msg = (error.message || '').toLowerCase();
+          if (msg.includes('user already registered') || msg.includes('already in use') || error.status === 422) {
+            throw new Error('An account with this email address already exists. Please sign in instead.');
+          }
+          if (msg.includes('rate limit') || error.status === 429) {
+            throw new Error('Too many attempts. Please wait a few minutes before trying again.');
+          }
+          if (msg.includes('password') && (msg.includes('weak') || msg.includes('short') || msg.includes('least'))) {
+            throw new Error('Password must be at least 8 characters long.');
+          }
           throw new Error(error.message || 'Registration failed with Supabase');
         }
 
+        // When Supabase has "Prevent user enumeration" enabled, existing email may return empty identities
+        if (data?.user?.identities && data.user.identities.length === 0) {
+          throw new Error('An account with this email address already exists. Please sign in or reset your password.');
+        }
+
         if (data?.user) {
-          // Upsert to public.profiles
-          try {
-            await sb.from('profiles').upsert({
-              id: data.user.id,
-              username: payload.username.trim(),
-              display_name: payload.fullName.trim(),
-              full_name: payload.fullName.trim(),
-              email: payload.email.trim(),
-              avatar_url: `https://api.dicebear.com/7.x/bottts/svg?seed=${data.user.id}`,
-              level: 1,
-              xp: 0,
-              momentum_points: 50,
-              is_guest: false,
-            });
-          } catch (profileErr) {
-            // Trigger may have already created profile
+          const isEmailVerified = Boolean(data.user.email_confirmed_at);
+          const authUser = supabaseUserToAuthUser(data.user);
+          authUser.emailVerified = isEmailVerified;
+
+          // If email is already verified (e.g. email confirmations turned off in Supabase)
+          // and a real session was returned:
+          if (isEmailVerified && data.session?.access_token) {
+            const token = data.session.access_token;
+            setStoredAuthToken(token);
+            clearLocalGuestSession();
+            return {
+              user: authUser,
+              token,
+              migrated: false,
+              state: getDefaultAppState(authUser),
+            };
           }
 
-          const authUser = supabaseUserToAuthUser(data.user);
-          const token = data.session?.access_token || `sb_token_${data.user.id}`;
-          setStoredAuthToken(token);
-          clearLocalGuestSession();
+          // When email verification is required:
+          // 1. Session is null until user confirms via email link.
+          // 2. DO NOT setStoredAuthToken with fake credentials.
+          // 3. DO NOT attempt client-side profiles insert as anonymous user (the database trigger handles it via SECURITY DEFINER).
+          // 4. Return user with emailVerified = false and empty token.
           return {
             user: authUser,
-            token,
+            token: '',
             migrated: false,
             state: getDefaultAppState(authUser),
           };
@@ -668,24 +714,34 @@ export const api = {
     return { message: 'Password updated successfully' };
   },
 
-  async verifyEmail(_payload: { email: string; code?: string }): Promise<{ message: string; emailVerified: boolean }> {
+  async verifyEmail(_payload: { email?: string; code?: string }): Promise<{ message: string; emailVerified: boolean }> {
     if (isSupabaseConfigured()) {
       const sb = getSupabase();
       if (sb) {
         try {
-          const { data: { user } } = await sb.auth.getUser();
-          if (user?.email_confirmed_at) {
-            return { message: 'Your email has been successfully verified!', emailVerified: true };
-          }
+          // 1. Try refreshing session to pick up confirmed email status
           const { data: refreshData } = await sb.auth.refreshSession();
           if (refreshData?.user?.email_confirmed_at) {
+            if (refreshData.session?.access_token) {
+              setStoredAuthToken(refreshData.session.access_token);
+            }
+            return { message: 'Your email has been successfully verified!', emailVerified: true };
+          }
+
+          // 2. Check getUser
+          const { data: { user } } = await sb.auth.getUser();
+          if (user?.email_confirmed_at) {
+            const { data: sessionData } = await sb.auth.getSession();
+            if (sessionData?.session?.access_token) {
+              setStoredAuthToken(sessionData.session.access_token);
+            }
             return { message: 'Your email has been successfully verified!', emailVerified: true };
           }
         } catch (e) {
-          // ignore
+          // Non-blocking catch
         }
         return {
-          message: 'Please check your email inbox and click the verification link to complete verification.',
+          message: 'Please check your email inbox and click the verification link to complete activation.',
           emailVerified: false,
         };
       }
@@ -694,6 +750,10 @@ export const api = {
   },
 
   async resendVerificationEmail(email: string): Promise<{ message: string }> {
+    if (!email || !email.includes('@')) {
+      throw new Error('A valid email address is required to resend verification.');
+    }
+
     if (isSupabaseConfigured()) {
       const sb = getSupabase();
       if (sb) {
@@ -704,11 +764,22 @@ export const api = {
             emailRedirectTo: typeof window !== 'undefined' ? `${window.location.origin}` : undefined,
           },
         });
-        if (error) throw new Error(error.message);
-        return { message: 'A new verification email has been dispatched.' };
+
+        if (error) {
+          const msg = (error.message || '').toLowerCase();
+          if (msg.includes('rate limit') || error.status === 429) {
+            throw new Error('Email rate limit reached. Please wait a few minutes before requesting another email.');
+          }
+          if (msg.includes('already confirmed') || msg.includes('already verified')) {
+            throw new Error('This email has already been verified. You can sign in now.');
+          }
+          throw new Error(error.message || 'Could not resend verification email.');
+        }
+
+        return { message: 'A new verification link has been sent to your email.' };
       }
     }
-    return { message: 'A new verification email has been dispatched.' };
+    return { message: 'A new verification link has been sent to your email.' };
   },
 
   async logout(): Promise<void> {

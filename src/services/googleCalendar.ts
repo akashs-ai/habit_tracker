@@ -24,6 +24,28 @@ export const CALENDAR_READ_EDIT_SCOPES = [
   CALENDAR_READONLY_SCOPE,
 ];
 
+export interface GoogleCalendarUser {
+  uid: string;
+  email: string | null;
+  displayName: string | null;
+  photoURL?: string | null;
+}
+
+export class UnauthorizedDomainError extends Error {
+  domain: string;
+  code: string;
+
+  constructor(domain: string, message?: string) {
+    super(
+      message ||
+        `Domain "${domain}" is not authorized for Firebase OAuth operations. Add it in Firebase Console -> Authentication -> Settings -> Authorized domains, or use Demo Calendar mode.`
+    );
+    this.name = 'UnauthorizedDomainError';
+    this.code = 'auth/unauthorized-domain';
+    this.domain = domain;
+  }
+}
+
 // Initialize Firebase App singleton
 const app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
 export const auth = getAuth(app);
@@ -48,32 +70,59 @@ export const createGoogleProvider = (
 // In-memory token cache (never persisted into localStorage/sessionStorage for security)
 let isSigningIn = false;
 let cachedAccessToken: string | null = null;
-let cachedUser: User | null = null;
+let cachedUser: GoogleCalendarUser | User | null = null;
 let cachedPermission: CalendarPermissionLevel = 'read_edit';
 
+type AuthListener = (user: GoogleCalendarUser | User | null, token: string | null) => void;
+const authListeners: AuthListener[] = [];
+
+export const notifyAuthListeners = (user: GoogleCalendarUser | User | null, token: string | null) => {
+  authListeners.forEach((fn) => {
+    try {
+      fn(user, token);
+    } catch (e) {
+      console.warn('Auth listener error:', e);
+    }
+  });
+};
+
 export const initAuth = (
-  onAuthSuccess?: (user: User, token: string) => void,
+  onAuthSuccess?: (user: GoogleCalendarUser | User, token: string) => void,
   onAuthFailure?: () => void
 ) => {
-  return onAuthStateChanged(auth, async (user: User | null) => {
+  const listener: AuthListener = (u, t) => {
+    if (u && t) {
+      if (onAuthSuccess) onAuthSuccess(u, t);
+    } else {
+      if (onAuthFailure) onAuthFailure();
+    }
+  };
+  authListeners.push(listener);
+
+  // Also hook into Firebase onAuthStateChanged if Firebase user is logged in
+  const unsubFirebase = onAuthStateChanged(auth, async (user: User | null) => {
     if (user && cachedAccessToken) {
       cachedUser = user;
-      if (onAuthSuccess) onAuthSuccess(user, cachedAccessToken);
-    } else {
+      notifyAuthListeners(user, cachedAccessToken);
+    } else if (!cachedUser && !cachedAccessToken) {
       if (!isSigningIn) {
-        cachedAccessToken = null;
-        cachedUser = null;
-        if (onAuthFailure) onAuthFailure();
+        notifyAuthListeners(null, null);
       }
     }
   });
+
+  return () => {
+    unsubFirebase();
+    const idx = authListeners.indexOf(listener);
+    if (idx !== -1) authListeners.splice(idx, 1);
+  };
 };
 
 export const getAccessToken = async (): Promise<string | null> => {
   return cachedAccessToken;
 };
 
-export const getCurrentGoogleUser = (): User | null => {
+export const getCurrentGoogleUser = (): GoogleCalendarUser | User | null => {
   return cachedUser || auth.currentUser;
 };
 
@@ -81,51 +130,223 @@ export const getCurrentPermissionLevel = (): CalendarPermissionLevel => {
   return cachedPermission;
 };
 
+/**
+ * Dynamically ensures the Google Identity Services client script is loaded
+ */
+export async function loadGsiClient(): Promise<void> {
+  if (typeof window !== 'undefined' && (window as any).google?.accounts?.oauth2) {
+    return;
+  }
+  return new Promise((resolve, reject) => {
+    if (typeof document === 'undefined') return resolve();
+    const existing = document.querySelector('script[src="https://accounts.google.com/gsi/client"]');
+    if (existing) {
+      if ((window as any).google?.accounts?.oauth2) {
+        resolve();
+      } else {
+        existing.addEventListener('load', () => resolve());
+        existing.addEventListener('error', (e) => reject(e));
+      }
+      return;
+    }
+    const script = document.createElement('script');
+    script.src = 'https://accounts.google.com/gsi/client';
+    script.async = true;
+    script.defer = true;
+    script.onload = () => resolve();
+    script.onerror = (e) => reject(e);
+    document.head.appendChild(script);
+  });
+}
+
+/**
+ * Sign in directly via Google Identity Services Token Client.
+ * Bypasses Firebase Auth authorized domain restrictions.
+ */
+export const signInWithGoogleIdentityServices = async (
+  permission: CalendarPermissionLevel = 'read_edit'
+): Promise<{ user: GoogleCalendarUser; accessToken: string; permission: CalendarPermissionLevel } | null> => {
+  await loadGsiClient();
+
+  const google = typeof window !== 'undefined' ? (window as any).google : null;
+  if (!google?.accounts?.oauth2) {
+    throw new Error('Google Identity Services library is not loaded');
+  }
+
+  const clientId = firebaseConfig.oAuthClientId;
+  if (!clientId) {
+    throw new Error('OAuth Client ID is not configured');
+  }
+
+  const scopes = [
+    permission === 'read_edit' ? CALENDAR_EVENTS_SCOPE : CALENDAR_READONLY_SCOPE,
+    CALENDAR_READONLY_SCOPE,
+    'https://www.googleapis.com/auth/userinfo.profile',
+    'https://www.googleapis.com/auth/userinfo.email',
+  ].join(' ');
+
+  return new Promise((resolve, reject) => {
+    let completed = false;
+    try {
+      const client = google.accounts.oauth2.initTokenClient({
+        client_id: clientId,
+        scope: scopes,
+        callback: async (response: any) => {
+          if (completed) return;
+          completed = true;
+
+          if (response?.error) {
+            if (response.error === 'access_denied' || response.error === 'user_cancelled') {
+              resolve(null);
+              return;
+            }
+            reject(new Error(`Google OAuth error: ${response.error_description || response.error}`));
+            return;
+          }
+
+          if (!response?.access_token) {
+            reject(new Error('No access token returned from Google sign-in'));
+            return;
+          }
+
+          const accessToken = response.access_token;
+          cachedAccessToken = accessToken;
+          cachedPermission = permission;
+
+          let userInfo: GoogleCalendarUser = {
+            uid: `gcal-${Date.now()}`,
+            displayName: 'Google Account',
+            email: 'user@google.com',
+            photoURL: null,
+          };
+
+          try {
+            const profileRes = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
+              headers: { Authorization: `Bearer ${accessToken}` },
+            });
+            if (profileRes.ok) {
+              const p = await profileRes.json();
+              userInfo = {
+                uid: p.sub || `gcal-${Date.now()}`,
+                displayName: p.name || p.given_name || p.email?.split('@')[0] || 'Google User',
+                email: p.email || null,
+                photoURL: p.picture || null,
+              };
+            }
+          } catch {
+            // Profile details optional
+          }
+
+          cachedUser = userInfo;
+          notifyAuthListeners(userInfo, accessToken);
+          resolve({ user: userInfo, accessToken, permission });
+        },
+        error_callback: (err: any) => {
+          if (completed) return;
+          completed = true;
+          reject(err);
+        },
+      });
+
+      client.requestAccessToken({ prompt: 'consent' });
+    } catch (err) {
+      if (!completed) {
+        completed = true;
+        reject(err);
+      }
+    }
+  });
+};
+
+/**
+ * Connects demo Google Calendar for sandbox / preview testing when domain is restricted
+ */
+export const connectDemoCalendar = (): {
+  user: GoogleCalendarUser;
+  accessToken: string;
+  permission: CalendarPermissionLevel;
+} => {
+  const demoUser: GoogleCalendarUser = {
+    uid: 'demo-google-user',
+    displayName: 'Alex (Demo Calendar)',
+    email: 'alex.rivera@gmail.com',
+    photoURL: null,
+  };
+  const token = 'demo-google-calendar-token';
+  cachedAccessToken = token;
+  cachedUser = demoUser;
+  cachedPermission = 'read_edit';
+  notifyAuthListeners(demoUser, token);
+  return { user: demoUser, accessToken: token, permission: 'read_edit' };
+};
+
 export const googleSignIn = async (
   permission: CalendarPermissionLevel = 'read_edit'
-): Promise<{ user: User; accessToken: string; permission: CalendarPermissionLevel } | null> => {
+): Promise<{ user: GoogleCalendarUser | User; accessToken: string; permission: CalendarPermissionLevel } | null> => {
   try {
     isSigningIn = true;
     cachedPermission = permission;
-    const provider = createGoogleProvider(permission);
-    const result = await signInWithPopup(auth, provider);
-    const credential = GoogleAuthProvider.credentialFromResult(result);
-    
-    if (!credential?.accessToken) {
-      throw new Error('No access token returned from Google sign-in. Please ensure third-party cookies/popups are allowed.');
-    }
 
-    cachedAccessToken = credential.accessToken;
-    cachedUser = result.user;
-    return { user: result.user, accessToken: cachedAccessToken, permission };
-  } catch (error: any) {
-    const code = error?.code || '';
-    const message = error?.message || '';
+    // 1. Attempt Firebase Auth popup first (works on authorized domains & localhost)
+    try {
+      const provider = createGoogleProvider(permission);
+      const result = await signInWithPopup(auth, provider);
+      const credential = GoogleAuthProvider.credentialFromResult(result);
+      
+      if (!credential?.accessToken) {
+        throw new Error('No access token returned from Google sign-in. Please ensure third-party cookies/popups are allowed.');
+      }
 
-    // Handle user cancellations or refusal gracefully without noisy error toasts
-    if (
-      code === 'auth/popup-closed-by-user' || 
-      code === 'auth/cancelled-popup-request' ||
-      code === 'auth/user-cancelled' ||
-      message.includes('user-cancelled') ||
-      message.includes('closed by user') ||
-      message.includes('user closed the popup') ||
-      message.includes('cancelled-popup-request')
-    ) {
-      return null;
+      cachedAccessToken = credential.accessToken;
+      cachedUser = result.user;
+      notifyAuthListeners(result.user, cachedAccessToken);
+      return { user: result.user, accessToken: cachedAccessToken, permission };
+    } catch (firebaseErr: any) {
+      const code = firebaseErr?.code || '';
+      const message = firebaseErr?.message || '';
+
+      // Handle user cancellations or refusal gracefully without noisy error toasts
+      if (
+        code === 'auth/popup-closed-by-user' || 
+        code === 'auth/cancelled-popup-request' ||
+        code === 'auth/user-cancelled' ||
+        message.includes('user-cancelled') ||
+        message.includes('closed by user') ||
+        message.includes('user closed the popup') ||
+        message.includes('cancelled-popup-request')
+      ) {
+        return null;
+      }
+
+      // If unauthorized-domain, seamlessly try Google Identity Services
+      if (code === 'auth/unauthorized-domain' || message.includes('auth/unauthorized-domain')) {
+        console.warn('Firebase unauthorized-domain detected; falling back to Google Identity Services...');
+        try {
+          const gsiResult = await signInWithGoogleIdentityServices(permission);
+          if (gsiResult) return gsiResult;
+        } catch (gsiErr: any) {
+          console.warn('Google Identity Services also failed:', gsiErr);
+          const hostname = typeof window !== 'undefined' ? window.location.hostname : 'current domain';
+          throw new UnauthorizedDomainError(hostname);
+        }
+        return null;
+      }
+
+      // Other Firebase errors
+      throw firebaseErr;
     }
-    
-    console.warn('Google Calendar OAuth sign-in issue:', error);
-    throw error;
   } finally {
     isSigningIn = false;
   }
 };
 
 export const googleSignOut = async (): Promise<void> => {
-  await signOut(auth);
+  try {
+    await signOut(auth);
+  } catch {}
   cachedAccessToken = null;
   cachedUser = null;
+  notifyAuthListeners(null, null);
 };
 
 function parseGCalTime(isoDateTime?: string): string | undefined {
@@ -181,6 +402,82 @@ function categoryColor(category: EventCategory): string {
  * Fetch events from Google Calendar Primary calendar
  */
 export async function fetchGoogleCalendarEvents(token: string): Promise<CalendarEvent[]> {
+  if (token.startsWith('demo-')) {
+    const today = new Date();
+    const yyyy = today.getFullYear();
+    const mm = String(today.getMonth() + 1).padStart(2, '0');
+    const dd = String(today.getDate()).padStart(2, '0');
+    const todayStr = `${yyyy}-${mm}-${dd}`;
+
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    const tmY = tomorrow.getFullYear();
+    const tmM = String(tomorrow.getMonth() + 1).padStart(2, '0');
+    const tmD = String(tomorrow.getDate()).padStart(2, '0');
+    const tomorrowStr = `${tmY}-${tmM}-${tmD}`;
+
+    const nextDay = new Date(today);
+    nextDay.setDate(nextDay.getDate() + 2);
+    const ndY = nextDay.getFullYear();
+    const ndM = String(nextDay.getMonth() + 1).padStart(2, '0');
+    const ndD = String(nextDay.getDate()).padStart(2, '0');
+    const nextDayStr = `${ndY}-${ndM}-${ndD}`;
+
+    return [
+      {
+        id: 'gcal-demo-1',
+        title: 'Team Sprint Planning',
+        date: todayStr,
+        startTime: '10:00 AM',
+        endTime: '11:00 AM',
+        allDay: false,
+        category: 'project',
+        color: categoryColor('project'),
+        location: 'Google Meet',
+        description: 'Sprint planning and feature roadmap sync with the engineering team.',
+        priority: 'high',
+      },
+      {
+        id: 'gcal-demo-2',
+        title: 'Deep Work: Core Architecture',
+        date: todayStr,
+        startTime: '02:00 PM',
+        endTime: '04:00 PM',
+        allDay: false,
+        category: 'study',
+        color: categoryColor('study'),
+        description: 'Focus block for core refactoring and tests.',
+        priority: 'high',
+      },
+      {
+        id: 'gcal-demo-3',
+        title: 'Gym & Cardio Session',
+        date: tomorrowStr,
+        startTime: '07:30 AM',
+        endTime: '08:45 AM',
+        allDay: false,
+        category: 'workout',
+        color: categoryColor('workout'),
+        location: 'Fitness Center',
+        description: 'Strength workout + 20 min HIIT.',
+        priority: 'medium',
+      },
+      {
+        id: 'gcal-demo-4',
+        title: 'Product Strategy Review',
+        date: nextDayStr,
+        startTime: '01:30 PM',
+        endTime: '02:30 PM',
+        allDay: false,
+        category: 'project',
+        color: categoryColor('project'),
+        location: 'Board Room A',
+        description: 'Monthly Q3 OKR and metric review.',
+        priority: 'medium',
+      },
+    ];
+  }
+
   // Fetch around current timeframe (e.g. 60 days in past to 120 days in future)
   const now = new Date();
   const past = new Date(now.getTime() - 60 * 24 * 60 * 60 * 1000);
@@ -254,6 +551,24 @@ export async function createGoogleCalendarEvent(
     category?: EventCategory;
   }
 ): Promise<CalendarEvent> {
+  const cat = event.category || detectCategory(event.title || '', event.description);
+
+  if (token.startsWith('demo-')) {
+    return {
+      id: `gcal-demo-${Date.now()}`,
+      title: event.title,
+      date: event.date,
+      startTime: event.startTime || '09:00 AM',
+      endTime: event.endTime || '10:00 AM',
+      allDay: !!event.allDay,
+      category: cat,
+      color: categoryColor(cat),
+      description: event.description,
+      location: event.location,
+      priority: 'medium',
+    };
+  }
+
   const url = 'https://www.googleapis.com/calendar/v3/calendars/primary/events';
   const startIso = formatTimeToIso(event.date, event.startTime);
   const endIso = formatTimeToIso(event.date, event.endTime || (event.startTime ? undefined : '10:00 AM'));
@@ -283,7 +598,7 @@ export async function createGoogleCalendarEvent(
   });
 
   const item = await safeResponseJson(res, 'Google Calendar create error');
-  const cat = event.category || detectCategory(item.summary || '', item.description);
+  const resolvedCat = event.category || detectCategory(item.summary || '', item.description);
   return {
     id: `gcal-${item.id}`,
     title: item.summary || event.title,
@@ -291,8 +606,8 @@ export async function createGoogleCalendarEvent(
     startTime: event.startTime || '09:00 AM',
     endTime: event.endTime || '10:00 AM',
     allDay: !!event.allDay,
-    category: cat,
-    color: categoryColor(cat),
+    category: resolvedCat,
+    color: categoryColor(resolvedCat),
     description: item.description,
     location: item.location,
     priority: 'medium',
@@ -307,6 +622,24 @@ export async function updateGoogleCalendarEvent(
   eventId: string,
   updates: Partial<CalendarEvent>
 ): Promise<CalendarEvent> {
+  const cat = updates.category || 'project';
+
+  if (token.startsWith('demo-')) {
+    return {
+      id: eventId,
+      title: updates.title || 'Event',
+      date: updates.date || new Date().toISOString().substring(0, 10),
+      startTime: updates.startTime,
+      endTime: updates.endTime,
+      allDay: updates.allDay,
+      category: cat,
+      color: categoryColor(cat),
+      description: updates.description,
+      location: updates.location,
+      priority: updates.priority || 'medium',
+    };
+  }
+
   const cleanId = eventId.replace(/^gcal-/, '');
   const url = `https://www.googleapis.com/calendar/v3/calendars/primary/events/${cleanId}`;
 
@@ -338,7 +671,7 @@ export async function updateGoogleCalendarEvent(
   });
 
   const item = await safeResponseJson(res, 'Google Calendar update error');
-  const cat = updates.category || detectCategory(item.summary || '', item.description);
+  const resolvedCat = updates.category || detectCategory(item.summary || '', item.description);
   return {
     id: `gcal-${item.id}`,
     title: item.summary || updates.title || 'Event',
@@ -346,8 +679,8 @@ export async function updateGoogleCalendarEvent(
     startTime: updates.startTime,
     endTime: updates.endTime,
     allDay: updates.allDay,
-    category: cat,
-    color: categoryColor(cat),
+    category: resolvedCat,
+    color: categoryColor(resolvedCat),
     description: item.description,
     location: item.location,
     priority: updates.priority || 'medium',
@@ -361,6 +694,10 @@ export async function deleteGoogleCalendarEvent(
   token: string,
   eventId: string
 ): Promise<boolean> {
+  if (token.startsWith('demo-')) {
+    return true;
+  }
+
   const cleanId = eventId.replace(/^gcal-/, '');
   const url = `https://www.googleapis.com/calendar/v3/calendars/primary/events/${cleanId}`;
 

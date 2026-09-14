@@ -44,7 +44,7 @@ import {
   AppNotification,
   UserSettingsProfile
 } from './types';
-import { Sparkles, X } from 'lucide-react';
+import { Sparkles, X, CheckCircle2 } from 'lucide-react';
 import { TasksPage } from './components/tasks/TasksPage';
 import { CalendarPage } from './components/calendar/CalendarPage';
 import { GoalsPage } from './components/goals/GoalsPage';
@@ -82,6 +82,7 @@ export default function App() {
   const [authModalScreen, setAuthModalScreen] = useState<AuthScreenType>('login');
   const [isGuestBannerDismissed, setIsGuestBannerDismissed] = useState(false);
   const [showLandingWelcome, setShowLandingWelcome] = useState(false);
+  const [verifiedBannerMessage, setVerifiedBannerMessage] = useState<string | null>(null);
 
   // Core Synchronized Data States
   const [user, setUser] = useState(initialUserProfile);
@@ -204,6 +205,12 @@ export default function App() {
   };
 
   const handleAuthSuccess = async (authUser: AuthUser, _token: string) => {
+    // Gatekeeping: Unverified non-guest users must not access dashboard
+    if (!authUser.emailVerified && !authUser.isGuest) {
+      handleOpenAuth('verify_email');
+      return;
+    }
+
     setCurrentUser(authUser);
     setShowLandingWelcome(false);
     try {
@@ -236,6 +243,14 @@ export default function App() {
         const { data: authListener } = sb.auth.onAuthStateChange(async (event, session) => {
           if (!isMounted) return;
           if (session?.user) {
+            const isEmailVerified = Boolean(session.user.email_confirmed_at);
+            const isAnonymous = Boolean(session.user.is_anonymous || session.user.user_metadata?.is_anonymous);
+
+            // Gatekeeping: If user is not anonymous and email is unconfirmed, do not grant dashboard access
+            if (!isEmailVerified && !isAnonymous) {
+              return;
+            }
+
             let profile: any = null;
             try {
               const { data: p } = await sb.from('profiles').select('*').eq('id', session.user.id).maybeSingle();
@@ -244,18 +259,21 @@ export default function App() {
               // ignore
             }
             const authUser = supabaseUserToAuthUser(session.user, profile);
+            authUser.emailVerified = isEmailVerified;
             setCurrentUser(authUser);
             setStoredAuthToken(session.access_token);
             setShowLandingWelcome(false);
             setIsAuthModalOpen(false);
 
-            // Clean up verification tokens/code from URL bar without page reload
+            // Clean up verification tokens/code from URL bar and notify user
             if (typeof window !== 'undefined' && (window.location.hash.includes('access_token') || window.location.search.includes('code='))) {
+              setVerifiedBannerMessage('Email successfully verified! Welcome to LifeRPG.');
               window.history.replaceState(null, '', window.location.pathname);
             }
           } else if (event === 'SIGNED_OUT') {
             setCurrentUser(null);
             setStoredAuthToken(null);
+            setShowLandingWelcome(true);
           }
         });
         authUnsubscribe = () => authListener.subscription.unsubscribe();
@@ -267,10 +285,19 @@ export default function App() {
       try {
         const meRes = await api.getMe();
         if (isMounted && meRes?.user) {
-          setCurrentUser(meRes.user);
+          if (meRes.user.emailVerified || meRes.user.isGuest) {
+            setCurrentUser(meRes.user);
+            setShowLandingWelcome(false);
+          } else {
+            setCurrentUser(null);
+            setShowLandingWelcome(true);
+          }
         }
       } catch (err) {
-        // No active session initially; waiting for sign-in or guest exploration
+        // No active session initially; show landing page
+        if (isMounted) {
+          setShowLandingWelcome(true);
+        }
       }
 
       // 3. Authoritative state load
@@ -881,6 +908,23 @@ export default function App() {
 
           {/* Main Layout Area with optional Guest Banner */}
           <div className="flex-1 flex flex-col min-w-0">
+            {/* Email Verification Success Banner */}
+            {verifiedBannerMessage && (
+              <div className="bg-[#22C55E]/15 border-b border-[#22C55E]/30 px-4 py-3 text-xs sm:text-sm text-[#86EFAC] flex items-center justify-between">
+                <div className="flex items-center gap-2 font-medium">
+                  <CheckCircle2 className="w-4 h-4 text-[#22C55E] shrink-0" />
+                  <span>{verifiedBannerMessage}</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setVerifiedBannerMessage(null)}
+                  className="text-[#86EFAC]/70 hover:text-white text-xs font-semibold px-2 py-0.5 rounded transition-colors"
+                >
+                  Dismiss
+                </button>
+              </div>
+            )}
+
             {/* Guest notification banner */}
             {currentUser?.isGuest && !isGuestBannerDismissed && (
               <GuestBanner
