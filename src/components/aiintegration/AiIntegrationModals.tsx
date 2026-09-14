@@ -23,7 +23,7 @@ import {
 } from 'lucide-react';
 import { AIIntegrationModel, CalendarIntegrationState } from '../../types';
 import { modelComparisons } from '../../data/aiIntegrationMockData';
-import { ChatGPTLogo, ClaudeLogo, GeminiLogo, GoogleCalendarTile, GoogleGLogo, AppleLogo } from './ModelLogos';
+import { ChatGPTLogo, ClaudeLogo, GeminiLogo, GoogleCalendarTile, GoogleGLogo } from './ModelLogos';
 
 interface CompareModelsModalProps {
   isOpen: boolean;
@@ -151,7 +151,7 @@ interface ConnectAgentModalProps {
       modelTier?: string;
       loginMethod?: string;
       password?: string;
-      authMethod?: 'google' | 'apple' | 'phone' | 'email' | 'apikey';
+      authMethod?: 'google' | 'phone' | 'email' | 'apikey';
       verificationCode?: string;
       phoneNumber?: string;
     }
@@ -159,7 +159,7 @@ interface ConnectAgentModalProps {
   userEmail?: string;
 }
 
-type AuthViewMode = 'options' | 'google' | 'apple' | 'phone' | 'email_password' | 'apikey';
+type AuthViewMode = 'options' | 'google' | 'phone' | 'email_password' | 'apikey';
 
 export const ConnectAgentModal: React.FC<ConnectAgentModalProps> = ({
   isOpen,
@@ -357,43 +357,6 @@ export const ConnectAgentModal: React.FC<ConnectAgentModalProps> = ({
     }
   };
 
-  const handleAppleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setErrorMsg(null);
-
-    const appleEmail = email.trim() || `${userEmail.split('@')[0]}@icloud.com`;
-    if (!appleEmail.includes('@')) {
-      setErrorMsg('Please enter a valid Apple ID.');
-      return;
-    }
-
-    setIsVerifying(true);
-    setVerifyStepText('Connecting to Apple ID Authentication Services...');
-
-    try {
-      await new Promise((r) => setTimeout(r, 650));
-      setVerifyStepText(`Verifying ${model.name} credentials with Apple Private Relay...`);
-      await new Promise((r) => setTimeout(r, 500));
-
-      await onConnect(model.id, {
-        authMethod: 'apple',
-        accountEmail: appleEmail,
-        password: password.trim() || 'apple-passkey-verified',
-        modelTier: selectedTier,
-        loginMethod: 'apple',
-      });
-
-      setVerificationSuccess(true);
-      setTimeout(() => {
-        onClose();
-      }, 700);
-    } catch (err: any) {
-      setErrorMsg(err.message || 'Apple credential verification failed.');
-    } finally {
-      setIsVerifying(false);
-    }
-  };
-
   const handleApiKeySubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMsg(null);
@@ -495,19 +458,6 @@ export const ConnectAgentModal: React.FC<ConnectAgentModalProps> = ({
                   >
                     <GoogleGLogo className="w-5 h-5 shrink-0" />
                     <span>Continue with Google</span>
-                  </button>
-
-                  {/* Continue with Apple */}
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setErrorMsg(null);
-                      setAuthView('apple');
-                    }}
-                    className="w-full flex items-center justify-center gap-3 py-3 px-4 rounded-xl bg-[#171F2C] hover:bg-[#1E293B] border border-white/10 hover:border-white/20 text-white font-medium text-sm transition-all shadow-sm active:scale-[0.99] cursor-pointer"
-                  >
-                    <AppleLogo className="w-5 h-5 shrink-0 text-white fill-current" />
-                    <span>Continue with Apple</span>
                   </button>
 
                   {/* Continue with phone */}
@@ -1015,123 +965,7 @@ export const ConnectAgentModal: React.FC<ConnectAgentModalProps> = ({
               </form>
             )}
 
-            {/* VIEW 5: Apple Authentication */}
-            {authView === 'apple' && (
-              <form onSubmit={handleAppleSubmit} className="space-y-4 animate-fadeIn">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setErrorMsg(null);
-                    setAuthView('options');
-                  }}
-                  className="inline-flex items-center gap-1.5 text-xs text-[#94A3B8] hover:text-white transition-colors cursor-pointer"
-                >
-                  <ArrowLeft className="w-3.5 h-3.5" />
-                  <span>Back to login options</span>
-                </button>
-
-                <div className="flex items-center gap-3">
-                  <div className="p-2.5 rounded-2xl bg-white/[0.05] border border-white/10 shrink-0">
-                    <AppleLogo className="w-7 h-7 text-white fill-current" />
-                  </div>
-                  <div>
-                    <h3 className="text-lg font-bold text-white">Sign in with Apple</h3>
-                    <p className="text-xs text-[#94A3B8]">
-                      Verify credentials with Apple ID Passkey or Password
-                    </p>
-                  </div>
-                </div>
-
-                {errorMsg && (
-                  <div className="p-3 rounded-xl bg-rose-500/15 border border-rose-500/30 text-xs text-rose-300 flex items-center gap-2">
-                    <AlertCircle className="w-4 h-4 shrink-0 text-rose-400" />
-                    <span>{errorMsg}</span>
-                  </div>
-                )}
-
-                <div>
-                  <label className="block text-xs font-semibold text-[#94A3B8] mb-1.5">
-                    Apple ID Email
-                  </label>
-                  <input
-                    type="email"
-                    required
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    placeholder="name@icloud.com"
-                    className="w-full py-2.5 px-3 rounded-xl bg-[#141D2A] border border-white/10 text-xs text-white placeholder-[#64748B] focus:outline-none focus:border-[#6366F1]"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-semibold text-[#94A3B8] mb-1.5">
-                    Apple Password or Passkey
-                  </label>
-                  <input
-                    type="password"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    placeholder="••••••••••••"
-                    className="w-full py-2.5 px-3 rounded-xl bg-[#141D2A] border border-white/10 text-xs text-white placeholder-[#64748B] focus:outline-none focus:border-[#6366F1]"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-semibold text-[#94A3B8] mb-1.5">
-                    Preferred Model Version
-                  </label>
-                  <select
-                    value={selectedTier}
-                    onChange={(e) => setSelectedTier(e.target.value)}
-                    className="w-full py-2.5 px-3 rounded-xl bg-[#141D2A] border border-white/10 text-xs text-white focus:outline-none focus:border-[#6366F1]"
-                  >
-                    {getTierOptions().map((tier) => (
-                      <option key={tier} value={tier}>
-                        {tier}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                {isVerifying && (
-                  <div className="p-3.5 rounded-xl bg-indigo-950/40 border border-indigo-500/30 text-xs text-indigo-200 flex items-center gap-3">
-                    <Loader2 className="w-4 h-4 animate-spin text-[#818CF8] shrink-0" />
-                    <span>{verifyStepText}</span>
-                  </div>
-                )}
-
-                <div className="pt-2 flex items-center justify-end gap-2.5">
-                  <button
-                    type="button"
-                    onClick={() => setAuthView('options')}
-                    disabled={isVerifying}
-                    className="px-4 py-2 rounded-xl bg-white/5 hover:bg-white/10 text-xs font-medium text-[#94A3B8] hover:text-white transition-colors cursor-pointer"
-                  >
-                    Cancel
-                  </button>
-
-                  <button
-                    type="submit"
-                    disabled={isVerifying}
-                    className="px-5 py-2.5 rounded-xl bg-[#6366F1] hover:bg-[#5254E0] disabled:opacity-50 text-xs font-semibold text-white transition-all flex items-center gap-2 shadow-sm shadow-indigo-600/30 cursor-pointer"
-                  >
-                    {isVerifying ? (
-                      <>
-                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                        <span>Verifying...</span>
-                      </>
-                    ) : (
-                      <>
-                        <Check className="w-3.5 h-3.5 stroke-[2.5]" />
-                        <span>Verify & Connect Apple ID</span>
-                      </>
-                    )}
-                  </button>
-                </div>
-              </form>
-            )}
-
-            {/* VIEW 6: Developer API Key / Token Authentication */}
+            {/* VIEW 5: Developer API Key / Token Authentication */}
             {authView === 'apikey' && (
               <form onSubmit={handleApiKeySubmit} className="space-y-4 animate-fadeIn">
                 <button

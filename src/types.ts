@@ -452,14 +452,14 @@ export interface AIIntegrationModel {
   isEnvironmentKeyConfigured?: boolean;
   verified?: boolean;
   verifiedAt?: string;
-  authMethod?: 'google' | 'apple' | 'phone' | 'email' | 'apikey';
+  authMethod?: 'google' | 'phone' | 'email' | 'apikey';
   authProviderName?: string;
   sessionToken?: string;
 }
 
 export interface AIAgentVerifyPayload {
   agentId: string;
-  authMethod: 'google' | 'apple' | 'phone' | 'email' | 'apikey';
+  authMethod: 'google' | 'phone' | 'email' | 'apikey';
   accountEmail?: string;
   password?: string;
   phoneNumber?: string;

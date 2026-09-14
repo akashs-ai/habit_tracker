@@ -574,7 +574,7 @@ export const api = {
   },
 
   async socialLogin(payload: {
-    provider: 'google' | 'github' | 'discord' | 'apple';
+    provider: 'google' | 'github' | 'discord';
     email?: string;
     fullName?: string;
   }): Promise<{ user: AuthUser; token: string; state: FullAppState }> {

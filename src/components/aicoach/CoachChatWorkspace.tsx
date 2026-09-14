@@ -509,7 +509,7 @@ export const CoachChatWorkspace: React.FC<CoachChatWorkspaceProps> = ({
                       {activeAgent.name} Authentication & Verification Required
                     </p>
                     <p className="text-[11px] text-[#94A3B8] mt-0.5">
-                      Verify your account credentials with Google, Apple, Phone, or API key to unlock {activeAgent.name} chat coaching.
+                      Verify your account credentials with Google, Phone, or API key to unlock {activeAgent.name} chat coaching.
                     </p>
                   </div>
                 </div>

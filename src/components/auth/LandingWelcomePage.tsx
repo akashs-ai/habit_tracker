@@ -13,6 +13,7 @@ import {
   LogIn
 } from 'lucide-react';
 import { MountainArt } from './MountainArt';
+import { Footer } from '../footer/Footer';
 
 interface LandingWelcomePageProps {
   onOpenLogin: () => void;
@@ -192,6 +193,9 @@ export const LandingWelcomePage: React.FC<LandingWelcomePageProps> = ({
           Join <span className="text-[#E2E8F0] font-semibold">50,000+</span> people building better lives with LifeRPG.
         </div>
       </footer>
+
+      {/* Team Expo Developer Footer */}
+      <Footer className="border-white/5 bg-[#080C16]/90" />
     </div>
   );
 };

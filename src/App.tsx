@@ -58,6 +58,7 @@ import { LandingWelcomePage } from './components/auth/LandingWelcomePage';
 import { AuthModal } from './components/auth/AuthModal';
 import { GuestBanner } from './components/auth/GuestBanner';
 import { LevelUpModal } from './components/effects/LevelUpModal';
+import { Footer } from './components/footer/Footer';
 import { api, BackendState, supabaseUserToAuthUser, setStoredAuthToken } from './services/api';
 import { AuthUser, AuthScreenType, AppearanceSettings as AppearanceSettingsType } from './types';
 import { getStoredAppearance, applyAppearanceToDOM } from './utils/appearanceManager';
@@ -1125,6 +1126,9 @@ export default function App() {
           </main>
         </div>
       )}
+
+            {/* Team Expo Developer Footer */}
+            <Footer className="pb-24 lg:pb-6" />
           </div>
         </>
       )}

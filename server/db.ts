@@ -1327,7 +1327,7 @@ class LifeRpgDatabase {
   }
 
   public socialLogin(
-    provider: 'google' | 'github' | 'discord' | 'apple',
+    provider: 'google' | 'github' | 'discord',
     email?: string,
     fullName?: string
   ): { user: UserAccount; token: string } {
@@ -2383,13 +2383,6 @@ class LifeRpgDatabase {
       }
       verifiedAccount = email.toLowerCase();
       providerName = 'Google Account (OAuth 2.0)';
-    } else if (authMethod === 'apple') {
-      const email = payload.accountEmail?.trim();
-      if (!email || !email.includes('@')) {
-        throw new Error('Credential verification failed: A valid Apple ID email address is required.');
-      }
-      verifiedAccount = email.toLowerCase();
-      providerName = 'Apple ID (Sign in with Apple)';
     } else if (authMethod === 'phone') {
       const phone = payload.phoneNumber?.trim();
       const code = payload.verificationCode?.trim();
