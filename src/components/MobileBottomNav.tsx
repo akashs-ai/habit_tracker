@@ -26,7 +26,9 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
     >
       {items.map((item) => {
         const Icon = item.icon;
-        const isActive = activeTab === item.id || (item.id === 'tasks' && activeTab === 'quests');
+        const isActive = activeTab === item.id || 
+          (item.id === 'tasks' && activeTab === 'quests') ||
+          (item.id === 'ai-coach' && (activeTab === 'coach' || activeTab === 'aicoach' || activeTab === 'ai_coach'));
         return (
           <button
             key={item.id}

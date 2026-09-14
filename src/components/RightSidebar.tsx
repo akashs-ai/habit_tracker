@@ -12,16 +12,19 @@ import {
   LineChart, 
   GraduationCap,
   Bookmark,
-  Heart
+  Heart,
+  ArrowRight,
+  Bot
 } from 'lucide-react';
 import { QuickNote } from '../types';
 
 interface RightSidebarProps {
   notes: QuickNote[];
   onAddNote?: () => void;
+  onNavigateTab?: (tab: string) => void;
 }
 
-export const RightSidebar: React.FC<RightSidebarProps> = ({ notes, onAddNote }) => {
+export const RightSidebar: React.FC<RightSidebarProps> = ({ notes, onAddNote, onNavigateTab }) => {
   // Focus Mode State
   const [focusDuration, setFocusDuration] = useState<number>(25);
   const [secondsRemaining, setSecondsRemaining] = useState<number>(25 * 60);
@@ -277,19 +280,43 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({ notes, onAddNote }) 
         id="ai-coach-card"
         className="bg-white dark:bg-[#111113] border border-[#E7EAF0] dark:border-[#27272A] rounded-2xl p-5 shadow-xs"
       >
-        <div className="flex items-center gap-2 mb-3">
-          <h3 className="font-bold text-base text-[#111827] dark:text-[#FAFAFA]">
-            AI Coach
-          </h3>
-          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-[#EEECFF] text-[#6366F1] dark:bg-[#232147] dark:text-[#A5B4FC]">
-            Beta
-          </span>
+        <div className="flex items-center justify-between mb-3">
+          <button
+            type="button"
+            onClick={() => onNavigateTab?.('ai-coach')}
+            className="flex items-center gap-2 group text-left cursor-pointer transition-transform active:scale-[0.98]"
+            title="Open AI Coach"
+          >
+            <h3 className="font-bold text-base text-[#111827] dark:text-[#FAFAFA] group-hover:text-[#6366F1] dark:group-hover:text-[#818CF8] transition-colors flex items-center gap-1.5">
+              <Bot className="w-4 h-4 text-[#6366F1] dark:text-[#818CF8]" />
+              <span>AI Coach</span>
+            </h3>
+            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-[#EEECFF] text-[#6366F1] dark:bg-[#232147] dark:text-[#A5B4FC]">
+              Beta
+            </span>
+          </button>
+
+          {onNavigateTab && (
+            <button
+              type="button"
+              id="ai-coach-open-link"
+              onClick={() => onNavigateTab('ai-coach')}
+              className="text-xs font-semibold text-[#6366F1] dark:text-[#818CF8] hover:text-[#4F46E5] hover:underline flex items-center gap-1 cursor-pointer transition-colors"
+            >
+              <span>Open</span>
+              <ArrowRight className="w-3.5 h-3.5" />
+            </button>
+          )}
         </div>
 
         {/* Mascot & Speech Bubble */}
-        <div className="flex items-start gap-3 p-3.5 rounded-xl bg-[#F8F9FD] dark:bg-[#18181B] border border-[#EAEFF8] dark:border-[#27272A] mb-3.5">
+        <div 
+          onClick={() => onNavigateTab?.('ai-coach')}
+          title="Click to consult AI Coach"
+          className="flex items-start gap-3 p-3.5 rounded-xl bg-[#F8F9FD] dark:bg-[#18181B] border border-[#EAEFF8] dark:border-[#27272A] mb-3.5 cursor-pointer hover:border-[#6366F1]/40 hover:bg-[#EEECFF]/30 dark:hover:bg-[#1E1B4B]/20 transition-all group"
+        >
           {/* Friendly Robot Avatar Vector */}
-          <div className="w-11 h-11 rounded-2xl bg-gradient-to-tr from-[#6366F1] to-[#A855F7] p-0.5 shrink-0 shadow-xs flex items-center justify-center">
+          <div className="w-11 h-11 rounded-2xl bg-gradient-to-tr from-[#6366F1] to-[#A855F7] p-0.5 shrink-0 shadow-xs flex items-center justify-center group-hover:scale-105 transition-transform">
             <div className="w-full h-full bg-[#1E1B4B] rounded-[14px] flex items-center justify-center relative overflow-hidden">
               {/* Antenna */}
               <div className="absolute top-1 w-1 h-1.5 bg-[#A855F7] rounded-full" />
@@ -303,10 +330,15 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({ notes, onAddNote }) 
             </div>
           </div>
 
-          <div className="flex-1">
-            <p className="text-xs font-semibold text-[#111827] dark:text-[#FAFAFA] leading-tight mb-1">
-              Good morning, Alex!
-            </p>
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center justify-between mb-0.5">
+              <p className="text-xs font-semibold text-[#111827] dark:text-[#FAFAFA] leading-tight">
+                Good morning, Alex!
+              </p>
+              <span className="text-[10px] text-[#6366F1] dark:text-[#818CF8] font-medium opacity-0 group-hover:opacity-100 transition-opacity">
+                Chat &rarr;
+              </span>
+            </div>
             <p className="text-xs text-[#52525B] dark:text-[#A1A1AA] leading-relaxed">
               {coachResponse || 'You have 90 minutes available today. Want me to optimize your plan?'}
             </p>
@@ -314,46 +346,62 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({ notes, onAddNote }) 
         </div>
 
         {/* Primary CTA Button */}
-        <button
-          onClick={() => handlePromptClick('optimize')}
-          className="w-full py-2.5 px-4 rounded-xl bg-gradient-to-r from-[#6366F1] to-[#7C6CFF] hover:from-[#5457E5] hover:to-[#6D5CEB] text-white text-xs font-semibold transition-all shadow-xs shadow-indigo-200 dark:shadow-none flex items-center justify-center gap-2 mb-3.5"
-        >
-          <span>Optimize My Day</span>
-          <Sparkles className="w-3.5 h-3.5 fill-white" />
-        </button>
+        <div className="flex flex-col gap-2 mb-3.5">
+          <button
+            type="button"
+            id="ai-coach-open-workspace-btn"
+            onClick={() => onNavigateTab?.('ai-coach')}
+            className="w-full py-2.5 px-4 rounded-xl bg-gradient-to-r from-[#6366F1] to-[#7C6CFF] hover:from-[#5457E5] hover:to-[#6D5CEB] active:scale-[0.99] text-white text-xs font-semibold transition-all shadow-xs shadow-indigo-200 dark:shadow-none flex items-center justify-center gap-2 cursor-pointer"
+          >
+            <span>Open AI Coach Workspace</span>
+            <Sparkles className="w-3.5 h-3.5 fill-white" />
+          </button>
+        </div>
 
         {/* 4 Quick Prompt Chips (2x2 Grid) */}
         <div className="grid grid-cols-2 gap-2">
           <button
-            onClick={() => handlePromptClick('habits')}
-            className="flex items-center gap-1.5 px-2.5 py-2 rounded-xl bg-[#F8F9FA] dark:bg-[#18181B] border border-[#E5E7EB] dark:border-[#27272A] hover:border-[#7C6CFF] text-[11px] font-medium text-[#4B5563] dark:text-[#A1A1AA] hover:text-[#7C6CFF] transition-all text-left"
+            onClick={() => {
+              handlePromptClick('habits');
+              onNavigateTab?.('ai-coach');
+            }}
+            className="flex items-center gap-1.5 px-2.5 py-2 rounded-xl bg-[#F8F9FA] dark:bg-[#18181B] border border-[#E5E7EB] dark:border-[#27272A] hover:border-[#7C6CFF] text-[11px] font-medium text-[#4B5563] dark:text-[#A1A1AA] hover:text-[#7C6CFF] transition-all text-left cursor-pointer"
           >
             <Compass className="w-3.5 h-3.5 shrink-0 text-[#6B7280]" />
             <span className="truncate">Suggest habits</span>
           </button>
 
           <button
-            onClick={() => handlePromptClick('goal')}
-            className="flex items-center gap-1.5 px-2.5 py-2 rounded-xl bg-[#F8F9FA] dark:bg-[#18181B] border border-[#E5E7EB] dark:border-[#27272A] hover:border-[#7C6CFF] text-[11px] font-medium text-[#4B5563] dark:text-[#A1A1AA] hover:text-[#7C6CFF] transition-all text-left"
+            onClick={() => {
+              handlePromptClick('goal');
+              onNavigateTab?.('ai-coach');
+            }}
+            className="flex items-center gap-1.5 px-2.5 py-2 rounded-xl bg-[#F8F9FA] dark:bg-[#18181B] border border-[#E5E7EB] dark:border-[#27272A] hover:border-[#7C6CFF] text-[11px] font-medium text-[#4B5563] dark:text-[#A1A1AA] hover:text-[#7C6CFF] transition-all text-left cursor-pointer"
           >
             <Target className="w-3.5 h-3.5 shrink-0 text-[#6B7280]" />
             <span className="truncate">Adjust my goal</span>
           </button>
 
           <button
-            onClick={() => handlePromptClick('progress')}
-            className="flex items-center gap-1.5 px-2.5 py-2 rounded-xl bg-[#F8F9FA] dark:bg-[#18181B] border border-[#E5E7EB] dark:border-[#27272A] hover:border-[#7C6CFF] text-[11px] font-medium text-[#4B5563] dark:text-[#A1A1AA] hover:text-[#7C6CFF] transition-all text-left"
+            onClick={() => {
+              handlePromptClick('progress');
+              onNavigateTab?.('ai-coach');
+            }}
+            className="flex items-center gap-1.5 px-2.5 py-2 rounded-xl bg-[#F8F9FA] dark:bg-[#18181B] border border-[#E5E7EB] dark:border-[#27272A] hover:border-[#7C6CFF] text-[11px] font-medium text-[#4B5563] dark:text-[#A1A1AA] hover:text-[#7C6CFF] transition-all text-left cursor-pointer"
           >
             <LineChart className="w-3.5 h-3.5 shrink-0 text-[#6B7280]" />
-            <span className="truncate">Explain my progress</span>
+            <span className="truncate">Explain progress</span>
           </button>
 
           <button
-            onClick={() => handlePromptClick('plan')}
-            className="flex items-center gap-1.5 px-2.5 py-2 rounded-xl bg-[#F8F9FA] dark:bg-[#18181B] border border-[#E5E7EB] dark:border-[#27272A] hover:border-[#7C6CFF] text-[11px] font-medium text-[#4B5563] dark:text-[#A1A1AA] hover:text-[#7C6CFF] transition-all text-left"
+            onClick={() => {
+              handlePromptClick('plan');
+              onNavigateTab?.('ai-coach');
+            }}
+            className="flex items-center gap-1.5 px-2.5 py-2 rounded-xl bg-[#F8F9FA] dark:bg-[#18181B] border border-[#E5E7EB] dark:border-[#27272A] hover:border-[#7C6CFF] text-[11px] font-medium text-[#4B5563] dark:text-[#A1A1AA] hover:text-[#7C6CFF] transition-all text-left cursor-pointer"
           >
             <GraduationCap className="w-3.5 h-3.5 shrink-0 text-[#6B7280]" />
-            <span className="truncate">Create a study plan</span>
+            <span className="truncate">Study plan</span>
           </button>
         </div>
       </div>

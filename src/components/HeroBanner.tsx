@@ -570,9 +570,13 @@ export const HeroBanner: React.FC<HeroBannerProps> = ({ user, onNavigateTab }) =
                     {/* Left Info */}
                     <div className="relative z-10 max-w-xl flex flex-col gap-2">
                       <div className="flex items-center gap-2">
-                        <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold tracking-wider uppercase bg-cyan-500/20 text-cyan-400 border border-cyan-500/30">
+                        <button
+                          type="button"
+                          onClick={() => onNavigateTab?.('ai-coach')}
+                          className="px-2.5 py-0.5 rounded-full text-[11px] font-bold tracking-wider uppercase bg-cyan-500/20 text-cyan-400 border border-cyan-500/30 hover:bg-cyan-500/30 transition-colors cursor-pointer"
+                        >
                           🧠 Analytics & AI Coach
-                        </span>
+                        </button>
                         <span className="hidden sm:inline-block text-xs text-cyan-200/60">Autonomous Insights</span>
                       </div>
                       <h3 className="text-xl sm:text-2xl lg:text-3xl font-bold tracking-tight text-white leading-tight">
@@ -584,8 +588,9 @@ export const HeroBanner: React.FC<HeroBannerProps> = ({ user, onNavigateTab }) =
                       <div className="pt-1">
                         <button
                           type="button"
-                          onClick={() => onNavigateTab?.('coach')}
-                          className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-xl bg-cyan-400 hover:bg-cyan-300 text-slate-950 text-xs font-bold shadow-md transition-all cursor-pointer"
+                          id="hero-consult-ai-coach-btn"
+                          onClick={() => onNavigateTab?.('ai-coach')}
+                          className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-xl bg-cyan-400 hover:bg-cyan-300 active:scale-95 text-slate-950 text-xs font-bold shadow-md transition-all cursor-pointer"
                         >
                           <span>Consult AI Coach</span>
                           <ArrowRight className="w-3.5 h-3.5" />
@@ -594,7 +599,12 @@ export const HeroBanner: React.FC<HeroBannerProps> = ({ user, onNavigateTab }) =
                     </div>
 
                     {/* Right Interactive Hologram Preview */}
-                    <div className="hidden md:flex relative z-10 w-64 bg-slate-950/70 backdrop-blur-md rounded-2xl border border-cyan-500/30 p-3.5 shadow-2xl flex-col gap-2.5">
+                    <div 
+                      id="hero-ai-coach-observation-card"
+                      onClick={() => onNavigateTab?.('ai-coach')}
+                      title="Open AI Coach"
+                      className="hidden md:flex relative z-10 w-64 bg-slate-950/70 backdrop-blur-md rounded-2xl border border-cyan-500/30 hover:border-cyan-400 p-3.5 shadow-2xl flex-col gap-2.5 cursor-pointer hover:scale-[1.02] active:scale-[0.99] transition-all"
+                    >
                       <div className="flex items-center justify-between text-xs">
                         <span className="font-bold text-cyan-300 flex items-center gap-1.5">
                           <Bot className="w-3.5 h-3.5 text-cyan-400" />
@@ -617,7 +627,10 @@ export const HeroBanner: React.FC<HeroBannerProps> = ({ user, onNavigateTab }) =
                   {/* 4 Feature Bento Cards */}
                   <div className="bg-white/95 dark:bg-[#111113]/95 backdrop-blur-md p-4 sm:p-5 border-t border-[#E7EAF0]/80 dark:border-[#27272A]">
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5 sm:gap-4">
-                      <div className="flex items-center gap-3.5 p-3.5 rounded-2xl bg-[#F8F9FD] dark:bg-[#18181B] border border-[#E9ECF5] dark:border-[#27272A] hover:border-cyan-500/40 transition-all">
+                      <div 
+                        onClick={() => onNavigateTab?.('analytics')}
+                        className="flex items-center gap-3.5 p-3.5 rounded-2xl bg-[#F8F9FD] dark:bg-[#18181B] border border-[#E9ECF5] dark:border-[#27272A] hover:border-cyan-500/40 transition-all cursor-pointer"
+                      >
                         <div className="w-11 h-11 rounded-xl bg-cyan-50 dark:bg-cyan-950/40 flex items-center justify-center shrink-0 text-cyan-600 dark:text-cyan-400">
                           <Activity className="w-5 h-5" />
                         </div>
@@ -627,7 +640,10 @@ export const HeroBanner: React.FC<HeroBannerProps> = ({ user, onNavigateTab }) =
                         </div>
                       </div>
 
-                      <div className="flex items-center gap-3.5 p-3.5 rounded-2xl bg-[#F8F9FD] dark:bg-[#18181B] border border-[#E9ECF5] dark:border-[#27272A] hover:border-indigo-500/40 transition-all">
+                      <div 
+                        onClick={() => onNavigateTab?.('analytics')}
+                        className="flex items-center gap-3.5 p-3.5 rounded-2xl bg-[#F8F9FD] dark:bg-[#18181B] border border-[#E9ECF5] dark:border-[#27272A] hover:border-indigo-500/40 transition-all cursor-pointer"
+                      >
                         <div className="w-11 h-11 rounded-xl bg-indigo-50 dark:bg-indigo-950/40 flex items-center justify-center shrink-0 text-indigo-600 dark:text-indigo-400">
                           <BrainCircuit className="w-5 h-5" />
                         </div>
@@ -637,7 +653,10 @@ export const HeroBanner: React.FC<HeroBannerProps> = ({ user, onNavigateTab }) =
                         </div>
                       </div>
 
-                      <div className="flex items-center gap-3.5 p-3.5 rounded-2xl bg-[#F8F9FD] dark:bg-[#18181B] border border-[#E9ECF5] dark:border-[#27272A] hover:border-purple-500/40 transition-all">
+                      <div 
+                        onClick={() => onNavigateTab?.('ai-coach')}
+                        className="flex items-center gap-3.5 p-3.5 rounded-2xl bg-[#F8F9FD] dark:bg-[#18181B] border border-[#E9ECF5] dark:border-[#27272A] hover:border-purple-500/40 transition-all cursor-pointer"
+                      >
                         <div className="w-11 h-11 rounded-xl bg-purple-50 dark:bg-purple-950/40 flex items-center justify-center shrink-0 text-purple-600 dark:text-purple-400">
                           <Bot className="w-5 h-5" />
                         </div>
@@ -647,7 +666,10 @@ export const HeroBanner: React.FC<HeroBannerProps> = ({ user, onNavigateTab }) =
                         </div>
                       </div>
 
-                      <div className="flex items-center gap-3.5 p-3.5 rounded-2xl bg-[#F8F9FD] dark:bg-[#18181B] border border-[#E9ECF5] dark:border-[#27272A] hover:border-emerald-500/40 transition-all">
+                      <div 
+                        onClick={() => onNavigateTab?.('analytics')}
+                        className="flex items-center gap-3.5 p-3.5 rounded-2xl bg-[#F8F9FD] dark:bg-[#18181B] border border-[#E9ECF5] dark:border-[#27272A] hover:border-emerald-500/40 transition-all cursor-pointer"
+                      >
                         <div className="w-11 h-11 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 flex items-center justify-center shrink-0 text-emerald-600 dark:text-emerald-400">
                           <TrendingUp className="w-5 h-5" />
                         </div>

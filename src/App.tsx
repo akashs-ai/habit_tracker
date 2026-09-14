@@ -74,6 +74,22 @@ export default function App() {
     return typeof window !== 'undefined' && window.matchMedia('(prefers-color-scheme: dark)').matches;
   });
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+
+  // Central tab navigation handler with alias normalization (e.g. 'coach' -> 'ai-coach')
+  const handleNavigateTab = (tab: string) => {
+    let target = tab;
+    if (tab === 'coach' || tab === 'aicoach' || tab === 'ai_coach') {
+      target = 'ai-coach';
+    } else if (tab === 'integration' || tab === 'integrations' || tab === 'ai_integration') {
+      target = 'ai-integration';
+    }
+    setActiveTab(target);
+    setIsMobileMenuOpen(false);
+    if (typeof window !== 'undefined') {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  };
+
   const [searchQuery, setSearchQuery] = useState('');
   const [activeQuestFilter, setActiveQuestFilter] = useState<QuestCategory>('all');
 
@@ -860,7 +876,7 @@ export default function App() {
           <div className="hidden lg:block shrink-0">
             <Sidebar
               activeTab={activeTab}
-              setActiveTab={setActiveTab}
+              setActiveTab={handleNavigateTab}
               isDark={isDark}
               setIsDark={handleToggleTheme}
               themeMode={appearance.theme}
@@ -890,10 +906,7 @@ export default function App() {
                 <div className="flex-1 overflow-y-auto">
                   <Sidebar
                     activeTab={activeTab}
-                    setActiveTab={(tab) => {
-                      setActiveTab(tab);
-                      setIsMobileMenuOpen(false);
-                    }}
+                    setActiveTab={handleNavigateTab}
                     isDark={isDark}
                     setIsDark={handleToggleTheme}
                     themeMode={appearance.theme}
@@ -962,12 +975,12 @@ export default function App() {
           lastSyncedTime={aiLastSyncedTime}
           userEmail={user.email || 'iitangaming18@gmail.com'}
         />
-      ) : activeTab === 'ai-coach' ? (
+      ) : (activeTab === 'ai-coach' || activeTab === 'coach' || activeTab === 'aicoach' || activeTab === 'ai_coach') ? (
         <AiCoachPage
           isDark={isDark}
           setIsDark={handleToggleTheme}
           onToggleMobileMenu={() => setIsMobileMenuOpen(true)}
-          onNavigate={(tab) => setActiveTab(tab)}
+          onNavigate={handleNavigateTab}
           agents={aiAgents}
           onSelectModelId={handleSelectAIModel}
           onSyncModels={handleSyncAIModels}
@@ -1045,7 +1058,7 @@ export default function App() {
           onMarkNotificationAsRead={handleMarkNotificationAsRead}
           onMarkAllNotificationsAsRead={handleMarkAllNotificationsAsRead}
           onClearAllNotifications={handleClearAllNotifications}
-          onNavigateTab={setActiveTab}
+          onNavigateTab={handleNavigateTab}
         />
       ) : activeTab === 'tasks' ? (
         <TasksPage
@@ -1061,7 +1074,7 @@ export default function App() {
           onMarkNotificationAsRead={handleMarkNotificationAsRead}
           onMarkAllNotificationsAsRead={handleMarkAllNotificationsAsRead}
           onClearAllNotifications={handleClearAllNotifications}
-          onNavigateTab={setActiveTab}
+          onNavigateTab={handleNavigateTab}
         />
       ) : (
         <div className="flex-1 flex flex-col min-w-0 pb-24 lg:pb-12">
@@ -1078,7 +1091,7 @@ export default function App() {
             onMarkNotificationAsRead={handleMarkNotificationAsRead}
             onMarkAllNotificationsAsRead={handleMarkAllNotificationsAsRead}
             onClearAllNotifications={handleClearAllNotifications}
-            onNavigateTab={setActiveTab}
+            onNavigateTab={handleNavigateTab}
           />
 
           {/* Page Container */}
@@ -1089,7 +1102,7 @@ export default function App() {
               {/* Left Main Column: Hero, Quests, Analytics Bento, Goals */}
               <div className="lg:col-span-8 xl:col-span-9 flex flex-col gap-8">
                 {/* 1. Hero & Bento Stats Carousel */}
-                <HeroBanner user={user} onNavigateTab={setActiveTab} />
+                <HeroBanner user={user} onNavigateTab={handleNavigateTab} />
 
                 {/* 2. Today's Quests */}
                 <TodayQuests
@@ -1119,6 +1132,7 @@ export default function App() {
                 <RightSidebar
                   notes={notes}
                   onAddNote={() => setIsAddNoteOpen(true)}
+                  onNavigateTab={handleNavigateTab}
                 />
               </div>
 
@@ -1186,7 +1200,7 @@ export default function App() {
       {/* Mobile Bottom Navigation Bar (< lg screens) */}
       <MobileBottomNav
         activeTab={activeTab}
-        setActiveTab={setActiveTab}
+        setActiveTab={handleNavigateTab}
       />
     </div>
   );

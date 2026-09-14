@@ -103,13 +103,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
           {/* AI Section Items */}
           {aiNavItems.map((item) => {
             const Icon = item.icon;
-            const isActive = activeTab === item.id;
+            const isActive = activeTab === item.id || (item.id === 'ai-coach' && (activeTab === 'coach' || activeTab === 'aicoach' || activeTab === 'ai_coach'));
             return (
               <button
                 key={item.id}
                 id={`nav-${item.id}`}
                 onClick={() => setActiveTab(item.id)}
-                className={`flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-medium transition-all duration-150 text-left ${
+                className={`flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-medium transition-all duration-150 text-left cursor-pointer ${
                   isActive
                     ? 'bg-[#EEEFFF] dark:bg-gradient-to-r dark:from-[#2B236F] dark:to-[#3E32A0] text-[#5B5CE2] dark:text-white shadow-[0_2px_12px_rgba(99,102,241,0.25)] border border-transparent dark:border-white/10'
                     : 'text-[#5E6470] dark:text-[#A1A1AA] hover:bg-[#F7F8FA] dark:hover:bg-[#18181B] hover:text-[#111827] dark:hover:text-[#FAFAFA]'
@@ -128,12 +128,19 @@ export const Sidebar: React.FC<SidebarProps> = ({
         {/* Motivational Landscape Card */}
         <div 
           id="sidebar-motivation-card" 
-          className="relative overflow-hidden rounded-2xl bg-gradient-to-b from-[#EBF0FF] to-[#DCE6FF] dark:from-[#1A2035] dark:to-[#141829] p-3.5 border border-[#DCE4FA] dark:border-[#252E4A]"
+          onClick={() => setActiveTab('ai-coach')}
+          title="Consult AI Coach"
+          className="relative overflow-hidden rounded-2xl bg-gradient-to-b from-[#EBF0FF] to-[#DCE6FF] dark:from-[#1A2035] dark:to-[#141829] p-3.5 border border-[#DCE4FA] dark:border-[#252E4A] cursor-pointer hover:border-[#6366F1]/50 transition-all group"
         >
-          <p className="text-[12px] font-medium leading-tight text-[#2B3674] dark:text-[#B5C7F7] mb-2.5">
-            Discipline today, <br />
-            a stronger you tomorrow.
-          </p>
+          <div className="flex items-center justify-between mb-2.5">
+            <p className="text-[12px] font-medium leading-tight text-[#2B3674] dark:text-[#B5C7F7]">
+              Discipline today, <br />
+              a stronger you tomorrow.
+            </p>
+            <span className="text-[10px] text-[#5B5CE2] font-semibold opacity-0 group-hover:opacity-100 transition-opacity">
+              Coach &rarr;
+            </span>
+          </div>
 
           {/* Clean Landscape Vector Illustration */}
           <div className="relative h-20 w-full rounded-xl overflow-hidden bg-gradient-to-b from-[#A5C0F3] via-[#7FA4E8] to-[#5885DE] dark:from-[#253966] dark:to-[#172342]">
