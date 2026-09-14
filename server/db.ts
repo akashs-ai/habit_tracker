@@ -61,6 +61,7 @@ export interface UserAccount {
   id: string;
   email: string;
   username: string;
+  displayUsername?: string;
   fullName: string;
   avatarUrl: string;
   timezone: string;
@@ -68,6 +69,8 @@ export interface UserAccount {
   isGuest: boolean;
   emailVerified: boolean;
   passwordHash?: string;
+  termsAcceptedAt?: string;
+  termsVersion?: string;
   createdAt: string;
   updatedAt: string;
   lastSeenAt: string;
@@ -85,10 +88,98 @@ export interface UserSession {
 export function validatePassword(password: string): { valid: boolean; errors: string[] } {
   const errors: string[] = [];
   if (!password || password.length < 8) errors.push('At least 8 characters');
-  if (!/[A-Z]/.test(password)) errors.push('One uppercase letter');
-  if (!/[a-z]/.test(password)) errors.push('One lowercase letter');
-  if (!/[0-9!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(password)) errors.push('One number or special character');
+  if (password && password.length > 128) errors.push('Maximum 128 characters');
+  if (!/[A-Z]/.test(password || '')) errors.push('At least one uppercase letter');
+  if (!/[a-z]/.test(password || '')) errors.push('At least one lowercase letter');
+  if (!/[0-9]/.test(password || '')) errors.push('At least one number');
+  if (!/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?~`]/.test(password || '')) errors.push('At least one special character');
   return { valid: errors.length === 0, errors };
+}
+
+export function validateUsername(username: string): { valid: boolean; error?: string } {
+  if (!username || !username.trim()) {
+    return { valid: false, error: 'Username is required' };
+  }
+  const clean = username.trim();
+  if (clean.length < 3) {
+    return { valid: false, error: 'Username must be at least 3 characters' };
+  }
+  if (clean.length > 30) {
+    return { valid: false, error: 'Username cannot exceed 30 characters' };
+  }
+  if (/\s/.test(clean)) {
+    return { valid: false, error: 'Username cannot contain spaces' };
+  }
+  if (!/^[a-zA-Z0-9_.]+$/.test(clean)) {
+    return { valid: false, error: 'Username can only contain letters, numbers, periods and underscores' };
+  }
+  return { valid: true };
+}
+
+export type PasswordStrength = 'weak' | 'fair' | 'strong';
+
+export function calculatePasswordStrength(password: string): {
+  strength: PasswordStrength;
+  score: number;
+  hasMinLength: boolean;
+  hasUpper: boolean;
+  hasLower: boolean;
+  hasNumber: boolean;
+  hasSpecial: boolean;
+} {
+  const hasMinLength = Boolean(password && password.length >= 8);
+  const hasUpper = /[A-Z]/.test(password || '');
+  const hasLower = /[a-z]/.test(password || '');
+  const hasNumber = /[0-9]/.test(password || '');
+  const hasSpecial = /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?~`]/.test(password || '');
+
+  let score = 0;
+  if (hasMinLength) score++;
+  if (hasUpper && hasLower) score++;
+  if (hasNumber) score++;
+  if (hasSpecial) score++;
+
+  let strength: PasswordStrength = 'weak';
+  if (score >= 4 && (password || '').length >= 10) {
+    strength = 'strong';
+  } else if (score >= 3 && hasMinLength) {
+    strength = 'fair';
+  } else {
+    strength = 'weak';
+  }
+
+  return {
+    strength,
+    score,
+    hasMinLength,
+    hasUpper,
+    hasLower,
+    hasNumber,
+    hasSpecial,
+  };
+}
+
+export function hashPassword(password: string): string {
+  const salt = crypto.randomBytes(16).toString('hex');
+  const hash = crypto.scryptSync(password, salt, 64).toString('hex');
+  return `scrypt:${salt}:${hash}`;
+}
+
+export function verifyPassword(password: string, storedHash?: string): boolean {
+  if (!storedHash || !password) return false;
+  if (storedHash.startsWith('scrypt:')) {
+    const parts = storedHash.split(':');
+    if (parts.length !== 3) return false;
+    const [, salt, originalHash] = parts;
+    try {
+      const computed = crypto.scryptSync(password, salt, 64).toString('hex');
+      return crypto.timingSafeEqual(Buffer.from(computed, 'hex'), Buffer.from(originalHash, 'hex'));
+    } catch {
+      return false;
+    }
+  }
+  // Backward compatibility fallback for test seeds (e.g. 'password123')
+  return storedHash === password;
 }
 
 function calculateEndTimeStr(startTime: string): string {
@@ -781,6 +872,19 @@ class LifeRpgDatabase {
     return this.users.find((u) => u.username.trim().toLowerCase() === lower) || null;
   }
 
+  public isUsernameAvailable(username: string, excludeUserId?: string): { available: boolean; reason?: string } {
+    const check = validateUsername(username);
+    if (!check.valid) {
+      return { available: false, reason: check.error };
+    }
+    const lower = username.trim().toLowerCase();
+    const existing = this.users.find((u) => u.id !== excludeUserId && u.username.toLowerCase() === lower);
+    if (existing) {
+      return { available: false, reason: 'Username is already taken' };
+    }
+    return { available: true, reason: 'Username is available' };
+  }
+
   public getUserByToken(token: string): UserAccount | null {
     if (!token) return null;
     if (token === 'token_alex_master' || token === 'alex-token-permanent') {
@@ -1196,7 +1300,7 @@ class LifeRpgDatabase {
     guestToken?: string;
   }): { user: UserAccount; token: string; migrated: boolean } {
     if (!payload.termsAccepted) {
-      throw new Error('You must agree to the Terms of Service and Privacy Policy.');
+      throw new Error('Please agree to the Terms & Conditions and Privacy Policy to continue.');
     }
     if (!payload.fullName || !payload.fullName.trim()) {
       throw new Error('Full Name is required.');
@@ -1204,8 +1308,16 @@ class LifeRpgDatabase {
     if (!payload.email || !payload.email.includes('@')) {
       throw new Error('A valid email address is required.');
     }
-    if (!payload.username || payload.username.length < 3) {
-      throw new Error('Username must be at least 3 characters.');
+    
+    // Strict username validation
+    const usernameValidation = validateUsername(payload.username);
+    if (!usernameValidation.valid) {
+      throw new Error(usernameValidation.error || 'Invalid username.');
+    }
+
+    const avail = this.isUsernameAvailable(payload.username);
+    if (!avail.available) {
+      throw new Error(avail.reason || 'This username is already taken. Please choose another.');
     }
 
     const passCheck = validatePassword(payload.password);
@@ -1216,9 +1328,6 @@ class LifeRpgDatabase {
     if (this.getUserByEmail(payload.email)) {
       throw new Error('An account with this email address already exists.');
     }
-    if (this.getUserByUsername(payload.username)) {
-      throw new Error('This username is already taken. Please choose another.');
-    }
 
     const newUserId = `user_${Date.now()}_${Math.floor(100 + Math.random() * 900)}`;
     let migrated = false;
@@ -1228,7 +1337,7 @@ class LifeRpgDatabase {
       const guestUser = this.getUserByToken(payload.guestToken);
       if (guestUser && guestUser.isGuest) {
         const guestStore = this.userStores[guestUser.id] || this.loadUserStore(guestUser.id);
-        guestStore.user.name = payload.fullName;
+        guestStore.user.name = payload.fullName.trim();
         this.userStores[newUserId] = guestStore;
         this.saveUserStore(newUserId, guestStore);
 
@@ -1249,23 +1358,29 @@ class LifeRpgDatabase {
     }
 
     if (!migrated) {
-      const newStore = this.createStarterStore(payload.fullName, false);
+      const newStore = this.createStarterStore(payload.fullName.trim(), false);
       this.userStores[newUserId] = newStore;
       this.saveUserStore(newUserId, newStore);
     }
 
     const now = new Date().toISOString();
+    const cleanDisplayUsername = payload.username.trim();
+    const normalizedUsername = cleanDisplayUsername.toLowerCase();
+
     const newUser: UserAccount = {
       id: newUserId,
-      email: payload.email.trim(),
-      username: payload.username.trim().toLowerCase(),
+      email: payload.email.trim().toLowerCase(),
+      username: normalizedUsername,
+      displayUsername: cleanDisplayUsername,
       fullName: payload.fullName.trim(),
       avatarUrl: `https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop&q=80`,
       timezone: 'America/Los_Angeles',
       locale: 'en-US',
       isGuest: false,
       emailVerified: false,
-      passwordHash: payload.password,
+      termsAcceptedAt: now,
+      termsVersion: '2.1',
+      passwordHash: hashPassword(payload.password),
       createdAt: now,
       updatedAt: now,
       lastSeenAt: now,
@@ -1302,8 +1417,14 @@ class LifeRpgDatabase {
     }
 
     // Verify password if provided or user has passwordHash
-    if (user.passwordHash && password && user.passwordHash !== password) {
-      throw new Error('Invalid email, username, or password.');
+    if (user.passwordHash && password) {
+      if (!verifyPassword(password, user.passwordHash)) {
+        throw new Error('Invalid email, username, or password.');
+      }
+      // If user had legacy plaintext password, upgrade it to scrypt hash
+      if (!user.passwordHash.startsWith('scrypt:')) {
+        user.passwordHash = hashPassword(password);
+      }
     }
 
     user.lastSeenAt = new Date().toISOString();
@@ -1458,7 +1579,7 @@ class LifeRpgDatabase {
       throw new Error('Invalid or expired reset token/email.');
     }
 
-    user.passwordHash = newPassword;
+    user.passwordHash = hashPassword(newPassword);
     user.resetToken = undefined;
     user.resetTokenExpires = undefined;
     user.updatedAt = new Date().toISOString();

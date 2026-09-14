@@ -366,8 +366,86 @@ export const api = {
       };
     }
 
-    // 3. If neither session exists, conclude without unconfigured backend call
+    // 3. Check backend session with stored token if present
+    const storedToken = getStoredAuthToken();
+    if (storedToken) {
+      try {
+        const res = await fetch('/api/auth/me', {
+          headers: {
+            Authorization: `Bearer ${storedToken}`,
+          },
+        });
+        if (res.ok) {
+          const data = await safeResponseJson(res, 'Failed to fetch me');
+          if (data?.success && data.user) {
+            return {
+              user: data.user,
+              token: storedToken,
+              state: data.state || getDefaultAppState(data.user),
+            };
+          }
+        }
+      } catch (e) {
+        // ignore and throw below
+      }
+    }
+
+    // 4. If no session exists, conclude without unconfigured backend call
     throw new Error('No active user session found');
+  },
+
+  async checkUsername(username: string): Promise<{ available: boolean; message: string }> {
+    const clean = (username || '').trim();
+    if (!clean) {
+      return { available: false, message: 'Username is required' };
+    }
+    if (clean.length < 3) {
+      return { available: false, message: 'Username must be at least 3 characters' };
+    }
+    if (clean.length > 30) {
+      return { available: false, message: 'Username cannot exceed 30 characters' };
+    }
+    if (/\s/.test(clean)) {
+      return { available: false, message: 'Username cannot contain spaces' };
+    }
+    if (!/^[a-zA-Z0-9_.]+$/.test(clean)) {
+      return { available: false, message: 'Username can only contain letters, numbers, periods and underscores' };
+    }
+
+    // Check Supabase if configured
+    if (isSupabaseConfigured()) {
+      const sb = getSupabase();
+      if (sb) {
+        try {
+          const { data } = await sb
+            .from('profiles')
+            .select('id')
+            .ilike('username', clean)
+            .maybeSingle();
+          if (data) {
+            return { available: false, message: 'Username is already taken' };
+          }
+        } catch {
+          // non-blocking
+        }
+      }
+    }
+
+    // Check backend API endpoint
+    try {
+      const res = await fetch(`/api/auth/check-username?username=${encodeURIComponent(clean)}`);
+      if (res.ok) {
+        const data = await res.json();
+        return {
+          available: Boolean(data.available),
+          message: data.message || (data.available ? 'Username is available' : 'Username is already taken'),
+        };
+      }
+    } catch {
+      // ignore
+    }
+
+    return { available: true, message: 'Username is available' };
   },
 
   async register(payload: {
@@ -465,30 +543,61 @@ export const api = {
       }
     }
 
-    // 2. Direct local account creation fallback if Supabase credentials are not configured
-    const localId = `user_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
-    const localUser: AuthUser = {
-      id: localId,
-      email: payload.email.trim(),
-      username: payload.username.trim(),
-      fullName: payload.fullName.trim(),
-      avatarUrl: `https://api.dicebear.com/7.x/bottts/svg?seed=${localId}`,
-      timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'America/Los_Angeles',
-      locale: typeof navigator !== 'undefined' ? navigator.language : 'en-US',
-      isGuest: false,
-      emailVerified: true,
-      createdAt: new Date().toISOString(),
-      lastSeenAt: new Date().toISOString(),
-    };
-    const localToken = `token_${localId}`;
-    setStoredAuthToken(localToken);
-    clearLocalGuestSession();
-    return {
-      user: localUser,
-      token: localToken,
-      migrated: false,
-      state: getDefaultAppState(localUser),
-    };
+    // 2. Call backend /api/auth/register
+    try {
+      const res = await fetch('/api/auth/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          fullName: payload.fullName.trim(),
+          email: payload.email.trim(),
+          username: payload.username.trim(),
+          password: payload.password,
+          termsAccepted: payload.termsAccepted,
+          guestToken: payload.guestToken,
+        }),
+      });
+      const data = await safeResponseJson(res, 'Registration failed');
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || 'Registration failed');
+      }
+      setStoredAuthToken(data.token);
+      clearLocalGuestSession();
+      return {
+        user: data.user,
+        token: data.token,
+        migrated: Boolean(data.migrated),
+        state: data.state || getDefaultAppState(data.user),
+      };
+    } catch (backendErr: any) {
+      if (backendErr.message && !backendErr.message.includes('Failed to fetch')) {
+        throw backendErr;
+      }
+      // Fallback only if backend network fetch failed completely
+      const localId = `user_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
+      const localUser: AuthUser = {
+        id: localId,
+        email: payload.email.trim(),
+        username: payload.username.trim(),
+        fullName: payload.fullName.trim(),
+        avatarUrl: `https://api.dicebear.com/7.x/bottts/svg?seed=${localId}`,
+        timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'America/Los_Angeles',
+        locale: typeof navigator !== 'undefined' ? navigator.language : 'en-US',
+        isGuest: false,
+        emailVerified: true,
+        createdAt: new Date().toISOString(),
+        lastSeenAt: new Date().toISOString(),
+      };
+      const localToken = `token_${localId}`;
+      setStoredAuthToken(localToken);
+      clearLocalGuestSession();
+      return {
+        user: localUser,
+        token: localToken,
+        migrated: false,
+        state: getDefaultAppState(localUser),
+      };
+    }
   },
 
   async login(payload: {
@@ -548,29 +657,56 @@ export const api = {
       }
     }
 
-    // 2. Direct local login fallback if Supabase not configured
-    const localId = `user_${Date.now()}`;
-    const localUser: AuthUser = {
-      id: localId,
-      email: payload.identifier.includes('@') ? payload.identifier : `${payload.identifier}@liferpg.internal`,
-      username: payload.identifier.split('@')[0],
-      fullName: payload.identifier.split('@')[0],
-      avatarUrl: `https://api.dicebear.com/7.x/bottts/svg?seed=${localId}`,
-      timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'America/Los_Angeles',
-      locale: typeof navigator !== 'undefined' ? navigator.language : 'en-US',
-      isGuest: false,
-      emailVerified: true,
-      createdAt: new Date().toISOString(),
-      lastSeenAt: new Date().toISOString(),
-    };
-    const localToken = `token_${localId}`;
-    setStoredAuthToken(localToken);
-    clearLocalGuestSession();
-    return {
-      user: localUser,
-      token: localToken,
-      state: getDefaultAppState(localUser),
-    };
+    // 2. Call backend /api/auth/login
+    try {
+      const res = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          identifier: payload.identifier.trim(),
+          password: payload.password,
+          rememberMe: payload.rememberMe !== false,
+        }),
+      });
+      const data = await safeResponseJson(res, 'Login failed');
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || 'Invalid email, username, or password.');
+      }
+      setStoredAuthToken(data.token);
+      clearLocalGuestSession();
+      return {
+        user: data.user,
+        token: data.token,
+        state: data.state || getDefaultAppState(data.user),
+      };
+    } catch (backendErr: any) {
+      if (backendErr.message && !backendErr.message.includes('Failed to fetch')) {
+        throw backendErr;
+      }
+      // Fallback only if backend fetch failed completely
+      const localId = `user_${Date.now()}`;
+      const localUser: AuthUser = {
+        id: localId,
+        email: payload.identifier.includes('@') ? payload.identifier : `${payload.identifier}@liferpg.internal`,
+        username: payload.identifier.split('@')[0],
+        fullName: payload.identifier.split('@')[0],
+        avatarUrl: `https://api.dicebear.com/7.x/bottts/svg?seed=${localId}`,
+        timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'America/Los_Angeles',
+        locale: typeof navigator !== 'undefined' ? navigator.language : 'en-US',
+        isGuest: false,
+        emailVerified: true,
+        createdAt: new Date().toISOString(),
+        lastSeenAt: new Date().toISOString(),
+      };
+      const localToken = `token_${localId}`;
+      setStoredAuthToken(localToken);
+      clearLocalGuestSession();
+      return {
+        user: localUser,
+        token: localToken,
+        state: getDefaultAppState(localUser),
+      };
+    }
   },
 
   async socialLogin(payload: {

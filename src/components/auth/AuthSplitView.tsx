@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { 
   Sparkles, 
   Mail, 
@@ -11,7 +11,9 @@ import {
   CheckCircle2, 
   AlertCircle,
   Loader2,
-  X
+  X,
+  ShieldCheck,
+  KeyRound
 } from 'lucide-react';
 import { MountainArt } from './MountainArt';
 import { TermsPrivacyModal } from './TermsPrivacyModal';
@@ -27,6 +29,8 @@ interface AuthSplitViewProps {
   isModal?: boolean;
 }
 
+type UsernameStatus = 'idle' | 'checking' | 'available' | 'taken' | 'invalid';
+
 export const AuthSplitView: React.FC<AuthSplitViewProps> = ({
   initialTab = 'login',
   onSuccess,
@@ -38,9 +42,9 @@ export const AuthSplitView: React.FC<AuthSplitViewProps> = ({
   const [tab, setTab] = useState<'login' | 'signup'>(initialTab);
 
   // Login form state
-  const [loginIdentifier, setLoginIdentifier] = useState('iitangaming18@gmail.com');
-  const [loginPassword, setLoginPassword] = useState('password123');
-  const [rememberMe, setRememberMe] = useState(true);
+  const [loginIdentifier, setLoginIdentifier] = useState('');
+  const [loginPassword, setLoginPassword] = useState('');
+  const [rememberMe, setRememberMe] = useState(false);
   const [showLoginPassword, setShowLoginPassword] = useState(false);
 
   // Sign up form state
@@ -48,8 +52,14 @@ export const AuthSplitView: React.FC<AuthSplitViewProps> = ({
   const [signupEmail, setSignupEmail] = useState('');
   const [signupUsername, setSignupUsername] = useState('');
   const [signupPassword, setSignupPassword] = useState('');
+  const [signupConfirmPassword, setSignupConfirmPassword] = useState('');
   const [showSignupPassword, setShowSignupPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [termsAccepted, setTermsAccepted] = useState(false);
+
+  // Username validation state
+  const [usernameStatus, setUsernameStatus] = useState<UsernameStatus>('idle');
+  const [usernameMessage, setUsernameMessage] = useState<string>('');
 
   // Terms & Privacy modal state
   const [termsModalOpen, setTermsModalOpen] = useState(false);
@@ -60,12 +70,148 @@ export const AuthSplitView: React.FC<AuthSplitViewProps> = ({
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
 
+  // Explicit lifecycle reset functions to guarantee pristine form states
+  const resetLoginForm = () => {
+    setLoginIdentifier('');
+    setLoginPassword('');
+    setRememberMe(false);
+    setShowLoginPassword(false);
+  };
+
+  const resetSignupForm = () => {
+    setSignupFullName('');
+    setSignupEmail('');
+    setSignupUsername('');
+    setSignupPassword('');
+    setSignupConfirmPassword('');
+    setShowSignupPassword(false);
+    setShowConfirmPassword(false);
+    setTermsAccepted(false);
+    setUsernameStatus('idle');
+    setUsernameMessage('');
+  };
+
+  const handleSwitchTab = (newTab: 'login' | 'signup') => {
+    setTab(newTab);
+    resetLoginForm();
+    resetSignupForm();
+    setError(null);
+    setNotice(null);
+  };
+
+  useEffect(() => {
+    setTab(initialTab);
+    resetLoginForm();
+    resetSignupForm();
+    setError(null);
+    setNotice(null);
+  }, [initialTab]);
+
+  // Password criteria calculations
+  const passwordCriteria = useMemo(() => {
+    const pwd = signupPassword;
+    return {
+      hasMinLength: pwd.length >= 8,
+      hasUpper: /[A-Z]/.test(pwd),
+      hasLower: /[a-z]/.test(pwd),
+      hasNumber: /[0-9]/.test(pwd),
+      hasSpecial: /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?~`]/.test(pwd),
+    };
+  }, [signupPassword]);
+
+  // Password strength calculation
+  const passwordStrength = useMemo(() => {
+    const pwd = signupPassword;
+    if (!pwd) return { score: 0, label: '', color: 'bg-white/10', textCol: 'text-[#94A3B8]', percent: '0%' };
+
+    let score = 0;
+    if (passwordCriteria.hasMinLength) score++;
+    if (passwordCriteria.hasUpper) score++;
+    if (passwordCriteria.hasLower) score++;
+    if (passwordCriteria.hasNumber) score++;
+    if (passwordCriteria.hasSpecial) score++;
+    if (pwd.length >= 12) score++;
+
+    if (score <= 2) {
+      return { score: 1, label: 'Weak', color: 'bg-[#EF4444]', textCol: 'text-[#F87171]', percent: '33%' };
+    } else if (score <= 4) {
+      return { score: 2, label: 'Fair', color: 'bg-[#F59E0B]', textCol: 'text-[#FBBF24]', percent: '66%' };
+    } else {
+      return { score: 3, label: 'Strong', color: 'bg-[#10B981]', textCol: 'text-[#34D399]', percent: '100%' };
+    }
+  }, [signupPassword, passwordCriteria]);
+
+  // Passwords match validation
+  const passwordsMatch = useMemo(() => {
+    if (!signupConfirmPassword) return null;
+    return signupPassword === signupConfirmPassword;
+  }, [signupPassword, signupConfirmPassword]);
+
+  // Debounced username availability checker
+  useEffect(() => {
+    const raw = signupUsername;
+    const trimmed = raw.trim();
+
+    if (!trimmed) {
+      setUsernameStatus('idle');
+      setUsernameMessage('');
+      return;
+    }
+
+    // Client-side rule validations
+    if (/\s/.test(raw)) {
+      setUsernameStatus('invalid');
+      setUsernameMessage('Username cannot contain spaces');
+      return;
+    }
+
+    if (!/^[a-zA-Z0-9_.]+$/.test(trimmed)) {
+      setUsernameStatus('invalid');
+      setUsernameMessage('Only letters, numbers, periods (.), and underscores (_) allowed');
+      return;
+    }
+
+    if (trimmed.length < 3) {
+      setUsernameStatus('invalid');
+      setUsernameMessage('Username must be at least 3 characters');
+      return;
+    }
+
+    if (trimmed.length > 30) {
+      setUsernameStatus('invalid');
+      setUsernameMessage('Username cannot exceed 30 characters');
+      return;
+    }
+
+    setUsernameStatus('checking');
+    setUsernameMessage('Checking availability...');
+
+    const timer = setTimeout(async () => {
+      try {
+        const res = await api.checkUsername(trimmed);
+        if (res.available) {
+          setUsernameStatus('available');
+          setUsernameMessage(res.message || 'Username is available');
+        } else {
+          setUsernameStatus('taken');
+          setUsernameMessage(res.message || 'Username is already taken');
+        }
+      } catch {
+        setUsernameStatus('idle');
+        setUsernameMessage('');
+      }
+    }, 350);
+
+    return () => clearTimeout(timer);
+  }, [signupUsername]);
+
   const handleLoginSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
     setNotice(null);
 
-    if (!loginIdentifier.trim()) {
+    const cleanIdentifier = loginIdentifier.trim();
+    if (!cleanIdentifier) {
       setError('Please enter your email or username.');
       return;
     }
@@ -77,13 +223,13 @@ export const AuthSplitView: React.FC<AuthSplitViewProps> = ({
     setLoading(true);
     try {
       const data = await api.login({
-        identifier: loginIdentifier.trim(),
+        identifier: cleanIdentifier,
         password: loginPassword,
         rememberMe,
       });
       onSuccess(data.user, data.token);
     } catch (err: any) {
-      setError(err.message || 'Login failed. Please check your credentials.');
+      setError(err.message || 'Invalid email, username, or password.');
     } finally {
       setLoading(false);
     }
@@ -94,6 +240,7 @@ export const AuthSplitView: React.FC<AuthSplitViewProps> = ({
     setError(null);
     setNotice(null);
 
+    // Full name validation
     const trimmedFullName = signupFullName.trim();
     if (!trimmedFullName) {
       setError('Please enter your full name.');
@@ -108,6 +255,7 @@ export const AuthSplitView: React.FC<AuthSplitViewProps> = ({
       return;
     }
 
+    // Email validation
     const trimmedEmail = signupEmail.trim();
     const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
     if (!trimmedEmail || !emailRegex.test(trimmedEmail)) {
@@ -115,27 +263,72 @@ export const AuthSplitView: React.FC<AuthSplitViewProps> = ({
       return;
     }
 
+    // Username validation
     const trimmedUsername = signupUsername.trim();
     if (!trimmedUsername) {
       setError('Please choose a username.');
       return;
     }
-    if (trimmedUsername.length < 3 || trimmedUsername.length > 20) {
-      setError('Username must be between 3 and 20 characters.');
+    if (/\s/.test(signupUsername)) {
+      setError('Username cannot contain spaces.');
       return;
     }
-    if (!/^[a-zA-Z0-9_]+$/.test(trimmedUsername)) {
-      setError('Username can only contain letters, numbers, and underscores.');
+    if (trimmedUsername.length < 3 || trimmedUsername.length > 30) {
+      setError('Username must be between 3 and 30 characters.');
+      return;
+    }
+    if (!/^[a-zA-Z0-9_.]+$/.test(trimmedUsername)) {
+      setError('Username can only contain letters, numbers, periods (.), and underscores (_).');
+      return;
+    }
+    if (usernameStatus === 'taken') {
+      setError('This username is already taken. Please choose another.');
       return;
     }
 
-    if (!signupPassword || signupPassword.length < 8) {
+    // Password validation
+    if (!signupPassword) {
+      setError('Password is required.');
+      return;
+    }
+    if (signupPassword.length < 8) {
       setError('Password must be at least 8 characters long.');
       return;
     }
+    if (signupPassword.length > 128) {
+      setError('Password cannot exceed 128 characters.');
+      return;
+    }
+    if (!passwordCriteria.hasUpper) {
+      setError('Password must contain at least one uppercase letter (A-Z).');
+      return;
+    }
+    if (!passwordCriteria.hasLower) {
+      setError('Password must contain at least one lowercase letter (a-z).');
+      return;
+    }
+    if (!passwordCriteria.hasNumber) {
+      setError('Password must contain at least one number (0-9).');
+      return;
+    }
+    if (!passwordCriteria.hasSpecial) {
+      setError('Password must contain at least one special character (e.g. !@#$%^&*).');
+      return;
+    }
 
+    // Confirm password validation
+    if (!signupConfirmPassword) {
+      setError('Please confirm your password.');
+      return;
+    }
+    if (signupPassword !== signupConfirmPassword) {
+      setError('Passwords do not match. Please re-enter your confirmation.');
+      return;
+    }
+
+    // Terms & conditions validation
     if (!termsAccepted) {
-      setError('You must agree to the Terms of Service and Privacy Policy to create an account.');
+      setError('Please agree to the Terms & Conditions and Privacy Policy to continue.');
       return;
     }
 
@@ -162,8 +355,6 @@ export const AuthSplitView: React.FC<AuthSplitViewProps> = ({
     try {
       const data = await api.socialLogin({
         provider,
-        email: provider === 'google' ? 'iitangaming18@gmail.com' : undefined,
-        fullName: provider === 'google' ? 'Alex Das' : undefined,
       });
       if (data?.user && data?.token) {
         onSuccess(data.user, data.token);
@@ -251,16 +442,13 @@ export const AuthSplitView: React.FC<AuthSplitViewProps> = ({
       </div>
 
       {/* Right Column: Auth Form */}
-      <div className="md:w-7/12 p-6 sm:p-10 flex flex-col justify-between bg-[#12192B]">
+      <div className="md:w-7/12 p-6 sm:p-9 flex flex-col justify-between bg-[#12192B]">
         <div>
           {/* Top Segmented Tabs: Login | Sign Up */}
           <div className="flex bg-[#0A0F1D] p-1 rounded-xl border border-white/10 max-w-xs mx-auto mb-6">
             <button
               type="button"
-              onClick={() => {
-                setTab('login');
-                setError(null);
-              }}
+              onClick={() => handleSwitchTab('login')}
               className={`flex-1 py-1.5 text-xs sm:text-sm font-semibold rounded-lg transition-all ${
                 tab === 'login'
                   ? 'bg-[#1E293B] text-white shadow-xs'
@@ -271,10 +459,7 @@ export const AuthSplitView: React.FC<AuthSplitViewProps> = ({
             </button>
             <button
               type="button"
-              onClick={() => {
-                setTab('signup');
-                setError(null);
-              }}
+              onClick={() => handleSwitchTab('signup')}
               className={`flex-1 py-1.5 text-xs sm:text-sm font-semibold rounded-lg transition-all ${
                 tab === 'signup'
                   ? 'bg-[#1E293B] text-white shadow-xs'
@@ -286,7 +471,7 @@ export const AuthSplitView: React.FC<AuthSplitViewProps> = ({
           </div>
 
           {/* Form Header */}
-          <div className="mb-6">
+          <div className="mb-5">
             <h3 className="text-xl sm:text-2xl font-bold text-white tracking-tight">
               {tab === 'login' ? 'Welcome back' : 'Create your account'}
             </h3>
@@ -299,7 +484,7 @@ export const AuthSplitView: React.FC<AuthSplitViewProps> = ({
 
           {/* Error Message Box */}
           {error && (
-            <div className="mb-5 p-3 rounded-xl bg-[#EF4444]/15 border border-[#EF4444]/30 text-xs text-[#FCA5A5] flex items-start gap-2">
+            <div className="mb-4 p-3 rounded-xl bg-[#EF4444]/15 border border-[#EF4444]/30 text-xs text-[#FCA5A5] flex items-start gap-2 animate-in fade-in duration-150">
               <AlertCircle className="w-4 h-4 text-[#EF4444] shrink-0 mt-0.5" />
               <span>{error}</span>
             </div>
@@ -307,7 +492,7 @@ export const AuthSplitView: React.FC<AuthSplitViewProps> = ({
 
           {/* Notice Message Box */}
           {notice && (
-            <div className="mb-5 p-3 rounded-xl bg-[#22C55E]/15 border border-[#22C55E]/30 text-xs text-[#86EFAC] flex items-start gap-2">
+            <div className="mb-4 p-3 rounded-xl bg-[#22C55E]/15 border border-[#22C55E]/30 text-xs text-[#86EFAC] flex items-start gap-2 animate-in fade-in duration-150">
               <CheckCircle2 className="w-4 h-4 text-[#22C55E] shrink-0 mt-0.5" />
               <span>{notice}</span>
             </div>
@@ -315,40 +500,48 @@ export const AuthSplitView: React.FC<AuthSplitViewProps> = ({
 
           {/* LOGIN FORM */}
           {tab === 'login' ? (
-            <form onSubmit={handleLoginSubmit} className="space-y-4">
+            <form onSubmit={handleLoginSubmit} autoComplete="off" className="space-y-4">
               <div>
-                <label className="block text-xs font-medium text-[#CBD5E1] mb-1.5">
+                <label htmlFor="login-identifier" className="block text-xs font-medium text-[#CBD5E1] mb-1.5">
                   Email or Username
                 </label>
                 <div className="relative">
                   <Mail className="w-4 h-4 text-[#64748B] absolute left-3.5 top-1/2 -translate-y-1/2" />
                   <input
+                    id="login-identifier"
+                    name="login_identifier"
                     type="text"
                     value={loginIdentifier}
                     onChange={(e) => setLoginIdentifier(e.target.value)}
                     placeholder="you@example.com or username"
+                    autoComplete="off"
+                    spellCheck={false}
                     className="w-full h-11 pl-10 pr-3.5 rounded-xl bg-[#0A0F1D] border border-white/10 text-xs sm:text-sm text-white placeholder:text-[#64748B] focus:outline-none focus:border-[#6366F1] focus:ring-1 focus:ring-[#6366F1] transition-colors"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="block text-xs font-medium text-[#CBD5E1] mb-1.5">
+                <label htmlFor="login-password" className="block text-xs font-medium text-[#CBD5E1] mb-1.5">
                   Password
                 </label>
                 <div className="relative">
                   <Lock className="w-4 h-4 text-[#64748B] absolute left-3.5 top-1/2 -translate-y-1/2" />
                   <input
+                    id="login-password"
+                    name="login_password"
                     type={showLoginPassword ? 'text' : 'password'}
                     value={loginPassword}
                     onChange={(e) => setLoginPassword(e.target.value)}
                     placeholder="Enter your password"
+                    autoComplete="new-password"
                     className="w-full h-11 pl-10 pr-10 rounded-xl bg-[#0A0F1D] border border-white/10 text-xs sm:text-sm text-white placeholder:text-[#64748B] focus:outline-none focus:border-[#6366F1] focus:ring-1 focus:ring-[#6366F1] transition-colors"
                   />
                   <button
                     type="button"
                     onClick={() => setShowLoginPassword(!showLoginPassword)}
-                    className="absolute right-3.5 top-1/2 -translate-y-1/2 text-[#64748B] hover:text-[#94A3B8]"
+                    className="absolute right-3.5 top-1/2 -translate-y-1/2 text-[#64748B] hover:text-[#94A3B8] transition-colors"
+                    aria-label={showLoginPassword ? 'Hide password' : 'Show password'}
                   >
                     {showLoginPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                   </button>
@@ -397,90 +590,233 @@ export const AuthSplitView: React.FC<AuthSplitViewProps> = ({
             </form>
           ) : (
             /* SIGN UP FORM */
-            <form onSubmit={handleSignupSubmit} className="space-y-3.5">
+            <form onSubmit={handleSignupSubmit} autoComplete="off" className="space-y-3.5">
+              {/* Full Name */}
               <div>
-                <label className="block text-xs font-medium text-[#CBD5E1] mb-1">
+                <label htmlFor="signup-fullname" className="block text-xs font-medium text-[#CBD5E1] mb-1">
                   Full Name
                 </label>
                 <div className="relative">
                   <User className="w-4 h-4 text-[#64748B] absolute left-3.5 top-1/2 -translate-y-1/2" />
                   <input
+                    id="signup-fullname"
+                    name="signup_fullname"
                     type="text"
                     value={signupFullName}
                     onChange={(e) => setSignupFullName(e.target.value)}
-                    placeholder="Alex Das"
+                    placeholder="e.g. John Doe"
+                    autoComplete="off"
                     className="w-full h-10 pl-10 pr-3.5 rounded-xl bg-[#0A0F1D] border border-white/10 text-xs sm:text-sm text-white placeholder:text-[#64748B] focus:outline-none focus:border-[#6366F1] focus:ring-1 focus:ring-[#6366F1] transition-colors"
                   />
                 </div>
               </div>
 
+              {/* Email & Username Grid */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {/* Email */}
                 <div>
-                  <label className="block text-xs font-medium text-[#CBD5E1] mb-1">
-                    Email
+                  <label htmlFor="signup-email" className="block text-xs font-medium text-[#CBD5E1] mb-1">
+                    Email Address
                   </label>
                   <div className="relative">
                     <Mail className="w-4 h-4 text-[#64748B] absolute left-3 top-1/2 -translate-y-1/2" />
                     <input
+                      id="signup-email"
+                      name="signup_email"
                       type="email"
                       value={signupEmail}
                       onChange={(e) => setSignupEmail(e.target.value)}
-                      placeholder="alex@gmail.com"
+                      placeholder="name@example.com"
+                      autoComplete="off"
                       className="w-full h-10 pl-9 pr-3 rounded-xl bg-[#0A0F1D] border border-white/10 text-xs sm:text-sm text-white placeholder:text-[#64748B] focus:outline-none focus:border-[#6366F1] focus:ring-1 focus:ring-[#6366F1] transition-colors"
                     />
                   </div>
                 </div>
 
+                {/* Username with Live Availability Indicator */}
                 <div>
-                  <label className="block text-xs font-medium text-[#CBD5E1] mb-1">
-                    Username
-                  </label>
+                  <div className="flex items-center justify-between mb-1">
+                    <label htmlFor="signup-username" className="block text-xs font-medium text-[#CBD5E1]">
+                      Username
+                    </label>
+                    {usernameStatus === 'available' && (
+                      <span className="text-[10px] text-[#34D399] flex items-center gap-1 font-medium">
+                        <CheckCircle2 className="w-3 h-3" /> Available
+                      </span>
+                    )}
+                    {usernameStatus === 'taken' && (
+                      <span className="text-[10px] text-[#F87171] flex items-center gap-1 font-medium">
+                        <AlertCircle className="w-3 h-3" /> Taken
+                      </span>
+                    )}
+                    {usernameStatus === 'checking' && (
+                      <span className="text-[10px] text-[#94A3B8] flex items-center gap-1">
+                        <Loader2 className="w-2.5 h-2.5 animate-spin" /> Checking
+                      </span>
+                    )}
+                  </div>
                   <div className="relative">
-                    <span className="text-[#64748B] text-xs absolute left-3.5 top-1/2 -translate-y-1/2 font-medium">@</span>
+                    <span className="text-[#64748B] text-xs absolute left-3.5 top-1/2 -translate-y-1/2 font-semibold select-none">
+                      @
+                    </span>
                     <input
+                      id="signup-username"
+                      name="signup_username"
                       type="text"
                       value={signupUsername}
                       onChange={(e) => setSignupUsername(e.target.value)}
-                      placeholder="alex"
-                      className="w-full h-10 pl-8 pr-3 rounded-xl bg-[#0A0F1D] border border-white/10 text-xs sm:text-sm text-white placeholder:text-[#64748B] focus:outline-none focus:border-[#6366F1] focus:ring-1 focus:ring-[#6366F1] transition-colors"
+                      placeholder="choose_username"
+                      autoComplete="off"
+                      className={`w-full h-10 pl-8 pr-8 rounded-xl bg-[#0A0F1D] border text-xs sm:text-sm text-white placeholder:text-[#64748B] focus:outline-none transition-colors ${
+                        usernameStatus === 'available'
+                          ? 'border-[#10B981]/60 focus:border-[#10B981] focus:ring-1 focus:ring-[#10B981]'
+                          : usernameStatus === 'taken' || usernameStatus === 'invalid'
+                          ? 'border-[#EF4444]/60 focus:border-[#EF4444] focus:ring-1 focus:ring-[#EF4444]'
+                          : 'border-white/10 focus:border-[#6366F1] focus:ring-1 focus:ring-[#6366F1]'
+                      }`}
                     />
+                    {usernameStatus === 'available' && (
+                      <Check className="w-3.5 h-3.5 text-[#34D399] absolute right-3 top-1/2 -translate-y-1/2" />
+                    )}
+                    {usernameStatus === 'taken' && (
+                      <AlertCircle className="w-3.5 h-3.5 text-[#F87171] absolute right-3 top-1/2 -translate-y-1/2" />
+                    )}
                   </div>
+                  {usernameMessage && usernameStatus !== 'available' && usernameStatus !== 'idle' && (
+                    <p className={`text-[10px] mt-1 ${usernameStatus === 'taken' || usernameStatus === 'invalid' ? 'text-[#F87171]' : 'text-[#94A3B8]'}`}>
+                      {usernameMessage}
+                    </p>
+                  )}
                 </div>
               </div>
 
+              {/* Password with Show/Hide & Live Strength Meter */}
               <div>
-                <label className="block text-xs font-medium text-[#CBD5E1] mb-1">
-                  Password
-                </label>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block text-xs font-medium text-[#CBD5E1]">
+                    Password
+                  </label>
+                  {signupPassword && (
+                    <span className={`text-[10px] font-semibold flex items-center gap-1 ${passwordStrength.textCol}`}>
+                      <ShieldCheck className="w-3 h-3" />
+                      {passwordStrength.label}
+                    </span>
+                  )}
+                </div>
                 <div className="relative">
                   <Lock className="w-4 h-4 text-[#64748B] absolute left-3.5 top-1/2 -translate-y-1/2" />
                   <input
                     type={showSignupPassword ? 'text' : 'password'}
                     value={signupPassword}
                     onChange={(e) => setSignupPassword(e.target.value)}
-                    placeholder="At least 8 characters"
+                    placeholder="Create a strong password"
+                    autoComplete="new-password"
                     className="w-full h-10 pl-10 pr-10 rounded-xl bg-[#0A0F1D] border border-white/10 text-xs sm:text-sm text-white placeholder:text-[#64748B] focus:outline-none focus:border-[#6366F1] focus:ring-1 focus:ring-[#6366F1] transition-colors"
                   />
                   <button
                     type="button"
                     onClick={() => setShowSignupPassword(!showSignupPassword)}
-                    className="absolute right-3.5 top-1/2 -translate-y-1/2 text-[#64748B] hover:text-[#94A3B8]"
+                    className="absolute right-3.5 top-1/2 -translate-y-1/2 text-[#64748B] hover:text-[#94A3B8] transition-colors"
+                    aria-label={showSignupPassword ? 'Hide password' : 'Show password'}
                   >
                     {showSignupPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                </div>
+
+                {/* Password Strength Visual Bar */}
+                {signupPassword && (
+                  <div className="mt-1.5 space-y-1.5">
+                    <div className="w-full h-1 bg-white/10 rounded-full overflow-hidden">
+                      <div 
+                        className={`h-full transition-all duration-300 ${passwordStrength.color}`}
+                        style={{ width: passwordStrength.percent }}
+                      />
+                    </div>
+
+                    {/* Criteria Checklist */}
+                    <div className="grid grid-cols-2 gap-x-2 gap-y-1 pt-1 text-[10px]">
+                      <span className={`flex items-center gap-1 ${passwordCriteria.hasMinLength ? 'text-[#34D399]' : 'text-[#64748B]'}`}>
+                        <Check className={`w-3 h-3 shrink-0 ${passwordCriteria.hasMinLength ? 'opacity-100' : 'opacity-30'}`} />
+                        8+ characters
+                      </span>
+                      <span className={`flex items-center gap-1 ${passwordCriteria.hasUpper ? 'text-[#34D399]' : 'text-[#64748B]'}`}>
+                        <Check className={`w-3 h-3 shrink-0 ${passwordCriteria.hasUpper ? 'opacity-100' : 'opacity-30'}`} />
+                        Uppercase (A-Z)
+                      </span>
+                      <span className={`flex items-center gap-1 ${passwordCriteria.hasLower ? 'text-[#34D399]' : 'text-[#64748B]'}`}>
+                        <Check className={`w-3 h-3 shrink-0 ${passwordCriteria.hasLower ? 'opacity-100' : 'opacity-30'}`} />
+                        Lowercase (a-z)
+                      </span>
+                      <span className={`flex items-center gap-1 ${passwordCriteria.hasNumber ? 'text-[#34D399]' : 'text-[#64748B]'}`}>
+                        <Check className={`w-3 h-3 shrink-0 ${passwordCriteria.hasNumber ? 'opacity-100' : 'opacity-30'}`} />
+                        Number (0-9)
+                      </span>
+                      <span className={`flex items-center gap-1 ${passwordCriteria.hasSpecial ? 'text-[#34D399]' : 'text-[#64748B]'}`}>
+                        <Check className={`w-3 h-3 shrink-0 ${passwordCriteria.hasSpecial ? 'opacity-100' : 'opacity-30'}`} />
+                        Symbol (!@#$)
+                      </span>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Confirm Password */}
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block text-xs font-medium text-[#CBD5E1]">
+                    Confirm Password
+                  </label>
+                  {signupConfirmPassword && (
+                    <span className={`text-[10px] font-medium flex items-center gap-1 ${passwordsMatch ? 'text-[#34D399]' : 'text-[#F87171]'}`}>
+                      {passwordsMatch ? (
+                        <>
+                          <CheckCircle2 className="w-3 h-3" /> Passwords match
+                        </>
+                      ) : (
+                        <>
+                          <AlertCircle className="w-3 h-3" /> Passwords do not match
+                        </>
+                      )}
+                    </span>
+                  )}
+                </div>
+                <div className="relative">
+                  <KeyRound className="w-4 h-4 text-[#64748B] absolute left-3.5 top-1/2 -translate-y-1/2" />
+                  <input
+                    type={showConfirmPassword ? 'text' : 'password'}
+                    value={signupConfirmPassword}
+                    onChange={(e) => setSignupConfirmPassword(e.target.value)}
+                    placeholder="Re-enter your password"
+                    autoComplete="new-password"
+                    className={`w-full h-10 pl-10 pr-10 rounded-xl bg-[#0A0F1D] border text-xs sm:text-sm text-white placeholder:text-[#64748B] focus:outline-none transition-colors ${
+                      signupConfirmPassword && passwordsMatch
+                        ? 'border-[#10B981]/60 focus:border-[#10B981] focus:ring-1 focus:ring-[#10B981]'
+                        : signupConfirmPassword && !passwordsMatch
+                        ? 'border-[#EF4444]/60 focus:border-[#EF4444] focus:ring-1 focus:ring-[#EF4444]'
+                        : 'border-white/10 focus:border-[#6366F1] focus:ring-1 focus:ring-[#6366F1]'
+                    }`}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                    className="absolute right-3.5 top-1/2 -translate-y-1/2 text-[#64748B] hover:text-[#94A3B8] transition-colors"
+                    aria-label={showConfirmPassword ? 'Hide password' : 'Show password'}
+                  >
+                    {showConfirmPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                   </button>
                 </div>
               </div>
 
               {/* Terms Checkbox */}
               <div className="pt-1">
-                <label className="flex items-start gap-2.5 cursor-pointer text-xs text-[#94A3B8]">
+                <label className="flex items-start gap-2.5 cursor-pointer text-xs text-[#94A3B8] select-none">
                   <input
                     type="checkbox"
                     checked={termsAccepted}
                     onChange={(e) => setTermsAccepted(e.target.checked)}
-                    className="mt-0.5 w-3.5 h-3.5 rounded bg-[#0A0F1D] border-white/20 text-[#6366F1] focus:ring-0 cursor-pointer"
+                    className="mt-0.5 w-4 h-4 rounded bg-[#0A0F1D] border-white/20 text-[#6366F1] focus:ring-0 focus:ring-offset-0 cursor-pointer"
                   />
-                  <span>
+                  <span className="leading-snug">
                     I agree to the{' '}
                     <button
                       type="button"
@@ -490,9 +826,9 @@ export const AuthSplitView: React.FC<AuthSplitViewProps> = ({
                         setTermsModalTab('terms');
                         setTermsModalOpen(true);
                       }}
-                      className="text-[#818CF8] hover:underline font-medium inline"
+                      className="text-[#818CF8] hover:text-[#A78BFA] hover:underline font-medium inline transition-colors"
                     >
-                      Terms of Service
+                      Terms & Conditions
                     </button>{' '}
                     and{' '}
                     <button
@@ -503,10 +839,11 @@ export const AuthSplitView: React.FC<AuthSplitViewProps> = ({
                         setTermsModalTab('privacy');
                         setTermsModalOpen(true);
                       }}
-                      className="text-[#818CF8] hover:underline font-medium inline"
+                      className="text-[#818CF8] hover:text-[#A78BFA] hover:underline font-medium inline transition-colors"
                     >
                       Privacy Policy
                     </button>
+                    .
                   </span>
                 </label>
               </div>
@@ -533,7 +870,7 @@ export const AuthSplitView: React.FC<AuthSplitViewProps> = ({
           )}
 
           {/* Social Sign-in Divider */}
-          <div className="relative my-6 text-center">
+          <div className="relative my-5 text-center">
             <div className="absolute inset-0 flex items-center">
               <div className="w-full border-t border-white/10" />
             </div>
@@ -542,7 +879,7 @@ export const AuthSplitView: React.FC<AuthSplitViewProps> = ({
             </span>
           </div>
 
-          {/* Social Buttons Grid */}
+          {/* Social Buttons Grid: Google, Discord, GitHub (Apple completely removed) */}
           <div className="grid grid-cols-3 gap-2.5">
             {/* Google */}
             <button
@@ -598,14 +935,14 @@ export const AuthSplitView: React.FC<AuthSplitViewProps> = ({
         </div>
 
         {/* Guest Alternative Link at Bottom */}
-        <div className="mt-8 pt-5 border-t border-white/10 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-[#94A3B8]">
+        <div className="mt-6 pt-4 border-t border-white/10 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-[#94A3B8]">
           <div>
             {tab === 'login' ? (
               <span>
                 Don&apos;t have an account?{' '}
                 <button
                   type="button"
-                  onClick={() => setTab('signup')}
+                  onClick={() => handleSwitchTab('signup')}
                   className="text-[#818CF8] hover:underline font-semibold"
                 >
                   Sign up
@@ -616,7 +953,7 @@ export const AuthSplitView: React.FC<AuthSplitViewProps> = ({
                 Already have an account?{' '}
                 <button
                   type="button"
-                  onClick={() => setTab('login')}
+                  onClick={() => handleSwitchTab('login')}
                   className="text-[#818CF8] hover:underline font-semibold"
                 >
                   Sign in
@@ -640,6 +977,8 @@ export const AuthSplitView: React.FC<AuthSplitViewProps> = ({
         isOpen={termsModalOpen}
         onClose={() => setTermsModalOpen(false)}
         initialTab={termsModalTab}
+        showAcceptButton={true}
+        onAccept={() => setTermsAccepted(true)}
       />
     </div>
   );

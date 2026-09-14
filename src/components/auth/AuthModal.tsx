@@ -39,7 +39,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   const [screen, setScreen] = useState<AuthScreenType>(initialScreen);
 
   // Email / Reset state
-  const [resetEmail, setResetEmail] = useState('iitangaming18@gmail.com');
+  const [resetEmail, setResetEmail] = useState('');
   const [resetSent, setResetSent] = useState(false);
   const [tempResetToken, setTempResetToken] = useState<string>('');
 
@@ -50,7 +50,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   // Verification state
-  const [verifyEmailAddress, setVerifyEmailAddress] = useState('iitangaming18@gmail.com');
+  const [verifyEmailAddress, setVerifyEmailAddress] = useState('');
   const [resendCountdown, setResendCountdown] = useState(0);
   const [resendLoading, setResendLoading] = useState(false);
 
@@ -74,6 +74,14 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     setScreen(initialScreen);
     setError(null);
     setSuccessNotice(null);
+    if (!isOpen) {
+      setResetEmail('');
+      setVerifyEmailAddress('');
+      setNewPassword('');
+      setConfirmPassword('');
+      setTempResetToken('');
+      setResetSent(false);
+    }
   }, [initialScreen, isOpen]);
 
   // Resend timer tick
@@ -225,6 +233,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
       {/* 1. Split View for Login / Sign Up */}
       {(screen === 'login' || screen === 'signup') && (
         <AuthSplitView
+          key={screen}
           isModal={true}
           initialTab={screen === 'signup' ? 'signup' : 'login'}
           onSuccess={(user, token) => {
@@ -389,7 +398,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                   type="email"
                   value={resetEmail}
                   onChange={(e) => setResetEmail(e.target.value)}
-                  placeholder="alex.das@gmail.com"
+                  placeholder="name@example.com"
+                  autoComplete="off"
                   className="w-full h-11 pl-10 pr-3.5 rounded-xl bg-[#0A0F1D] border border-white/10 text-xs sm:text-sm text-white placeholder:text-[#64748B] focus:outline-none focus:border-[#6366F1] focus:ring-1 focus:ring-[#6366F1] transition-colors"
                 />
               </div>

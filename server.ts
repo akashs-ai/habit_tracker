@@ -203,6 +203,21 @@ async function startServer() {
     }
   });
 
+  // Check Username Availability
+  app.get('/api/auth/check-username', (req: Request, res: Response) => {
+    try {
+      const rawUsername = (req.query.username as string) || '';
+      const result = db.isUsernameAvailable(rawUsername);
+      res.json({
+        success: true,
+        available: result.available,
+        message: result.reason,
+      });
+    } catch (err: any) {
+      res.status(400).json({ success: false, error: err.message });
+    }
+  });
+
   // Register
   app.post('/api/auth/register', (req: Request, res: Response) => {
     try {
@@ -246,7 +261,7 @@ async function startServer() {
     }
   });
 
-  // Social Login (Google, GitHub, Discord, Apple)
+  // Social Login (Google, GitHub, Discord)
   app.post('/api/auth/social', (req: Request, res: Response) => {
     try {
       const { provider, email, fullName } = req.body;
