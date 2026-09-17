@@ -17,6 +17,18 @@ export const FeaturedRewardsSection: React.FC<FeaturedRewardsSectionProps> = ({
   onUnlockReward,
   onSeeAll,
 }) => {
+  const [inFlightRewardId, setInFlightRewardId] = React.useState<string | null>(null);
+
+  const handleCardUnlock = async (reward: RewardItem) => {
+    if (inFlightRewardId === reward.id) return;
+    try {
+      setInFlightRewardId(reward.id);
+      await Promise.resolve(onUnlockReward(reward));
+    } finally {
+      setInFlightRewardId(null);
+    }
+  };
+
   const renderPreviewGraphic = (reward: RewardItem) => {
     switch (reward.previewType) {
       case 'aurora-theme':
@@ -228,15 +240,22 @@ export const FeaturedRewardsSection: React.FC<FeaturedRewardsSectionProps> = ({
                   </button>
                 ) : (
                   <button
-                    onClick={() => onUnlockReward(reward)}
-                    className={`w-full h-8 rounded-xl text-xs font-semibold transition-all shadow-xs flex items-center justify-center gap-1.5 cursor-pointer ${
-                      canAfford
-                        ? 'bg-[#6366F1] hover:bg-[#7C7FF5] text-white shadow-indigo-600/25'
-                        : 'bg-slate-100 dark:bg-white/5 text-slate-400 dark:text-[#9AA3B5] border border-slate-200 dark:border-white/8 hover:bg-slate-200 dark:hover:bg-white/10'
+                    onClick={() => handleCardUnlock(reward)}
+                    disabled={!canAfford || inFlightRewardId === reward.id}
+                    className={`w-full h-8 rounded-xl text-xs font-semibold transition-all shadow-xs flex items-center justify-center gap-1.5 ${
+                      inFlightRewardId === reward.id
+                        ? 'bg-[#6366F1]/70 text-white cursor-wait'
+                        : canAfford
+                        ? 'bg-[#6366F1] hover:bg-[#7C7FF5] text-white shadow-indigo-600/25 cursor-pointer'
+                        : 'bg-slate-100 dark:bg-white/5 text-slate-400 dark:text-[#9AA3B5] border border-slate-200 dark:border-white/8 hover:bg-slate-200 dark:hover:bg-white/10 cursor-not-allowed'
                     }`}
                   >
-                    {!canAfford && <Lock className="w-3 h-3 text-slate-400 dark:text-[#687185]" />}
-                    <span>Unlock</span>
+                    {inFlightRewardId === reward.id ? (
+                      <span className="inline-block w-3 h-3 border-2 border-white/40 border-t-white rounded-full animate-spin mr-0.5" />
+                    ) : (
+                      !canAfford && <Lock className="w-3 h-3 text-slate-400 dark:text-[#687185]" />
+                    )}
+                    <span>{inFlightRewardId === reward.id ? 'Unlocking...' : 'Unlock'}</span>
                   </button>
                 )}
               </div>

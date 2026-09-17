@@ -127,7 +127,13 @@ export default function App() {
   const [notes, setNotes] = useState<QuickNote[]>(() => initialCached?.notes || initialNotes);
   const [rewards, setRewards] = useState<RewardItem[]>(() => initialCached?.rewards || initialFeaturedRewards);
   const [badges, setBadges] = useState<RewardBadge[]>(() => initialCached?.badges || initialBadges);
-  const [collection, setCollection] = useState<CollectionItem[]>(() => initialCached?.collection || initialCollectionItems);
+  const [collection, setCollection] = useState<CollectionItem[]>(() => {
+    if (Array.isArray(initialCached?.collectionItems)) return initialCached.collectionItems;
+    if (Array.isArray(initialCached?.collection)) return initialCached.collection;
+    if (initialCached?.authUser || isSupabaseConfigured()) return [];
+    return initialCollectionItems;
+  });
+  const lastPointsUpdateTimestampRef = useRef<number>(0);
   const [notifications, setNotifications] = useState<AppNotification[]>(initialNotifications);
 
   // Notification action handlers
@@ -175,6 +181,7 @@ export default function App() {
     if (data.rewards) setRewards(data.rewards);
     if (data.badges) setBadges(data.badges);
     if (data.collection) setCollection(data.collection);
+    else if (data.collectionItems) setCollection(data.collectionItems);
     if (data.notes) setNotes(data.notes);
     if (data.attributes) setAttributes(data.attributes);
     if (data.weeklyData) setWeeklyData(data.weeklyData);
@@ -282,6 +289,11 @@ export default function App() {
     }
     setCurrentUser(null);
     setTasks([]);
+    setQuests([]);
+    setDetailedGoals([]);
+    setCalendarEvents([]);
+    setCollection([]);
+    setRewards(initialFeaturedRewards);
     setShowLandingWelcome(true);
   };
 
@@ -328,6 +340,11 @@ export default function App() {
             setCurrentUser(null);
             setStoredAuthToken(null);
             setTasks([]);
+            setQuests([]);
+            setDetailedGoals([]);
+            setCalendarEvents([]);
+            setCollection([]);
+            setRewards(initialFeaturedRewards);
             setShowLandingWelcome(true);
           }
         });
@@ -437,6 +454,9 @@ export default function App() {
         filter: `id=eq.${currentUser.id}`,
         onUpdate: (payload: any) => {
           if (!payload) return;
+          const payloadTime = payload.updated_at ? new Date(payload.updated_at).getTime() : 0;
+          const isStalePoints = payloadTime > 0 && payloadTime < lastPointsUpdateTimestampRef.current;
+
           setUser((prev) => ({
             ...prev,
             name: payload.display_name || prev.name,
@@ -449,8 +469,8 @@ export default function App() {
             nextLevelXp: payload.xp_to_next_level ?? prev.nextLevelXp,
             streak: payload.streak_days ?? prev.streak,
             streakDays: payload.streak_days ?? prev.streakDays,
-            momentumPoints: payload.momentum_points ?? prev.momentumPoints,
-            totalPoints: payload.momentum_points ?? prev.totalPoints,
+            momentumPoints: isStalePoints ? prev.momentumPoints : (payload.momentum_points ?? prev.momentumPoints),
+            totalPoints: isStalePoints ? prev.totalPoints : (payload.momentum_points ?? prev.totalPoints),
           }));
         },
       }),
@@ -501,6 +521,84 @@ export default function App() {
         onInsert: (newNotif: any) => {
           if (newNotif) {
             setNotifications((prev) => [newNotif, ...prev]);
+          }
+        },
+      }),
+      subscribeToUserTable(currentUser.id, {
+        table: 'reward_claims',
+        onInsert: (payload: any) => {
+          if (!payload?.reward_id) return;
+          setRewards((prevRewards) => {
+            const target = prevRewards.find((r) => r.id === payload.reward_id);
+            const category = target?.category;
+            const updated = prevRewards.map((r) => {
+              if (r.id === payload.reward_id) {
+                return { ...r, status: payload.is_active ? ('active' as const) : ('owned' as const) };
+              }
+              if (payload.is_active && category && r.category === category && r.status === 'active') {
+                return { ...r, status: 'owned' as const };
+              }
+              return r;
+            });
+
+            setCollection((prevCol) => {
+              if (prevCol.some((c) => c.id === payload.id)) {
+                return prevCol.map((c) =>
+                  c.id === payload.id ? { ...c, active: Boolean(payload.is_active) } : c
+                );
+              }
+              return [
+                {
+                  id: payload.id,
+                  name: target?.name || 'Reward Item',
+                  type: (target?.badgeTag as any) || 'Theme',
+                  icon: target?.previewType || 'star',
+                  active: Boolean(payload.is_active),
+                },
+                ...prevCol,
+              ];
+            });
+
+            return updated;
+          });
+        },
+        onUpdate: (payload: any) => {
+          if (!payload?.reward_id) return;
+          setRewards((prevRewards) => {
+            const target = prevRewards.find((r) => r.id === payload.reward_id);
+            const category = target?.category;
+            return prevRewards.map((r) => {
+              if (r.id === payload.reward_id) {
+                return { ...r, status: payload.is_active ? ('active' as const) : ('owned' as const) };
+              }
+              if (payload.is_active && category && r.category === category && r.status === 'active') {
+                return { ...r, status: 'owned' as const };
+              }
+              return r;
+            });
+          });
+          setCollection((prevCol) =>
+            prevCol.map((c) =>
+              c.id === payload.id ? { ...c, active: Boolean(payload.is_active) } : c
+            )
+          );
+        },
+        onDelete: (payload: any) => {
+          if (!payload) return;
+          const claimId = payload.id;
+          const rewardId = payload.reward_id;
+
+          setCollection((prevCol) => prevCol.filter((c) => c.id !== claimId));
+
+          if (rewardId) {
+            setRewards((prevRewards) =>
+              prevRewards.map((r) => {
+                if (r.id === rewardId) {
+                  return { ...r, status: 'available' as const };
+                }
+                return r;
+              })
+            );
           }
         },
       }),
@@ -1034,6 +1132,59 @@ export default function App() {
     const res = await api.claimReward(rewardId, termsAccepted);
     if (res.state) {
       syncFromBackend(res.state);
+    } else {
+      const target = rewards.find((r) => r.id === rewardId) || res.reward;
+      const category = target?.category;
+      setRewards((prev) =>
+        prev.map((r) => {
+          if (r.id === rewardId) return { ...r, status: 'active' as const };
+          if (category && r.category === category && r.status === 'active') {
+            return { ...r, status: 'owned' as const };
+          }
+          return r;
+        })
+      );
+      if (res.claim) {
+        setCollection((prev) => {
+          const itemExists = prev.some((c) => c.id === res.claim.id);
+          const updated = prev.map((c) => {
+            if (category && target?.badgeTag && c.type === target.badgeTag) {
+              return { ...c, active: false };
+            }
+            return c;
+          });
+          if (!itemExists && target) {
+            return [
+              {
+                id: res.claim.id || `claim-${Date.now()}`,
+                name: target.name,
+                type: (target.badgeTag as any) || 'Theme',
+                icon: target.previewType || 'star',
+                active: true,
+              },
+              ...updated,
+            ];
+          }
+          return updated.map((c) =>
+            c.id === res.claim.id ? { ...c, active: true } : c
+          );
+        });
+      }
+      if (typeof res.remainingPoints === 'number') {
+        lastPointsUpdateTimestampRef.current = Date.now();
+        setUser((prev) => ({
+          ...prev,
+          momentumPoints: res.remainingPoints!,
+          totalPoints: res.remainingPoints!,
+        }));
+      } else if (target?.cost) {
+        lastPointsUpdateTimestampRef.current = Date.now();
+        setUser((prev) => ({
+          ...prev,
+          momentumPoints: Math.max(0, (prev.momentumPoints ?? prev.totalPoints ?? 0) - target.cost),
+          totalPoints: Math.max(0, (prev.totalPoints ?? prev.momentumPoints ?? 0) - target.cost),
+        }));
+      }
     }
     return res;
   };
@@ -1042,6 +1193,27 @@ export default function App() {
     const res = await api.activateReward(rewardId);
     if (res.state) {
       syncFromBackend(res.state);
+    } else {
+      const target = rewards.find((r) => r.id === rewardId);
+      const category = target?.category;
+      setRewards((prev) =>
+        prev.map((r) => {
+          if (r.id === rewardId) return { ...r, status: 'active' as const };
+          if (category && r.category === category && r.status === 'active') {
+            return { ...r, status: 'owned' as const };
+          }
+          return r;
+        })
+      );
+      setCollection((prev) =>
+        prev.map((c) => {
+          if (target && c.name === target.name) return { ...c, active: true };
+          if (category && target?.badgeTag && c.type === target.badgeTag) {
+            return { ...c, active: false };
+          }
+          return c;
+        })
+      );
     }
     return res;
   };

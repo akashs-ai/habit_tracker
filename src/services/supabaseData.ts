@@ -1,4 +1,4 @@
-import { TaskItem, TaskPriority, UserProfile, AuthUser, Quest } from '../types';
+import { TaskItem, TaskPriority, UserProfile, AuthUser, Quest, RewardItem, CollectionItem } from '../types';
 import { getSupabase } from '../lib/supabase';
 import { initialUserProfile, initialQuests } from '../data/mockData';
 import { getLiveTodayISO, getStartOfWeek, formatDateISO } from '../utils/dateUtils';
@@ -1193,3 +1193,180 @@ export async function verifyCurrentAuthUserStreak(customDate?: string): Promise<
     };
   }
 }
+
+/**
+ * Fetches authoritative rewards catalog and user-scoped claims from Supabase
+ */
+export async function fetchUserRewardsFromSupabase(userId?: string): Promise<{
+  rewards: RewardItem[];
+  claims: any[];
+  collection: CollectionItem[];
+}> {
+  const sb = getSupabase();
+  if (!sb) {
+    return { rewards: [], claims: [], collection: [] };
+  }
+
+  try {
+    // 1. Fetch active reward catalog
+    const { data: catalogRows, error: catalogErr } = await sb
+      .from('rewards')
+      .select('*')
+      .eq('active', true)
+      .order('cost', { ascending: true });
+
+    if (catalogErr) {
+      console.warn('Error fetching rewards catalog from Supabase:', catalogErr.message);
+      return { rewards: [], claims: [], collection: [] };
+    }
+
+    // 2. Fetch user claims if authenticated
+    let userClaims: any[] = [];
+    if (userId) {
+      const { data: claimsData, error: claimsErr } = await sb
+        .from('reward_claims')
+        .select('*')
+        .eq('user_id', userId);
+
+      if (!claimsErr && claimsData) {
+        userClaims = claimsData;
+      }
+    }
+
+    const claimsByRewardId = new Map<string, any>();
+    userClaims.forEach((claim) => {
+      claimsByRewardId.set(claim.reward_id, claim);
+    });
+
+    // 3. Map into UI RewardItem models
+    const rewards: RewardItem[] = (catalogRows || []).map((row) => {
+      const claim = claimsByRewardId.get(row.id);
+      let status: 'locked' | 'available' | 'owned' | 'active' = 'available';
+      if (claim) {
+        status = claim.is_active ? 'active' : 'owned';
+      }
+
+      return {
+        id: row.id,
+        name: row.title,
+        category: (row.category as any) || 'themes',
+        badgeTag: row.badge_tag || row.badge_level || 'Reward',
+        description: row.description || '',
+        cost: row.cost,
+        status,
+        previewType: (row.preview_type as any) || 'custom',
+        accentColor: row.accent_color || '#38BDF8',
+        includes: Array.isArray(row.includes) ? row.includes : [],
+      };
+    });
+
+    // 4. Map user claims into CollectionItem models
+    const collection: CollectionItem[] = userClaims.map((claim) => {
+      const reward = (catalogRows || []).find((r) => r.id === claim.reward_id);
+      return {
+        id: claim.id,
+        name: reward?.title || 'Reward Item',
+        type: (reward?.badge_tag as any) || 'Theme',
+        icon: reward?.preview_type || 'star',
+        active: Boolean(claim.is_active),
+      };
+    });
+
+    return { rewards, claims: userClaims, collection };
+  } catch (err) {
+    console.error('Failed to fetch rewards from Supabase:', err);
+    return { rewards: [], claims: [], collection: [] };
+  }
+}
+
+/**
+ * Claims a reward atomically via Supabase claim_user_reward RPC
+ */
+export async function claimUserRewardInSupabase(
+  rewardId: string,
+  termsAccepted: boolean = true
+): Promise<{
+  success: boolean;
+  reward?: RewardItem;
+  claim?: any;
+  remainingPoints?: number;
+  error?: string;
+}> {
+  const sb = getSupabase();
+  if (!sb) {
+    throw new Error('Supabase client not initialized');
+  }
+
+  const { data, error } = await sb.rpc('claim_user_reward', {
+    p_reward_id: rewardId,
+    p_terms_accepted: termsAccepted,
+  });
+
+  if (error) {
+    console.error('Supabase claim_user_reward RPC error:', error);
+    throw new Error(error.message || 'Failed to claim reward');
+  }
+
+  const r = data?.reward;
+  const mappedReward: RewardItem | undefined = r
+    ? {
+        id: r.id,
+        name: r.title,
+        category: r.category,
+        badgeTag: r.badge_tag || 'Reward',
+        description: r.description || '',
+        cost: r.cost,
+        status: 'active',
+        previewType: r.preview_type || 'custom',
+        accentColor: r.accent_color,
+        includes: r.includes || [],
+      }
+    : undefined;
+
+  return {
+    success: true,
+    reward: mappedReward,
+    claim: {
+      id: data?.claim_id,
+      rewardId,
+      transactionHash: data?.transaction_hash,
+      status: 'fulfilled',
+      isActive: true,
+    },
+    remainingPoints: data?.remaining_points,
+  };
+}
+
+/**
+ * Equips / activates an owned reward cosmetic via Supabase activate_user_reward RPC
+ */
+export async function activateUserRewardInSupabase(
+  rewardId: string
+): Promise<{
+  success: boolean;
+  rewardId: string;
+  category?: string;
+  status: string;
+}> {
+  const sb = getSupabase();
+  if (!sb) {
+    throw new Error('Supabase client not initialized');
+  }
+
+  const { data, error } = await sb.rpc('activate_user_reward', {
+    p_reward_id: rewardId,
+  });
+
+  if (error) {
+    console.error('Supabase activate_user_reward RPC error:', error);
+    throw new Error(error.message || 'Failed to activate reward');
+  }
+
+  return {
+    success: true,
+    rewardId: data?.reward_id || rewardId,
+    category: data?.category,
+    status: data?.status || 'active',
+  };
+}
+

@@ -32,6 +32,7 @@ export const RewardDetailModal: React.FC<RewardDetailModalProps> = ({
   const isActive = reward.status === 'active';
 
   const handleUnlockClick = async () => {
+    if (isProcessing) return;
     if (!termsAccepted) {
       setClaimError('You must agree to the Reward Claim Terms & Conditions before claiming.');
       return;

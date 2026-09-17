@@ -92,14 +92,14 @@ export const RewardsPage: React.FC<RewardsPageProps> = ({
   const maxXP = liveMaxXP !== undefined ? liveMaxXP : 500;
 
   const [localRewardsList, setLocalRewardsList] = useState<RewardItem[]>(initialFeaturedRewards);
-  const rewardsList = liveRewards && liveRewards.length > 0 ? liveRewards : localRewardsList;
+  const rewardsList = liveRewards !== undefined && liveRewards.length > 0 ? liveRewards : localRewardsList;
 
   const [localBadgesList, setLocalBadgesList] = useState<RewardBadge[]>(initialBadges);
-  const badgesList = liveBadges && liveBadges.length > 0 ? liveBadges : localBadgesList;
+  const badgesList = liveBadges !== undefined && liveBadges.length > 0 ? liveBadges : localBadgesList;
 
   const [nextBadge, setNextBadge] = useState(initialNextBadge);
   const [localCollection, setLocalCollection] = useState<CollectionItem[]>(initialCollectionItems);
-  const collectionItems = liveCollection && liveCollection.length > 0 ? liveCollection : localCollection;
+  const collectionItems = liveCollection !== undefined ? liveCollection : localCollection;
 
   const [waysToEarn, setWaysToEarn] = useState<WaysToEarnItem[]>(initialWaysToEarn);
 

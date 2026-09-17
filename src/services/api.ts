@@ -37,6 +37,9 @@ import {
   createUserHabitInSupabase,
   updateUserHabitInSupabase,
   deleteUserHabitInSupabase,
+  fetchUserRewardsFromSupabase,
+  claimUserRewardInSupabase,
+  activateUserRewardInSupabase,
 } from './supabaseData';
 import {
   getStoredUserCache,
@@ -274,7 +277,7 @@ export function getDefaultAppState(user?: AuthUser): FullAppState {
     goals: [...initialGoalsData],
     rewards: [...initialFeaturedRewards],
     badges: [...initialBadges],
-    collectionItems: [...initialCollectionItems],
+    collectionItems: user ? [] : [...initialCollectionItems],
     waysToEarn: [...initialWaysToEarn],
     claims: [],
     notes: [...initialNotes],
@@ -384,10 +387,11 @@ export const api = {
             const cached = getStoredUserCache(sbUser.id);
 
             // Single parallel data-fetching pipeline directly to Supabase - NO redundant waterfalls
-            const [profData, userTasks, userHabits] = await Promise.all([
+            const [profData, userTasks, userHabits, userRewards] = await Promise.all([
               fetchUserProfileFromSupabase(sbUser.id).catch(() => null),
               fetchUserTasksFromSupabase(sbUser.id).catch(() => []),
               fetchUserHabitsFromSupabase(sbUser.id).catch(() => []),
+              fetchUserRewardsFromSupabase(sbUser.id).catch(() => ({ rewards: [], claims: [], collection: [] })),
             ]);
 
             const authUser = supabaseUserToAuthUser(sbUser, profData?.profile);
@@ -405,11 +409,19 @@ export const api = {
               tasks: userTasks,
               calendarEvents: cached?.calendarEvents || baseState.calendarEvents,
               goals: cached?.goals || cached?.detailedGoals || baseState.goals,
-              rewards: cached?.rewards || baseState.rewards,
+              rewards: Array.isArray(userRewards?.rewards) && userRewards.rewards.length > 0
+                ? userRewards.rewards
+                : (Array.isArray(cached?.rewards) && cached.rewards.length > 0 ? cached.rewards : baseState.rewards),
               badges: cached?.badges || baseState.badges,
-              collectionItems: cached?.collectionItems || cached?.collection || baseState.collectionItems,
+              collectionItems: Array.isArray(userRewards?.collection)
+                ? userRewards.collection
+                : (Array.isArray(cached?.collectionItems)
+                    ? cached.collectionItems
+                    : (Array.isArray(cached?.collection) ? cached.collection : [])),
               waysToEarn: cached?.waysToEarn || baseState.waysToEarn,
-              claims: cached?.claims || baseState.claims,
+              claims: Array.isArray(userRewards?.claims)
+                ? userRewards.claims
+                : (Array.isArray(cached?.claims) ? cached.claims : []),
               notes: cached?.notes || baseState.notes,
               attributes: cached?.attributes || baseState.attributes,
               weeklyData: cached?.weeklyData || baseState.weeklyData,
@@ -1119,10 +1131,11 @@ export const api = {
             const userId = session.user.id;
             const cached = getStoredUserCache(userId);
 
-            const [profData, userTasks, userHabits] = await Promise.all([
+            const [profData, userTasks, userHabits, userRewards] = await Promise.all([
               fetchUserProfileFromSupabase(userId).catch(() => null),
               fetchUserTasksFromSupabase(userId).catch(() => []),
               fetchUserHabitsFromSupabase(userId).catch(() => []),
+              fetchUserRewardsFromSupabase(userId).catch(() => ({ rewards: [], claims: [], collection: [] })),
             ]);
 
             const authUser = supabaseUserToAuthUser(session.user, profData?.profile);
@@ -1138,11 +1151,19 @@ export const api = {
               tasks: userTasks,
               calendarEvents: cached?.calendarEvents || baseState.calendarEvents,
               goals: cached?.goals || cached?.detailedGoals || baseState.goals,
-              rewards: cached?.rewards || baseState.rewards,
+              rewards: Array.isArray(userRewards?.rewards) && userRewards.rewards.length > 0
+                ? userRewards.rewards
+                : (Array.isArray(cached?.rewards) && cached.rewards.length > 0 ? cached.rewards : baseState.rewards),
               badges: cached?.badges || baseState.badges,
-              collectionItems: cached?.collectionItems || cached?.collection || baseState.collectionItems,
+              collectionItems: Array.isArray(userRewards?.collection)
+                ? userRewards.collection
+                : (Array.isArray(cached?.collectionItems)
+                    ? cached.collectionItems
+                    : (Array.isArray(cached?.collection) ? cached.collection : [])),
               waysToEarn: cached?.waysToEarn || baseState.waysToEarn,
-              claims: cached?.claims || baseState.claims,
+              claims: Array.isArray(userRewards?.claims)
+                ? userRewards.claims
+                : (Array.isArray(cached?.claims) ? cached.claims : []),
               notes: cached?.notes || baseState.notes,
               attributes: cached?.attributes || baseState.attributes,
               weeklyData: cached?.weeklyData || baseState.weeklyData,
@@ -1549,7 +1570,25 @@ export const api = {
     return json.data;
   },
 
-  async claimReward(rewardId: string, termsAccepted: boolean): Promise<{ reward: RewardItem; claim: any; state: FullAppState }> {
+  async claimReward(
+    rewardId: string,
+    termsAccepted: boolean
+  ): Promise<{ reward: RewardItem; claim: any; state?: FullAppState; remainingPoints?: number }> {
+    if (isSupabaseConfigured()) {
+      const sb = getSupabase();
+      if (sb) {
+        const { data: sessionData } = await sb.auth.getSession();
+        if (sessionData?.session?.user) {
+          const result = await claimUserRewardInSupabase(rewardId, termsAccepted);
+          return {
+            reward: result.reward!,
+            claim: result.claim,
+            remainingPoints: result.remainingPoints,
+          };
+        }
+      }
+    }
+
     const res = await authFetch('/api/rewards/claim', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -1563,10 +1602,35 @@ export const api = {
     if (!res.ok || !json.success) {
       throw new Error(json.error || 'Failed to claim reward');
     }
-    return { reward: json.data.reward, claim: json.data.claim, state: json.state };
+    const remainingPoints =
+      typeof json.data?.remaining_points === 'number'
+        ? json.data.remaining_points
+        : typeof json.state?.user?.momentumPoints === 'number'
+        ? json.state.user.momentumPoints
+        : undefined;
+
+    return {
+      reward: json.data.reward,
+      claim: json.data.claim,
+      state: json.state,
+      remainingPoints,
+    };
   },
 
-  async activateReward(rewardId: string): Promise<{ reward: RewardItem; state: FullAppState }> {
+  async activateReward(rewardId: string): Promise<{ reward?: RewardItem; state?: FullAppState }> {
+    if (isSupabaseConfigured()) {
+      const sb = getSupabase();
+      if (sb) {
+        const { data: sessionData } = await sb.auth.getSession();
+        if (sessionData?.session?.user) {
+          const result = await activateUserRewardInSupabase(rewardId);
+          return {
+            reward: { id: rewardId, status: 'active' } as any,
+          };
+        }
+      }
+    }
+
     const res = await authFetch('/api/rewards/activate', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
