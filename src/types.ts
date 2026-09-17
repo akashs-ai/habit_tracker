@@ -255,6 +255,11 @@ export interface CalendarEvent {
   subtasks?: { id: string; title: string; completed: boolean }[];
   attachments?: { name: string; size: string }[];
   priority?: 'high' | 'medium' | 'low';
+  googleEventId?: string;
+  taskId?: string;
+  isAutoTask?: boolean;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 // Rewards Types

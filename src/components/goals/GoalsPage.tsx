@@ -11,6 +11,7 @@ import {
   SlidersHorizontal 
 } from 'lucide-react';
 import { DetailedGoal, GoalStatus, GoalSortOption, GoalCategory } from '../../types';
+import { generateUUID } from '../../utils/uuid';
 import { GoalsHeader } from './GoalsHeader';
 import { GoalsOverviewCard } from './GoalsOverviewCard';
 import { GoalCard } from './GoalCard';
@@ -25,6 +26,7 @@ interface GoalsPageProps {
   onAddGoal: (goal: Omit<DetailedGoal, 'id'>) => void;
   onUpdateGoal: (goal: DetailedGoal) => void;
   onDeleteGoal: (id: string) => void;
+  onToggleSubtask?: (goalId: string, subtaskId: string) => void;
   isDark: boolean;
   setIsDark: (dark: boolean) => void;
   onToggleMobileMenu: () => void;
@@ -35,6 +37,7 @@ export const GoalsPage: React.FC<GoalsPageProps> = ({
   onAddGoal,
   onUpdateGoal,
   onDeleteGoal,
+  onToggleSubtask,
   isDark,
   setIsDark,
   onToggleMobileMenu,
@@ -152,7 +155,7 @@ export const GoalsPage: React.FC<GoalsPageProps> = ({
     if (!target) return;
 
     const newM = {
-      id: `m-${Date.now()}`,
+      id: generateUUID(),
       title: milestone.title,
       targetDate: milestone.targetDate,
       notes: milestone.notes,
@@ -358,6 +361,7 @@ export const GoalsPage: React.FC<GoalsPageProps> = ({
 
         {/* Bottom Content Row: Milestones, Categories, Motivational Inspiration */}
         <GoalBottomRow
+          goals={goals}
           categoryCounts={categoryCounts}
           onOpenTimelineModal={() => {
             // Focus on milestones
@@ -390,6 +394,7 @@ export const GoalsPage: React.FC<GoalsPageProps> = ({
         onClose={() => setSelectedGoalForDetail(null)}
         onUpdateGoal={onUpdateGoal}
         onDeleteGoal={onDeleteGoal}
+        onToggleSubtask={onToggleSubtask}
       />
 
       <AddMilestoneModal

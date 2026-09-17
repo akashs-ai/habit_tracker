@@ -10,6 +10,7 @@ import {
 import firebaseConfig from '../../firebase-applet-config.json';
 import { CalendarEvent, EventCategory, CalendarPermissionLevel } from '../types';
 import { safeResponseJson } from './api';
+import { generateUUID, isUUID } from '../utils/uuid';
 
 export const CALENDAR_READONLY_SCOPE = 'https://www.googleapis.com/auth/calendar.readonly';
 export const CALENDAR_EVENTS_SCOPE = 'https://www.googleapis.com/auth/calendar.events';
@@ -425,7 +426,8 @@ export async function fetchGoogleCalendarEvents(token: string): Promise<Calendar
 
     return [
       {
-        id: 'gcal-demo-1',
+        id: generateUUID(),
+        googleEventId: 'gcal-demo-1',
         title: 'Team Sprint Planning',
         date: todayStr,
         startTime: '10:00 AM',
@@ -438,7 +440,8 @@ export async function fetchGoogleCalendarEvents(token: string): Promise<Calendar
         priority: 'high',
       },
       {
-        id: 'gcal-demo-2',
+        id: generateUUID(),
+        googleEventId: 'gcal-demo-2',
         title: 'Deep Work: Core Architecture',
         date: todayStr,
         startTime: '02:00 PM',
@@ -450,7 +453,8 @@ export async function fetchGoogleCalendarEvents(token: string): Promise<Calendar
         priority: 'high',
       },
       {
-        id: 'gcal-demo-3',
+        id: generateUUID(),
+        googleEventId: 'gcal-demo-3',
         title: 'Gym & Cardio Session',
         date: tomorrowStr,
         startTime: '07:30 AM',
@@ -463,7 +467,8 @@ export async function fetchGoogleCalendarEvents(token: string): Promise<Calendar
         priority: 'medium',
       },
       {
-        id: 'gcal-demo-4',
+        id: generateUUID(),
+        googleEventId: 'gcal-demo-4',
         title: 'Product Strategy Review',
         date: nextDayStr,
         startTime: '01:30 PM',
@@ -480,8 +485,8 @@ export async function fetchGoogleCalendarEvents(token: string): Promise<Calendar
 
   // Fetch around current timeframe (e.g. 60 days in past to 120 days in future)
   const now = new Date();
-  const past = new Date(now.getTime() - 60 * 24 * 60 * 60 * 1000);
-  const future = new Date(now.getTime() + 120 * 24 * 60 * 60 * 1000);
+  const past = new Date(now.getTime() - 60 * 24 * 60 * 1000);
+  const future = new Date(now.getTime() + 120 * 24 * 60 * 1000);
 
   const url = `https://www.googleapis.com/calendar/v3/calendars/primary/events?timeMin=${encodeURIComponent(past.toISOString())}&timeMax=${encodeURIComponent(future.toISOString())}&singleEvents=true&orderBy=startTime`;
 
@@ -503,7 +508,8 @@ export async function fetchGoogleCalendarEvents(token: string): Promise<Calendar
     const cat = detectCategory(item.summary || '', item.description);
 
     return {
-      id: `gcal-${item.id}`,
+      id: generateUUID(),
+      googleEventId: item.id,
       title: item.summary || '(Untitled Event)',
       date: dateStr,
       startTime: startTime || (isAllDay ? undefined : '09:00 AM'),
@@ -555,7 +561,8 @@ export async function createGoogleCalendarEvent(
 
   if (token.startsWith('demo-')) {
     return {
-      id: `gcal-demo-${Date.now()}`,
+      id: generateUUID(),
+      googleEventId: `gcal-demo-${Date.now()}`,
       title: event.title,
       date: event.date,
       startTime: event.startTime || '09:00 AM',
@@ -600,7 +607,8 @@ export async function createGoogleCalendarEvent(
   const item = await safeResponseJson(res, 'Google Calendar create error');
   const resolvedCat = event.category || detectCategory(item.summary || '', item.description);
   return {
-    id: `gcal-${item.id}`,
+    id: generateUUID(),
+    googleEventId: item.id,
     title: item.summary || event.title,
     date: event.date,
     startTime: event.startTime || '09:00 AM',
@@ -673,7 +681,8 @@ export async function updateGoogleCalendarEvent(
   const item = await safeResponseJson(res, 'Google Calendar update error');
   const resolvedCat = updates.category || detectCategory(item.summary || '', item.description);
   return {
-    id: `gcal-${item.id}`,
+    id: isUUID(eventId) ? eventId : generateUUID(),
+    googleEventId: item.id,
     title: item.summary || updates.title || 'Event',
     date: updates.date || parseGCalDate(item.start || {}),
     startTime: updates.startTime,

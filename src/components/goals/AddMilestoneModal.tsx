@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { X, Calendar } from 'lucide-react';
 import { DetailedGoal } from '../../types';
+import { getLiveTodayISO, addDaysISO } from '../../utils/dateUtils';
 
 interface AddMilestoneModalProps {
   goal: DetailedGoal | null;
@@ -16,7 +17,7 @@ export const AddMilestoneModal: React.FC<AddMilestoneModalProps> = ({
   onAddMilestone,
 }) => {
   const [milestoneTitle, setMilestoneTitle] = useState('');
-  const [targetDate, setTargetDate] = useState('2025-03-31');
+  const [targetDate, setTargetDate] = useState(() => addDaysISO(getLiveTodayISO(), 30));
   const [notes, setNotes] = useState('');
 
   if (!isOpen || !goal) return null;

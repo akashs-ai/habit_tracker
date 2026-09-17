@@ -14,6 +14,8 @@ import {
   FolderGit2
 } from 'lucide-react';
 import { DetailedGoal, GoalCategory } from '../../types';
+import { generateUUID } from '../../utils/uuid';
+import { formatReadableDate, getLiveTodayISO, addDaysISO } from '../../utils/dateUtils';
 
 interface CreateGoalModalProps {
   isOpen: boolean;
@@ -28,9 +30,8 @@ export const CreateGoalModal: React.FC<CreateGoalModalProps> = ({
 }) => {
   const [activeStep, setActiveStep] = useState<'basic' | 'milestones' | 'tasks' | 'review'>('basic');
 
-  const now = new Date();
-  const currentYearEnd = `${now.getFullYear()}-12-31`;
-  const defaultMilestoneDate = new Date(now.getTime() + 30 * 86400000).toISOString().split('T')[0];
+  const currentYearEnd = `${new Date().getFullYear()}-12-31`;
+  const defaultMilestoneDate = addDaysISO(getLiveTodayISO(), 30);
 
   // Form Fields
   const [title, setTitle] = useState('');
@@ -69,13 +70,8 @@ export const CreateGoalModal: React.FC<CreateGoalModalProps> = ({
       Custom: 'target',
     };
 
-    // Format dueDate to e.g. "Dec 31, 2025"
-    let formattedDue = dueDate;
-    try {
-      const parts = dueDate.split('-');
-      const d = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
-      formattedDue = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-    } catch {}
+    // Format dueDate to e.g. "Dec 31, 2026"
+    const formattedDue = formatReadableDate(dueDate);
 
     onCreateGoal({
       title: title.trim(),
@@ -90,11 +86,11 @@ export const CreateGoalModal: React.FC<CreateGoalModalProps> = ({
       color: categoryColors[category] || '#6C63FF',
       icon: categoryIcons[category] || 'target',
       subtasks: [
-        { id: `st-${Date.now()}-1`, title: task1 || 'Complete foundational steps', completed: false },
-        { id: `st-${Date.now()}-2`, title: task2 || 'Execute key milestone', completed: false },
+        { id: generateUUID(), title: task1 || 'Complete foundational steps', completed: false },
+        { id: generateUUID(), title: task2 || 'Execute key milestone', completed: false },
       ],
       milestones: [
-        { id: `m-${Date.now()}-1`, title: milestone1 || 'Phase 1 Complete', targetDate: milestoneDate1 || '2025-06-30', completed: false },
+        { id: generateUUID(), title: milestone1 || 'Phase 1 Complete', targetDate: milestoneDate1 || defaultMilestoneDate, completed: false },
       ],
     });
 

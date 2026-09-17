@@ -1,25 +1,86 @@
-import React from 'react';
-import { ArrowRight, Code, Heart, BookOpen, User, FolderGit2 } from 'lucide-react';
-import { goalMilestonesTimeline } from '../../data/goalsMockData';
+import React, { useMemo } from 'react';
+import { ArrowRight, Code, Heart, BookOpen, User, FolderGit2, Flag } from 'lucide-react';
+import { DetailedGoal } from '../../types';
 
 interface GoalBottomRowProps {
+  goals?: DetailedGoal[];
   onOpenTimelineModal?: () => void;
   onOpenCategoryModal?: () => void;
   categoryCounts: Record<string, number>;
 }
 
 export const GoalBottomRow: React.FC<GoalBottomRowProps> = ({
+  goals = [],
   onOpenTimelineModal,
   onOpenCategoryModal,
   categoryCounts,
 }) => {
   const categoriesList = [
-    { name: 'Career', count: categoryCounts['Career'] || 2, color: '#6C63FF', icon: Code },
-    { name: 'Health', count: categoryCounts['Health'] || 1, color: '#31C48D', icon: Heart },
-    { name: 'Learning', count: categoryCounts['Learning'] || 1, color: '#F59E0B', icon: BookOpen },
-    { name: 'Personal', count: categoryCounts['Personal'] || 2, color: '#FF5C67', icon: User },
-    { name: 'Projects', count: categoryCounts['Projects'] || 1, color: '#4F8CFF', icon: FolderGit2 },
+    { name: 'Career', count: categoryCounts['Career'] || 0, color: '#6C63FF', icon: Code },
+    { name: 'Health', count: categoryCounts['Health'] || 0, color: '#31C48D', icon: Heart },
+    { name: 'Learning', count: categoryCounts['Learning'] || 0, color: '#F59E0B', icon: BookOpen },
+    { name: 'Personal', count: categoryCounts['Personal'] || 0, color: '#FF5C67', icon: User },
+    { name: 'Projects', count: categoryCounts['Projects'] || 0, color: '#4F8CFF', icon: FolderGit2 },
   ];
+
+  // Dynamically extract milestones from real active goals, sorted chronologically
+  const timelineMilestones = useMemo(() => {
+    const rawMilestones: { title: string; targetDate: string; completed: boolean }[] = [];
+    
+    for (const g of goals) {
+      if (g.status === 'archived') continue;
+      if (g.milestones && g.milestones.length > 0) {
+        for (const m of g.milestones) {
+          rawMilestones.push({
+            title: m.title,
+            targetDate: m.targetDate || '',
+            completed: Boolean(m.completed),
+          });
+        }
+      }
+    }
+
+    // Sort chronologically by targetDate, placing missing/invalid dates at the end deterministically
+    rawMilestones.sort((a, b) => {
+      const timeA = a.targetDate ? new Date(a.targetDate).getTime() : NaN;
+      const timeB = b.targetDate ? new Date(b.targetDate).getTime() : NaN;
+      const validA = !isNaN(timeA);
+      const validB = !isNaN(timeB);
+
+      if (validA && validB) {
+        if (timeA !== timeB) return timeA - timeB;
+      } else if (validA && !validB) {
+        return -1;
+      } else if (!validA && validB) {
+        return 1;
+      }
+      return a.title.localeCompare(b.title);
+    });
+
+    const list = rawMilestones.slice(0, 4).map((m, idx) => ({
+      step: `M${idx + 1}`,
+      title: m.title,
+      date: m.targetDate || 'Upcoming',
+      completed: m.completed,
+      isCurrent: false,
+    }));
+
+    // Mark the first non-completed milestone as current
+    let foundCurrent = false;
+    for (const item of list) {
+      if (!item.completed && !foundCurrent) {
+        item.isCurrent = true;
+        foundCurrent = true;
+      }
+    }
+
+    return list;
+  }, [goals]);
+
+  const completedTimelineCount = timelineMilestones.filter((m) => m.completed).length;
+  const timelineProgressPercent = timelineMilestones.length > 0
+    ? Math.round((completedTimelineCount / timelineMilestones.length) * 100)
+    : 0;
 
   return (
     <div
@@ -42,36 +103,51 @@ export const GoalBottomRow: React.FC<GoalBottomRowProps> = ({
         </div>
 
         {/* Timeline visualization */}
-        <div className="relative py-4 my-auto">
-          {/* Base Track */}
-          <div className="absolute top-1/2 left-4 right-4 h-0.5 -translate-y-1/2 bg-slate-200 dark:bg-white/10" />
+        {timelineMilestones.length > 0 ? (
+          <div className="relative py-4 my-auto">
+            {/* Base Track */}
+            <div className="absolute top-1/2 left-4 right-4 h-0.5 -translate-y-1/2 bg-slate-200 dark:bg-white/10" />
 
-          {/* Active Filled Track (up to 50%) */}
-          <div className="absolute top-1/2 left-4 w-[50%] h-0.5 -translate-y-1/2 bg-[#6C63FF]" />
+            {/* Active Filled Track */}
+            <div 
+              className="absolute top-1/2 left-4 h-0.5 -translate-y-1/2 bg-[#6C63FF] transition-all duration-500" 
+              style={{ width: `${Math.max(5, timelineProgressPercent * 0.85)}%` }}
+            />
 
-          {/* Milestone Nodes */}
-          <div className="relative flex items-center justify-between px-1">
-            {goalMilestonesTimeline.map((item, idx) => (
-              <div key={idx} className="flex flex-col items-center group">
-                <div
-                  className={`w-3.5 h-3.5 rounded-full border-2 transition-all ${
-                    item.isCurrent
-                      ? 'bg-[#6C63FF] border-[#6C63FF] ring-4 ring-[#6C63FF]/20'
-                      : item.completed
-                      ? 'bg-[#6C63FF] border-[#6C63FF]'
-                      : 'bg-white dark:bg-[#141821] border-slate-300 dark:border-white/20'
-                  }`}
-                />
-                <span className="text-[11px] font-medium text-slate-900 dark:text-[#F7F8FC] mt-2">
-                  {item.step}
-                </span>
-                <span className="text-[10px] text-slate-500 dark:text-[#697388]">
-                  {item.date}
-                </span>
-              </div>
-            ))}
+            {/* Milestone Nodes */}
+            <div className="relative flex items-center justify-between px-1">
+              {timelineMilestones.map((item, idx) => (
+                <div key={idx} className="flex flex-col items-center group max-w-[72px] text-center">
+                  <div
+                    className={`w-3.5 h-3.5 rounded-full border-2 transition-all ${
+                      item.isCurrent
+                        ? 'bg-[#6C63FF] border-[#6C63FF] ring-4 ring-[#6C63FF]/20'
+                        : item.completed
+                        ? 'bg-[#6C63FF] border-[#6C63FF]'
+                        : 'bg-white dark:bg-[#141821] border-slate-300 dark:border-white/20'
+                    }`}
+                  />
+                  <span className="text-[11px] font-medium text-slate-900 dark:text-[#F7F8FC] mt-2 truncate w-full" title={item.title}>
+                    {item.step}
+                  </span>
+                  <span className="text-[10px] text-slate-500 dark:text-[#697388] truncate w-full">
+                    {item.date}
+                  </span>
+                </div>
+              ))}
+            </div>
           </div>
-        </div>
+        ) : (
+          <div className="py-5 text-center my-auto flex flex-col items-center justify-center">
+            <Flag className="w-6 h-6 text-slate-300 dark:text-[#697388]/50 mb-1.5" />
+            <p className="text-xs text-slate-500 dark:text-[#697388]">
+              No milestones created yet.
+            </p>
+            <span className="text-[11px] text-slate-400 dark:text-[#697388]/80 mt-0.5">
+              Add milestones to your goals to populate timeline.
+            </span>
+          </div>
+        )}
       </div>
 
       {/* 2. Goal Categories Card */}

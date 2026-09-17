@@ -95,6 +95,12 @@ export const CalendarPage: React.FC<CalendarPageProps> = ({
   const [isNotificationOpen, setIsNotificationOpen] = useState(false);
   const notificationRef = useRef<HTMLDivElement>(null);
 
+  // Authoritatively derive the active detail event from the latest events list to prevent stale subtask/mutation closures
+  const activeDetailEvent = useMemo(() => {
+    if (!selectedEventForDetail) return null;
+    return events.find((e) => e.id === selectedEventForDetail.id) || selectedEventForDetail;
+  }, [selectedEventForDetail, events]);
+
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
       if (notificationRef.current && !notificationRef.current.contains(e.target as Node)) {
@@ -137,9 +143,18 @@ export const CalendarPage: React.FC<CalendarPageProps> = ({
       const gcalEvents = await fetchGoogleCalendarEvents(token);
       let newCount = 0;
       for (const gev of gcalEvents) {
-        const alreadyExists = events.some(
-          (e) => e.id === gev.id || (e.title === gev.title && e.date === gev.date && e.startTime === gev.startTime)
-        );
+        const alreadyExists = events.some((e) => {
+          // FIRST check googleEventId
+          if (gev.googleEventId && e.googleEventId) {
+            return e.googleEventId === gev.googleEventId;
+          }
+          if (e.id === gev.id) return true;
+          // Fallback only when googleEventId is unavailable on either event
+          if (!gev.googleEventId || !e.googleEventId) {
+            return e.title === gev.title && e.date === gev.date && e.startTime === gev.startTime;
+          }
+          return false;
+        });
         if (!alreadyExists) {
           onAddEvent(gev);
           newCount++;
@@ -647,8 +662,8 @@ export const CalendarPage: React.FC<CalendarPageProps> = ({
 
       {/* Event Detail Modal */}
       <EventDetailModal
-        event={selectedEventForDetail}
-        isOpen={!!selectedEventForDetail}
+        event={activeDetailEvent}
+        isOpen={!!activeDetailEvent}
         onClose={() => setSelectedEventForDetail(null)}
         onUpdateEvent={onUpdateEvent}
         onDeleteEvent={onDeleteEvent}

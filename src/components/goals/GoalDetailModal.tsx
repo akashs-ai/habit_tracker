@@ -18,6 +18,7 @@ import {
   Brain
 } from 'lucide-react';
 import { DetailedGoal } from '../../types';
+import { generateUUID } from '../../utils/uuid';
 
 interface GoalDetailModalProps {
   goal: DetailedGoal | null;
@@ -25,6 +26,7 @@ interface GoalDetailModalProps {
   onClose: () => void;
   onUpdateGoal: (updatedGoal: DetailedGoal) => void;
   onDeleteGoal: (id: string) => void;
+  onToggleSubtask?: (goalId: string, subtaskId: string) => void;
 }
 
 export const GoalDetailModal: React.FC<GoalDetailModalProps> = ({
@@ -33,6 +35,7 @@ export const GoalDetailModal: React.FC<GoalDetailModalProps> = ({
   onClose,
   onUpdateGoal,
   onDeleteGoal,
+  onToggleSubtask,
 }) => {
   const [activeTab, setActiveTab] = useState<'overview' | 'tasks' | 'milestones' | 'notes'>('overview');
   const [newSubgoalTitle, setNewSubgoalTitle] = useState('');
@@ -67,17 +70,18 @@ export const GoalDetailModal: React.FC<GoalDetailModalProps> = ({
   // Subgoal toggle
   const handleToggleSubgoal = (subgoalId: string) => {
     if (!goal.subtasks) return;
+    if (onToggleSubtask) {
+      onToggleSubtask(goal.id, subgoalId);
+      return;
+    }
     const updatedSubtasks = goal.subtasks.map((st) =>
       st.id === subgoalId ? { ...st, completed: !st.completed } : st
     );
 
-    const completedCount = updatedSubtasks.filter((s) => s.completed).length;
-    const progress = Math.round((completedCount / updatedSubtasks.length) * 100);
-
     onUpdateGoal({
       ...goal,
       subtasks: updatedSubtasks,
-      progress,
+      progress: goal.progress,
     });
   };
 
@@ -87,23 +91,34 @@ export const GoalDetailModal: React.FC<GoalDetailModalProps> = ({
     if (!newSubgoalTitle.trim()) return;
 
     const newSubtask = {
-      id: `st-${Date.now()}`,
+      id: generateUUID(),
       title: newSubgoalTitle.trim(),
       completed: false,
     };
 
     const updatedSubtasks = [...(goal.subtasks || []), newSubtask];
-    const completedCount = updatedSubtasks.filter((s) => s.completed).length;
-    const progress = Math.round((completedCount / updatedSubtasks.length) * 100);
 
     onUpdateGoal({
       ...goal,
       subtasks: updatedSubtasks,
-      progress,
+      progress: goal.progress,
     });
 
     setNewSubgoalTitle('');
     setIsAddingSubgoal(false);
+  };
+
+  // Milestone toggle
+  const handleToggleMilestone = (milestoneId: string) => {
+    if (!goal.milestones) return;
+    const updatedMilestones = goal.milestones.map((m) =>
+      m.id === milestoneId ? { ...m, completed: !m.completed } : m
+    );
+
+    onUpdateGoal({
+      ...goal,
+      milestones: updatedMilestones,
+    });
   };
 
   // Save notes
@@ -408,13 +423,17 @@ export const GoalDetailModal: React.FC<GoalDetailModalProps> = ({
                     <div className="font-semibold text-slate-900 dark:text-[#F7F8FC]">{m.title}</div>
                     <div className="text-[11px] text-slate-500 dark:text-[#697388] mt-0.5">Target: {m.targetDate}</div>
                   </div>
-                  <span
-                    className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${
-                      m.completed ? 'bg-[#31C48D]/20 text-[#31C48D]' : 'bg-slate-200 dark:bg-white/10 text-slate-600 dark:text-[#697388]'
+                  <button
+                    type="button"
+                    onClick={() => handleToggleMilestone(m.id)}
+                    className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold transition-colors cursor-pointer ${
+                      m.completed
+                        ? 'bg-[#31C48D]/20 text-[#31C48D] hover:bg-[#31C48D]/30'
+                        : 'bg-slate-200 dark:bg-white/10 text-slate-700 dark:text-[#A5AEC2] hover:bg-[#6C63FF] hover:text-white'
                     }`}
                   >
-                    {m.completed ? 'Completed' : 'Pending'}
-                  </span>
+                    {m.completed ? 'Completed' : 'Mark Done'}
+                  </button>
                 </div>
               ))}
             </div>
