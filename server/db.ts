@@ -1830,11 +1830,14 @@ class LifeRpgDatabase {
   }
 
   // --- Quests (Daily Habits) ---
-  public toggleQuest(questId: string): Quest | null {
+  public toggleQuest(questId: string, forceCompleted?: boolean): Quest | null {
     const quest = this.data.quests.find((q) => q.id === questId);
     if (!quest) return null;
 
-    const isNowCompleted = !quest.completed;
+    const isNowCompleted = forceCompleted !== undefined ? forceCompleted : !quest.completed;
+    if (forceCompleted !== undefined && quest.completed === forceCompleted) {
+      return quest;
+    }
     quest.completed = isNowCompleted;
 
     const xpDelta = isNowCompleted ? quest.xpReward : -quest.xpReward;
@@ -1884,11 +1887,14 @@ class LifeRpgDatabase {
   }
 
   // --- Tasks ---
-  public toggleTask(taskId: string): TaskItem | null {
+  public toggleTask(taskId: string, forceCompleted?: boolean): TaskItem | null {
     const task = this.data.tasks.find((t) => t.id === taskId);
     if (!task) return null;
 
-    const isNowCompleted = !task.completed;
+    const isNowCompleted = forceCompleted !== undefined ? forceCompleted : !task.completed;
+    if (forceCompleted !== undefined && task.completed === forceCompleted) {
+      return task;
+    }
     task.completed = isNowCompleted;
 
     const xpDelta = isNowCompleted ? (task.xpReward || 15) : -(task.xpReward || 15);

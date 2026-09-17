@@ -42,11 +42,14 @@ export const HeroBanner: React.FC<HeroBannerProps> = ({ user, onNavigateTab }) =
   const [touchStart, setTouchStart] = useState<number | null>(null);
   const [touchEnd, setTouchEnd] = useState<number | null>(null);
 
-  // Donut progress calculation for Slide 1: 780 / 1200 = 65%
+  // Donut progress calculation for Slide 1
   const radius = 24;
   const circumference = 2 * Math.PI * radius;
-  const progressRatio = Math.min(user.currentXp / user.nextLevelXp, 1);
+  const safeNextLevelXp = Math.max(1, user.nextLevelXp || 500);
+  const safeCurrentXp = Math.max(0, user.currentXp || 0);
+  const progressRatio = Math.min(Math.max(0, safeCurrentXp / safeNextLevelXp), 1);
   const strokeDashoffset = circumference - progressRatio * circumference;
+  const progressPercent = Math.round(progressRatio * 100);
 
   const { greeting: timeGreeting } = getCurrentTimeInfo();
   const liveDateString = formatFullDayHeader(getLiveTodayISO());
@@ -268,7 +271,7 @@ export const HeroBanner: React.FC<HeroBannerProps> = ({ user, onNavigateTab }) =
                             />
                           </svg>
                           <div className="absolute inset-0 flex items-center justify-center">
-                            <span className="text-[11px] font-bold text-[#6366F1]">65%</span>
+                            <span className="text-[11px] font-bold text-[#6366F1]">{progressPercent}%</span>
                           </div>
                         </div>
 
@@ -280,7 +283,7 @@ export const HeroBanner: React.FC<HeroBannerProps> = ({ user, onNavigateTab }) =
                             {user.currentXp.toLocaleString()} / {user.nextLevelXp.toLocaleString()} XP
                           </p>
                           <p className="text-[11px] text-[#9CA3AF] dark:text-[#80808A]">
-                            Next level in {user.nextLevelXp - user.currentXp} XP
+                            Next level in {Math.max(0, safeNextLevelXp - safeCurrentXp)} XP
                           </p>
                         </div>
                       </div>
@@ -296,7 +299,7 @@ export const HeroBanner: React.FC<HeroBannerProps> = ({ user, onNavigateTab }) =
                         </div>
                         <div className="flex flex-col">
                           <span className="font-display text-2xl font-bold text-[#111827] dark:text-[#FAFAFA] leading-tight">
-                            {user.streakDays}
+                            {user.streakDays ?? 0}
                           </span>
                           <span className="text-xs font-medium text-[#6B7280] dark:text-[#9CA3AF]">
                             Day Streak
@@ -315,7 +318,7 @@ export const HeroBanner: React.FC<HeroBannerProps> = ({ user, onNavigateTab }) =
                         </div>
                         <div className="flex flex-col">
                           <span className="font-display text-2xl font-bold text-[#111827] dark:text-[#FAFAFA] leading-tight">
-                            {user.totalPoints}
+                            {(user.momentumPoints ?? user.totalPoints ?? 0).toLocaleString()}
                           </span>
                           <span className="text-xs font-medium text-[#6B7280] dark:text-[#9CA3AF]">
                             Total Points
@@ -334,7 +337,7 @@ export const HeroBanner: React.FC<HeroBannerProps> = ({ user, onNavigateTab }) =
                         </div>
                         <div className="flex flex-col">
                           <span className="font-display text-2xl font-bold text-[#111827] dark:text-[#FAFAFA] leading-tight">
-                            {user.questsDoneThisWeek}
+                            {user.questsDoneThisWeek ?? 0}
                           </span>
                           <span className="text-xs font-medium text-[#6B7280] dark:text-[#9CA3AF]">
                             Quests Done This Week

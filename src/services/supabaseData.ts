@@ -1,7 +1,8 @@
 import { TaskItem, TaskPriority, UserProfile, AuthUser, Quest } from '../types';
 import { getSupabase } from '../lib/supabase';
 import { initialUserProfile, initialQuests } from '../data/mockData';
-import { getLiveTodayISO } from '../utils/dateUtils';
+import { getLiveTodayISO, getStartOfWeek, formatDateISO } from '../utils/dateUtils';
+import { calculateProgressionDelta, getXpRequiredForLevel } from '../utils/progression';
 
 export interface SerializedTaskPayload {
   description?: string;
@@ -11,6 +12,7 @@ export interface SerializedTaskPayload {
   notes?: string;
   dueText?: string;
   viewCategory?: 'today' | 'upcoming' | 'overdue' | 'someday';
+  clientTempId?: string;
 }
 
 /**
@@ -24,6 +26,7 @@ export function parseTaskDescription(rawDesc: string | null | undefined): {
   notes: string;
   dueText: string;
   viewCategory: 'today' | 'upcoming' | 'overdue' | 'someday';
+  clientTempId?: string;
 } {
   const defaultResult = {
     description: '',
@@ -33,6 +36,7 @@ export function parseTaskDescription(rawDesc: string | null | undefined): {
     notes: '',
     dueText: 'Today',
     viewCategory: 'today' as const,
+    clientTempId: undefined,
   };
 
   if (!rawDesc) return defaultResult;
@@ -49,6 +53,7 @@ export function parseTaskDescription(rawDesc: string | null | undefined): {
         notes: typeof parsed.notes === 'string' ? parsed.notes : '',
         dueText: typeof parsed.dueText === 'string' ? parsed.dueText : 'Today',
         viewCategory: parsed.viewCategory || 'today',
+        clientTempId: typeof parsed.clientTempId === 'string' ? parsed.clientTempId : undefined,
       };
     } catch {
       // Not valid JSON, treat as plain description text
@@ -74,6 +79,7 @@ export function mapTaskRowToTaskItem(row: any): TaskItem {
 
   return {
     id: row.id,
+    clientTempId: meta.clientTempId,
     title: row.title || 'Untitled Task',
     description: meta.description,
     completed: Boolean(row.completed),
@@ -101,6 +107,7 @@ export function serializeTaskDescription(task: Partial<TaskItem>): string {
     notes: task.notes || '',
     dueText: task.dueText || 'Today',
     viewCategory: task.viewCategory || 'today',
+    clientTempId: task.clientTempId,
   };
   return JSON.stringify(payload);
 }
@@ -236,13 +243,174 @@ export async function updateUserTaskInSupabase(
 }
 
 /**
- * Toggles task completion state in Supabase Postgres
+ * Persists an XP and Momentum Points delta to the user's profile in Supabase Postgres.
+ * Invokes the atomic apply_user_progression_delta RPC when available, falling back
+ * to a direct row update using the shared progression engine.
+ */
+export async function applyUserProgressionDeltaInSupabase(
+  userId: string,
+  xpDelta: number,
+  pointsDelta: number = xpDelta
+): Promise<Partial<UserProfile>> {
+  const sb = getSupabase();
+  if (!sb || !userId) {
+    throw new Error('Supabase client not initialized or unauthenticated.');
+  }
+
+  // 1. Try atomic PostgreSQL RPC
+  try {
+    const { data: rpcRes, error: rpcErr } = await sb.rpc('apply_user_progression_delta', {
+      p_user_id: userId,
+      p_xp_delta: xpDelta,
+      p_points_delta: pointsDelta,
+    });
+    if (!rpcErr && rpcRes && typeof rpcRes === 'object' && !(rpcRes as any).error) {
+      const typedRes = rpcRes as any;
+      return {
+        level: typedRes.level,
+        currentXp: typedRes.currentXp ?? typedRes.xp,
+        nextLevelXp: typedRes.nextLevelXp ?? typedRes.xp_to_next_level,
+        totalPoints: typedRes.totalPoints ?? typedRes.momentum_points,
+        momentumPoints: typedRes.momentumPoints ?? typedRes.momentum_points,
+        streakDays: typedRes.streakDays ?? typedRes.streak_days,
+        streak: typedRes.streakDays ?? typedRes.streak_days,
+      };
+    }
+  } catch (rpcCatch) {
+    console.warn('apply_user_progression_delta RPC fallback:', rpcCatch);
+  }
+
+  // 2. Fallback to client-side formula calculation and direct table update
+  const { data: profile } = await sb
+    .from('profiles')
+    .select('xp, level, xp_to_next_level, momentum_points, streak_days')
+    .eq('id', userId)
+    .maybeSingle();
+
+  if (!profile) {
+    return {};
+  }
+
+  const prog = calculateProgressionDelta(
+    {
+      level: profile.level ?? 1,
+      currentXp: profile.xp ?? 0,
+      nextLevelXp: profile.xp_to_next_level ?? 500,
+      momentumPoints: profile.momentum_points ?? 0,
+      totalPoints: profile.momentum_points ?? 0,
+    },
+    xpDelta,
+    pointsDelta
+  );
+
+  await sb
+    .from('profiles')
+    .update({
+      xp: prog.currentXp,
+      level: prog.level,
+      xp_to_next_level: prog.nextLevelXp,
+      momentum_points: prog.momentumPoints,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', userId);
+
+  return {
+    level: prog.level,
+    currentXp: prog.currentXp,
+    nextLevelXp: prog.nextLevelXp,
+    totalPoints: prog.totalPoints,
+    momentumPoints: prog.momentumPoints,
+    streakDays: profile.streak_days ?? 0,
+    streak: profile.streak_days ?? 0,
+  };
+}
+
+/**
+ * Calculates authoritative weekly completions, points, and consistency from Supabase
+ */
+export async function fetchWeeklyStatsFromSupabase(userId: string): Promise<{
+  questsDoneThisWeek: number;
+  pointsThisWeek: number;
+  weeklyConsistency: number;
+}> {
+  const sb = getSupabase();
+  if (!sb || !userId) {
+    return { questsDoneThisWeek: 0, pointsThisWeek: 0, weeklyConsistency: 0 };
+  }
+
+  try {
+    const todayStr = getLiveTodayISO();
+    const mondayDate = getStartOfWeek(todayStr, 1);
+    const startOfWeekStr = formatDateISO(mondayDate);
+
+    // 1. Fetch habit completions this week
+    const { data: compRows } = await sb
+      .from('habit_completions')
+      .select('completed_date, xp_earned')
+      .eq('user_id', userId)
+      .gte('completed_date', startOfWeekStr);
+
+    // 2. Fetch completed tasks this week
+    const { data: taskRows } = await sb
+      .from('tasks')
+      .select('completed, completed_at, description')
+      .eq('user_id', userId)
+      .eq('completed', true)
+      .gte('completed_at', startOfWeekStr);
+
+    // 3. Fetch count of active habits
+    const { count: habitCount } = await sb
+      .from('habits')
+      .select('id', { count: 'exact', head: true })
+      .eq('user_id', userId)
+      .eq('archived', false);
+
+    const habitCompletionsCount = compRows?.length || 0;
+    const taskCompletionsCount = taskRows?.length || 0;
+    const totalWeeklyCompletions = habitCompletionsCount + taskCompletionsCount;
+
+    let habitXp = 0;
+    (compRows || []).forEach((c: any) => {
+      habitXp += Number(c.xp_earned) || 25;
+    });
+
+    let taskXp = 0;
+    (taskRows || []).forEach((t: any) => {
+      const meta = parseTaskDescription(t.description);
+      taskXp += meta.xpReward || 15;
+    });
+
+    const pointsThisWeek = habitXp + taskXp;
+
+    // Consistency: days elapsed in current week (Monday = 1, Sunday = 7)
+    const now = new Date();
+    const currentDayOfWeek = now.getDay() === 0 ? 7 : now.getDay();
+    const activeHabits = habitCount || 1;
+    const expectedHabitCompletions = activeHabits * currentDayOfWeek;
+    const consistency = Math.min(
+      100,
+      Math.round((habitCompletionsCount / Math.max(1, expectedHabitCompletions)) * 100)
+    );
+
+    return {
+      questsDoneThisWeek: totalWeeklyCompletions,
+      pointsThisWeek,
+      weeklyConsistency: consistency,
+    };
+  } catch (err) {
+    console.warn('Error fetching weekly stats from Supabase:', err);
+    return { questsDoneThisWeek: 0, pointsThisWeek: 0, weeklyConsistency: 0 };
+  }
+}
+
+/**
+ * Toggles task completion state in Supabase Postgres and synchronizes profile XP & Momentum Points
  */
 export async function toggleUserTaskInSupabase(
   userId: string,
   taskId: string,
   completed: boolean
-): Promise<TaskItem> {
+): Promise<{ task: TaskItem; userProgression?: Partial<UserProfile> }> {
   const sb = getSupabase();
   if (!sb || !userId) {
     throw new Error('Supabase client not initialized or unauthenticated.');
@@ -267,7 +435,19 @@ export async function toggleUserTaskInSupabase(
     throw new Error(`Failed to update task status in database: ${error?.message || 'Task not found'}`);
   }
 
-  return mapTaskRowToTaskItem(data);
+  const mappedTask = mapTaskRowToTaskItem(data);
+  const xpReward = mappedTask.xpReward || 15;
+  const xpChange = completed ? xpReward : -xpReward;
+
+  // Persist updated progression to profiles in Supabase
+  let userProgression: Partial<UserProfile> | undefined = undefined;
+  try {
+    userProgression = await applyUserProgressionDeltaInSupabase(userId, xpChange, xpChange);
+  } catch (progErr) {
+    console.warn('Failed to update user progression for task:', progErr);
+  }
+
+  return { task: mappedTask, userProgression };
 }
 
 /**
@@ -332,6 +512,10 @@ export async function fetchUserProfileFromSupabase(userId: string): Promise<{
     // Fallback to persisted streak_days
   }
 
+  // Calculate authoritative weekly stats
+  const weeklyStats = await fetchWeeklyStatsFromSupabase(userId);
+
+  const rawPoints = typeof data.momentum_points === 'number' ? data.momentum_points : 0;
   const userProgression: UserProfile = {
     ...initialUserProfile,
     name: data.display_name || initialUserProfile.name,
@@ -339,13 +523,16 @@ export async function fetchUserProfileFromSupabase(userId: string): Promise<{
     username: data.username || initialUserProfile.username || '',
     avatarUrl: data.avatar_url || initialUserProfile.avatarUrl,
     bio: data.bio || initialUserProfile.bio,
-    level: data.level || 1,
-    currentXp: data.xp || 0,
-    nextLevelXp: data.xp_to_next_level || 500,
-    totalPoints: data.momentum_points || 50,
-    momentumPoints: data.momentum_points || 50,
+    level: data.level ?? 1,
+    currentXp: data.xp ?? 0,
+    nextLevelXp: data.xp_to_next_level || getXpRequiredForLevel(data.level ?? 1),
+    totalPoints: rawPoints,
+    momentumPoints: rawPoints,
     streak: authoritativeStreak,
     streakDays: authoritativeStreak,
+    questsDoneThisWeek: weeklyStats.questsDoneThisWeek,
+    pointsThisWeek: weeklyStats.pointsThisWeek,
+    weeklyConsistency: weeklyStats.weeklyConsistency,
   };
 
   return { profile: data, userProgression };
@@ -627,20 +814,25 @@ export async function fetchUserHabitsFromSupabase(userId: string): Promise<Quest
 
   const completedSet = new Set((completions || []).map((c: any) => c.habit_id));
 
-  return habits.map((h: any) => {
-    const meta = parseHabitDescription(h.description);
-    return {
-      id: h.id,
-      title: h.title,
-      subtitle: meta.subtitle,
-      category: meta.questCategory,
-      durationMinutes: meta.durationMinutes,
-      xpReward: h.xp_reward || 25,
-      attribute: meta.attribute,
-      completed: completedSet.has(h.id),
-      isStarted: meta.isStarted,
-    };
-  });
+  return habits.map((h: any) => mapHabitRowToQuest(h, completedSet.has(h.id)));
+}
+
+/**
+ * Maps a Supabase habits row and completion status into a typed Quest item.
+ */
+export function mapHabitRowToQuest(row: any, isCompleted: boolean = false): Quest {
+  const meta = parseHabitDescription(row?.description);
+  return {
+    id: row?.id || `quest-${Date.now()}`,
+    title: row?.title || 'Daily Quest',
+    subtitle: meta.subtitle,
+    category: meta.questCategory,
+    durationMinutes: meta.durationMinutes,
+    xpReward: row?.xp_reward || 25,
+    attribute: meta.attribute,
+    completed: isCompleted,
+    isStarted: meta.isStarted,
+  };
 }
 
 /**
@@ -653,7 +845,7 @@ export async function toggleHabitCompletionInSupabase(
   userId: string,
   habitIdOrQuestId: string,
   forceCompleted?: boolean
-): Promise<Quest> {
+): Promise<Quest & { userProgression?: Partial<UserProfile> }> {
   const sb = getSupabase();
   if (!sb || !userId) {
     throw new Error('Supabase client not initialized or unauthenticated.');
@@ -738,37 +930,26 @@ export async function toggleHabitCompletionInSupabase(
     }
   }
 
-  // Update profile XP & momentum
+  // Update profile XP & momentum using centralized progression engine
   const xpChange = isNowCompleted ? xpReward : -xpReward;
-  const { data: profile } = await sb
-    .from('profiles')
-    .select('xp, level, xp_to_next_level, momentum_points')
-    .eq('id', userId)
-    .maybeSingle();
+  let updatedProgression: Partial<UserProfile> | undefined = undefined;
 
-  if (profile) {
-    let newXp = (profile.xp || 0) + xpChange;
-    let newLevel = profile.level || 1;
-    let nextLevelXp = profile.xp_to_next_level || 500;
+  try {
+    updatedProgression = await applyUserProgressionDeltaInSupabase(userId, xpChange, xpChange);
 
-    if (newXp >= nextLevelXp) {
-      newLevel += 1;
-      newXp = newXp - nextLevelXp;
-      nextLevelXp += 200;
-    } else if (newXp < 0) {
-      newXp = 0;
-    }
-
-    await sb
+    // Fetch authoritative streak_days updated by PostgreSQL trigger
+    const { data: profAfter } = await sb
       .from('profiles')
-      .update({
-        xp: newXp,
-        level: newLevel,
-        xp_to_next_level: nextLevelXp,
-        momentum_points: Math.max(0, (profile.momentum_points || 50) + xpChange),
-        updated_at: new Date().toISOString(),
-      })
-      .eq('id', userId);
+      .select('streak_days')
+      .eq('id', userId)
+      .maybeSingle();
+
+    if (profAfter && typeof profAfter.streak_days === 'number') {
+      updatedProgression.streakDays = profAfter.streak_days;
+      updatedProgression.streak = profAfter.streak_days;
+    }
+  } catch (err) {
+    console.warn('Failed to update progression for habit:', err);
   }
 
   const meta = parseHabitDescription(habitRow.description);
@@ -782,7 +963,110 @@ export async function toggleHabitCompletionInSupabase(
     attribute: meta.attribute,
     completed: isNowCompleted,
     isStarted: meta.isStarted,
+    userProgression: updatedProgression,
+  } as Quest & { userProgression?: Partial<UserProfile> };
+}
+
+/**
+ * Updates an existing habit in Supabase Postgres
+ */
+export async function updateUserHabitInSupabase(
+  userId: string,
+  habitId: string,
+  updates: Partial<Quest>
+): Promise<Quest> {
+  const sb = getSupabase();
+  if (!sb || !userId) {
+    throw new Error('Supabase client not initialized or unauthenticated.');
+  }
+
+  // Fetch current habit row to merge description metadata cleanly
+  const { data: existing, error: fetchErr } = await sb
+    .from('habits')
+    .select('*')
+    .eq('id', habitId)
+    .eq('user_id', userId)
+    .single();
+
+  if (fetchErr || !existing) {
+    throw new Error(`Failed to find habit for update: ${fetchErr?.message || 'Not found'}`);
+  }
+
+  const existingMeta = parseHabitDescription(existing.description);
+  const updatedMeta = {
+    subtitle: updates.subtitle !== undefined ? updates.subtitle : existingMeta.subtitle,
+    durationMinutes: updates.durationMinutes !== undefined ? updates.durationMinutes : existingMeta.durationMinutes,
+    attribute: updates.attribute !== undefined ? updates.attribute : existingMeta.attribute,
+    questCategory: updates.category !== undefined ? updates.category : existingMeta.questCategory,
+    isStarted: updates.isStarted !== undefined ? updates.isStarted : existingMeta.isStarted,
   };
+
+  const updatePayload: Record<string, any> = {
+    updated_at: new Date().toISOString(),
+  };
+
+  if (updates.title !== undefined) updatePayload.title = updates.title.trim();
+  if (updates.category !== undefined) updatePayload.category = mapQuestCategoryToDbCategory(updates.category);
+  if (updates.xpReward !== undefined) updatePayload.xp_reward = updates.xpReward;
+  updatePayload.description = serializeHabitDescription(updatedMeta);
+
+  const { data, error } = await sb
+    .from('habits')
+    .update(updatePayload)
+    .eq('id', habitId)
+    .eq('user_id', userId)
+    .select()
+    .single();
+
+  if (error || !data) {
+    console.error('Error updating habit in Supabase:', error);
+    throw new Error(`Failed to update habit: ${error?.message || 'Unknown error'}`);
+  }
+
+  const meta = parseHabitDescription(data.description);
+  return {
+    id: data.id,
+    title: data.title,
+    subtitle: meta.subtitle,
+    category: meta.questCategory,
+    durationMinutes: meta.durationMinutes,
+    xpReward: data.xp_reward || 25,
+    attribute: meta.attribute,
+    completed: updates.completed ?? false,
+    isStarted: meta.isStarted,
+  };
+}
+
+/**
+ * Deletes a habit and its completions from Supabase Postgres
+ */
+export async function deleteUserHabitInSupabase(
+  userId: string,
+  habitId: string
+): Promise<void> {
+  const sb = getSupabase();
+  if (!sb || !userId) {
+    throw new Error('Supabase client not initialized or unauthenticated.');
+  }
+
+  // 1. Delete associated habit completions first
+  await sb
+    .from('habit_completions')
+    .delete()
+    .eq('habit_id', habitId)
+    .eq('user_id', userId);
+
+  // 2. Delete the habit
+  const { error } = await sb
+    .from('habits')
+    .delete()
+    .eq('id', habitId)
+    .eq('user_id', userId);
+
+  if (error) {
+    console.error('Error deleting habit from Supabase:', error);
+    throw new Error(`Failed to delete habit: ${error.message}`);
+  }
 }
 
 /**

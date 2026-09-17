@@ -521,11 +521,11 @@ async function startServer() {
 
   app.post('/api/quests/toggle', (req: Request, res: Response) => {
     try {
-      const { questId } = req.body;
+      const { questId, forceCompleted } = req.body;
       if (!questId) {
         return res.status(400).json({ success: false, error: 'questId is required.' });
       }
-      const updated = db.toggleQuest(questId);
+      const updated = db.toggleQuest(questId, forceCompleted);
       if (!updated) {
         return res.status(404).json({ success: false, error: 'Quest not found.' });
       }
@@ -634,7 +634,8 @@ async function startServer() {
 
   app.post('/api/tasks/:id/toggle', async (req: Request, res: Response) => {
     try {
-      const updated = db.toggleTask(req.params.id);
+      const forceCompleted = typeof req.body?.forceCompleted === 'boolean' ? req.body.forceCompleted : undefined;
+      const updated = db.toggleTask(req.params.id, forceCompleted);
       if (!updated) {
         return res.status(404).json({ success: false, error: 'Task not found.' });
       }

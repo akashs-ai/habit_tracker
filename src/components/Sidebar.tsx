@@ -37,9 +37,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
   setIsDark,
   themeMode,
   onSetThemeMode,
-  userLevel,
+  userLevel = 1,
   currentUser,
-  momentumPoints = 4320,
+  momentumPoints = 0,
 }) => {
   const primaryNavItems = [
     { id: 'dashboard', label: 'Home', icon: Home },
@@ -232,7 +232,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
             <div className="min-w-0">
               <div className="flex items-center gap-1.5">
                 <p className="text-xs font-semibold text-[#111827] dark:text-[#FAFAFA] leading-tight truncate">
-                  {currentUser?.fullName || (currentUser?.isGuest ? 'Guest' : 'Alex')}
+                  {currentUser?.fullName || (currentUser?.isGuest ? 'Guest' : (currentUser?.username ? `@${currentUser.username}` : 'Adventurer'))}
                 </p>
                 {currentUser?.isGuest && (
                   <span className="px-1.5 py-0.2 rounded text-[9px] font-semibold bg-[#F59E0B]/20 text-[#F59E0B]">

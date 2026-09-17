@@ -66,16 +66,19 @@ export const AnalyticsPage: React.FC<AnalyticsPageProps> = ({
     if (!liveUser && !liveTasks && !liveQuests) return baseKpi;
     const completedTasks = liveTasks ? liveTasks.filter((t) => t.completed).length : baseKpi.tasksCompleted;
     const totalTasks = liveTasks ? liveTasks.length : baseKpi.tasksTotal;
-    const streak = liveUser ? (liveUser as any).streakDays ?? liveUser.streakDays : baseKpi.currentStreakDays;
-    const mp = liveUser ? (liveUser as any).momentumPoints ?? liveUser.totalPoints : baseKpi.momentumPoints;
+    const streak = liveUser ? (liveUser.streakDays ?? liveUser.streak ?? 0) : baseKpi.currentStreakDays;
+    const mp = liveUser ? (liveUser.momentumPoints ?? liveUser.totalPoints ?? 0) : baseKpi.momentumPoints;
     const completedQuests = liveQuests ? liveQuests.filter((q) => q.completed).length : 0;
     const totalQuests = liveQuests ? liveQuests.length : 4;
     const ratio = Math.round(((completedTasks + completedQuests) / Math.max(1, totalTasks + totalQuests)) * 100);
+    const consistency = (timeRange === '7d' && liveUser?.weeklyConsistency !== undefined)
+      ? liveUser.weeklyConsistency
+      : (ratio > 0 ? ratio : baseKpi.overallConsistency);
 
     return {
       ...baseKpi,
-      overallConsistency: ratio > 0 ? ratio : baseKpi.overallConsistency,
-      currentStreakDays: streak !== undefined ? streak : baseKpi.currentStreakDays,
+      overallConsistency: consistency,
+      currentStreakDays: streak,
       tasksCompleted: completedTasks,
       tasksTotal: totalTasks,
       momentumPoints: mp,

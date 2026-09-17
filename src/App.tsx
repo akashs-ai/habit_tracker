@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Sidebar } from './components/Sidebar';
 import { Header } from './components/Header';
 import { HeroBanner } from './components/HeroBanner';
@@ -18,7 +18,6 @@ import {
   leaderboardFriends, 
   initialGoals, 
   initialNotes,
-  initialTasks,
   initialNotifications
 } from './data/mockData';
 import { initialCalendarEvents } from './data/calendarMockData';
@@ -45,16 +44,20 @@ import {
   UserSettingsProfile
 } from './types';
 import { Sparkles, X, CheckCircle2 } from 'lucide-react';
-import { TasksPage } from './components/tasks/TasksPage';
-import { CalendarPage } from './components/calendar/CalendarPage';
-import { GoalsPage } from './components/goals/GoalsPage';
-import { FriendsPage } from './components/friends/FriendsPage';
-import { RewardsPage } from './components/rewards/RewardsPage';
-import { AnalyticsPage } from './components/analytics/AnalyticsPage';
-import { AiCoachPage } from './components/aicoach/AiCoachPage';
-import { AiIntegrationPage } from './components/aiintegration/AiIntegrationPage';
-import { SettingsPage } from './components/settings/SettingsPage';
-import { LandingWelcomePage } from './components/auth/LandingWelcomePage';
+import { LoadingSkeleton } from './components/common/LoadingSkeleton';
+import { AppLoadingOverlay } from './components/common/AppLoadingOverlay';
+
+// Code-split pages for high performance, fast initial load, and optimal chunking
+const TasksPage = React.lazy(() => import('./components/tasks/TasksPage').then(m => ({ default: m.TasksPage })));
+const CalendarPage = React.lazy(() => import('./components/calendar/CalendarPage').then(m => ({ default: m.CalendarPage })));
+const GoalsPage = React.lazy(() => import('./components/goals/GoalsPage').then(m => ({ default: m.GoalsPage })));
+const FriendsPage = React.lazy(() => import('./components/friends/FriendsPage').then(m => ({ default: m.FriendsPage })));
+const RewardsPage = React.lazy(() => import('./components/rewards/RewardsPage').then(m => ({ default: m.RewardsPage })));
+const AnalyticsPage = React.lazy(() => import('./components/analytics/AnalyticsPage').then(m => ({ default: m.AnalyticsPage })));
+const AiCoachPage = React.lazy(() => import('./components/aicoach/AiCoachPage').then(m => ({ default: m.AiCoachPage })));
+const AiIntegrationPage = React.lazy(() => import('./components/aiintegration/AiIntegrationPage').then(m => ({ default: m.AiIntegrationPage })));
+const SettingsPage = React.lazy(() => import('./components/settings/SettingsPage').then(m => ({ default: m.SettingsPage })));
+const LandingWelcomePage = React.lazy(() => import('./components/auth/LandingWelcomePage').then(m => ({ default: m.LandingWelcomePage })));
 import { AuthModal } from './components/auth/AuthModal';
 import { GuestBanner } from './components/auth/GuestBanner';
 import { LevelUpModal } from './components/effects/LevelUpModal';
@@ -64,6 +67,9 @@ import { AuthUser, AuthScreenType, AppearanceSettings as AppearanceSettingsType 
 import { getStoredAppearance, applyAppearanceToDOM } from './utils/appearanceManager';
 import { subscribeToUserTable, isSupabaseConfigured, getSupabase } from './lib/supabase';
 import { initialAIModels } from './data/aiIntegrationMockData';
+import { getStoredUserCache, setStoredUserCache, clearUserCache, getLastActiveUserId } from './services/userCache';
+import { mapHabitRowToQuest, mapTaskRowToTaskItem } from './services/supabaseData';
+import { calculateProgressionDelta } from './utils/progression';
 
 export default function App() {
   const [activeTab, setActiveTab] = useState('dashboard');
@@ -94,27 +100,34 @@ export default function App() {
   const [searchQuery, setSearchQuery] = useState('');
   const [activeQuestFilter, setActiveQuestFilter] = useState<QuestCategory>('all');
 
+  // Synchronous pre-initialization from authenticated user cache if present
+  const initialCached = useMemo(() => {
+    const lastId = getLastActiveUserId();
+    return lastId ? getStoredUserCache(lastId) : null;
+  }, []);
+
   // Authentication States
-  const [currentUser, setCurrentUser] = useState<AuthUser | null>(null);
+  const [currentUser, setCurrentUser] = useState<AuthUser | null>(() => initialCached?.authUser || null);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [authModalScreen, setAuthModalScreen] = useState<AuthScreenType>('login');
   const [isGuestBannerDismissed, setIsGuestBannerDismissed] = useState(false);
   const [showLandingWelcome, setShowLandingWelcome] = useState(false);
   const [verifiedBannerMessage, setVerifiedBannerMessage] = useState<string | null>(null);
+  const [isInitialLoading, setIsInitialLoading] = useState(() => !initialCached);
 
   // Core Synchronized Data States
-  const [user, setUser] = useState(initialUserProfile);
-  const [quests, setQuests] = useState<Quest[]>(initialQuests);
-  const [tasks, setTasks] = useState<TaskItem[]>(initialTasks);
-  const [calendarEvents, setCalendarEvents] = useState<CalendarEvent[]>(initialCalendarEvents);
-  const [detailedGoals, setDetailedGoals] = useState<DetailedGoal[]>(initialGoalsData);
-  const [attributes, setAttributes] = useState(initialAttributes);
-  const [weeklyData, setWeeklyData] = useState(weeklyProgressData);
+  const [user, setUser] = useState(() => initialCached?.user || initialUserProfile);
+  const [quests, setQuests] = useState<Quest[]>(() => initialCached?.quests || initialQuests);
+  const [tasks, setTasks] = useState<TaskItem[]>(() => initialCached?.tasks ?? []);
+  const [calendarEvents, setCalendarEvents] = useState<CalendarEvent[]>(() => initialCached?.calendarEvents || initialCalendarEvents);
+  const [detailedGoals, setDetailedGoals] = useState<DetailedGoal[]>(() => initialCached?.goals || initialGoalsData);
+  const [attributes, setAttributes] = useState(() => initialCached?.attributes || initialAttributes);
+  const [weeklyData, setWeeklyData] = useState(() => initialCached?.weeklyData || weeklyProgressData);
   const [friends] = useState(leaderboardFriends);
-  const [notes, setNotes] = useState<QuickNote[]>(initialNotes);
-  const [rewards, setRewards] = useState<RewardItem[]>(initialFeaturedRewards);
-  const [badges, setBadges] = useState<RewardBadge[]>(initialBadges);
-  const [collection, setCollection] = useState<CollectionItem[]>(initialCollectionItems);
+  const [notes, setNotes] = useState<QuickNote[]>(() => initialCached?.notes || initialNotes);
+  const [rewards, setRewards] = useState<RewardItem[]>(() => initialCached?.rewards || initialFeaturedRewards);
+  const [badges, setBadges] = useState<RewardBadge[]>(() => initialCached?.badges || initialBadges);
+  const [collection, setCollection] = useState<CollectionItem[]>(() => initialCached?.collection || initialCollectionItems);
   const [notifications, setNotifications] = useState<AppNotification[]>(initialNotifications);
 
   // Notification action handlers
@@ -233,6 +246,17 @@ export default function App() {
       return;
     }
 
+    const cached = getStoredUserCache(authUser.id);
+    if (cached) {
+      syncFromBackend({
+        ...cached,
+        claims: cached.claims || [],
+        collectionItems: cached.collectionItems || cached.collection || [],
+      } as BackendState);
+    } else {
+      setIsInitialLoading(true);
+    }
+
     setCurrentUser(authUser);
     setShowLandingWelcome(false);
     try {
@@ -240,6 +264,8 @@ export default function App() {
       syncFromBackend(state);
     } catch (err) {
       console.warn('Sync state after auth:', err);
+    } finally {
+      setIsInitialLoading(false);
     }
   };
 
@@ -249,7 +275,13 @@ export default function App() {
     } catch (err) {
       console.warn('Logout error:', err);
     }
+    if (currentUser?.id) {
+      clearUserCache(currentUser.id);
+    } else {
+      clearUserCache();
+    }
     setCurrentUser(null);
+    setTasks([]);
     setShowLandingWelcome(true);
   };
 
@@ -295,6 +327,7 @@ export default function App() {
           } else if (event === 'SIGNED_OUT') {
             setCurrentUser(null);
             setStoredAuthToken(null);
+            setTasks([]);
             setShowLandingWelcome(true);
           }
         });
@@ -303,43 +336,49 @@ export default function App() {
     }
 
     const fetchInitialData = async () => {
-      // 2. Check current authenticated user session
       try {
-        const meRes = await api.getMe();
-        if (isMounted && meRes?.user) {
-          if (meRes.user.emailVerified || meRes.user.isGuest) {
-            setCurrentUser(meRes.user);
+        // ONE Consolidated Hydration Pipeline
+        try {
+          const meRes = await api.getMe();
+          if (!isMounted) return;
+
+          if (meRes?.user) {
+            if (meRes.user.emailVerified || meRes.user.isGuest) {
+              setCurrentUser(meRes.user);
+              setShowLandingWelcome(false);
+              if (meRes.state) {
+                syncFromBackend(meRes.state);
+              }
+            } else {
+              setCurrentUser(null);
+              setShowLandingWelcome(true);
+            }
+          }
+        } catch (err: any) {
+          if (!isMounted) return;
+          console.warn('Initial session check notice:', err?.message || err);
+
+          // If we have valid cached data for the user, keep it in offline/degraded mode
+          const activeUserId = getLastActiveUserId();
+          const cached = activeUserId ? getStoredUserCache(activeUserId) : null;
+          if (cached?.authUser) {
+            setCurrentUser(cached.authUser);
             setShowLandingWelcome(false);
+            syncFromBackend({
+              ...cached,
+              claims: cached.claims || [],
+              collectionItems: cached.collectionItems || cached.collection || [],
+            } as BackendState);
           } else {
+            // No session and no valid cache: show landing page
             setCurrentUser(null);
             setShowLandingWelcome(true);
           }
         }
-      } catch (err) {
-        // No active session initially; show landing page
+      } finally {
         if (isMounted) {
-          setShowLandingWelcome(true);
+          setIsInitialLoading(false);
         }
-      }
-
-      // 3. Authoritative state load
-      try {
-        const state = await api.getState();
-        if (isMounted && state) {
-          syncFromBackend(state);
-        }
-      } catch (err) {
-        console.warn('Backend not ready yet, using initialized local state:', err);
-      }
-
-      // 4. Initial AI agents load
-      try {
-        const agents = await api.getAIAgents();
-        if (isMounted && agents && agents.length > 0) {
-          setAiAgents(agents);
-        }
-      } catch (err) {
-        console.warn('AI agents initial load fallback:', err);
       }
     };
 
@@ -350,31 +389,112 @@ export default function App() {
     };
   }, []);
 
-  // Real-time synchronization when Supabase is configured
+  // Real-time synchronization when Supabase is configured (surgical updates without full refetches)
   useEffect(() => {
     if (!currentUser?.id || !isSupabaseConfigured()) return;
     const channels = [
       subscribeToUserTable(currentUser.id, {
         table: 'habits',
-        onInsert: () => api.getState().then(syncFromBackend).catch(console.warn),
-        onUpdate: () => api.getState().then(syncFromBackend).catch(console.warn),
-        onDelete: () => api.getState().then(syncFromBackend).catch(console.warn),
+        onInsert: (payload: any) => {
+          if (!payload) return;
+          const quest = mapHabitRowToQuest(payload, false);
+          setQuests((prev) => (prev.some((q) => q.id === quest.id) ? prev : [quest, ...prev]));
+        },
+        onUpdate: (payload: any) => {
+          if (!payload) return;
+          setQuests((prev) =>
+            prev.map((q) => {
+              if (q.id === payload.id) {
+                const mapped = mapHabitRowToQuest(payload, q.completed);
+                return { ...mapped, completed: q.completed };
+              }
+              return q;
+            })
+          );
+        },
+        onDelete: (payload: any) => {
+          if (!payload?.id) return;
+          setQuests((prev) => prev.filter((q) => q.id !== payload.id));
+        },
       }),
       subscribeToUserTable(currentUser.id, {
         table: 'habit_completions',
-        onInsert: () => api.getState().then(syncFromBackend).catch(console.warn),
-        onDelete: () => api.getState().then(syncFromBackend).catch(console.warn),
+        onInsert: (payload: any) => {
+          if (!payload?.habit_id) return;
+          setQuests((prev) =>
+            prev.map((q) => (q.id === payload.habit_id ? { ...q, completed: true } : q))
+          );
+        },
+        onDelete: (payload: any) => {
+          if (!payload?.habit_id) return;
+          setQuests((prev) =>
+            prev.map((q) => (q.id === payload.habit_id ? { ...q, completed: false } : q))
+          );
+        },
       }),
       subscribeToUserTable(currentUser.id, {
         table: 'profiles',
         filter: `id=eq.${currentUser.id}`,
-        onUpdate: () => api.getState().then(syncFromBackend).catch(console.warn),
+        onUpdate: (payload: any) => {
+          if (!payload) return;
+          setUser((prev) => ({
+            ...prev,
+            name: payload.display_name || prev.name,
+            displayName: payload.display_name || prev.displayName || prev.name,
+            username: payload.username || prev.username,
+            avatarUrl: payload.avatar_url || prev.avatarUrl,
+            bio: payload.bio || prev.bio,
+            level: payload.level ?? prev.level,
+            currentXp: payload.xp ?? prev.currentXp,
+            nextLevelXp: payload.xp_to_next_level ?? prev.nextLevelXp,
+            streak: payload.streak_days ?? prev.streak,
+            streakDays: payload.streak_days ?? prev.streakDays,
+            momentumPoints: payload.momentum_points ?? prev.momentumPoints,
+            totalPoints: payload.momentum_points ?? prev.totalPoints,
+          }));
+        },
       }),
       subscribeToUserTable(currentUser.id, {
         table: 'tasks',
-        onInsert: () => api.getState().then(syncFromBackend).catch(console.warn),
-        onUpdate: () => api.getState().then(syncFromBackend).catch(console.warn),
-        onDelete: () => api.getState().then(syncFromBackend).catch(console.warn),
+        onInsert: (payload: any) => {
+          if (!payload) return;
+          const task = mapTaskRowToTaskItem(payload);
+          if (task.clientTempId) {
+            tempIdToRealUuidMap.current.set(task.clientTempId, task.id);
+          }
+          setTasks((prev) => {
+            // 1. If this exact database UUID already exists, do not duplicate
+            if (prev.some((t) => t.id === task.id)) return prev;
+
+            // 2. If an optimistic task exists with this clientTempId, replace in-place
+            if (task.clientTempId && prev.some((t) => t.id === task.clientTempId || t.clientTempId === task.clientTempId)) {
+              return prev.map((t) =>
+                (t.id === task.clientTempId || t.clientTempId === task.clientTempId) ? task : t
+              );
+            }
+
+            // 3. Otherwise it is a genuinely new task from another tab or device
+            return [task, ...prev];
+          });
+        },
+        onUpdate: (payload: any) => {
+          if (!payload) return;
+          const task = mapTaskRowToTaskItem(payload);
+          if (task.clientTempId) {
+            tempIdToRealUuidMap.current.set(task.clientTempId, task.id);
+          }
+          setTasks((prev) =>
+            prev.map((t) =>
+              t.id === task.id || (task.clientTempId && (t.id === task.clientTempId || t.clientTempId === task.clientTempId))
+                ? task
+                : t
+            )
+          );
+        },
+        onDelete: (payload: any) => {
+          if (!payload?.id) return;
+          setTasks((prev) => prev.filter((t) => t.id !== payload.id));
+        },
       }),
       subscribeToUserTable(currentUser.id, {
         table: 'notifications',
@@ -496,45 +616,42 @@ export default function App() {
     });
   }, [detailedGoals]);
 
+  // Concurrency lock refs: prevent duplicate in-flight mutations for the same habit/task
+  const pendingQuestTogglesRef = useRef<Set<string>>(new Set());
+  const pendingTaskTogglesRef = useRef<Set<string>>(new Set());
+  const pendingCreationPromisesRef = useRef<Map<string, Promise<TaskItem>>>(new Map());
+  const tempIdToRealUuidMap = useRef<Map<string, string>>(new Map());
+
   // Handle Quest Complete / Toggle (Home)
   const handleToggleQuestComplete = async (questId: string) => {
-    // 1. Optimistic update
+    // 0. Concurrency guard: Ignore repeated clicks while mutation is already pending for this habit
+    if (pendingQuestTogglesRef.current.has(questId)) return;
+
     const target = quests.find((q) => q.id === questId);
     if (!target) return;
+
+    pendingQuestTogglesRef.current.add(questId);
     const isNowCompleted = !target.completed;
     const xpChange = isNowCompleted ? target.xpReward : -target.xpReward;
 
-    const previousQuests = [...quests];
-    const previousUser = { ...user };
-
+    // 1. Optimistic update
     setQuests((prev) =>
       prev.map((q) => (q.id === questId ? { ...q, completed: isNowCompleted } : q))
     );
 
     setUser((prevUser) => {
-      let newXp = prevUser.currentXp + xpChange;
-      let newLevel = prevUser.level;
-      let nextLevelXp = prevUser.nextLevelXp;
-
-      if (newXp >= nextLevelXp) {
-        newLevel += 1;
-        newXp = newXp - nextLevelXp;
-        nextLevelXp += 200;
-        setLevelUpLevel(newLevel);
+      const prog = calculateProgressionDelta(prevUser, xpChange, xpChange);
+      if (prog.level > prevUser.level) {
+        setLevelUpLevel(prog.level);
         setIsLevelUpOpen(true);
-      } else if (newXp < 0) {
-        newXp = 0;
       }
 
       return {
         ...prevUser,
-        currentXp: newXp,
-        level: newLevel,
-        nextLevelXp,
-        totalPoints: Math.max(0, prevUser.totalPoints + xpChange),
+        ...prog,
         questsDoneThisWeek: isNowCompleted
-          ? prevUser.questsDoneThisWeek + 1
-          : Math.max(0, prevUser.questsDoneThisWeek - 1),
+          ? (prevUser.questsDoneThisWeek ?? 0) + 1
+          : Math.max(0, (prevUser.questsDoneThisWeek ?? 0) - 1),
       };
     });
 
@@ -549,13 +666,27 @@ export default function App() {
 
     // 2. Authoritative backend transaction
     try {
-      const res = await api.toggleQuest(questId);
+      const res = await api.toggleQuest(questId, isNowCompleted);
+      if (res.quest) {
+        setQuests((prev) => prev.map((q) => (q.id === questId ? res.quest : q)));
+      }
+      if (res.userProgression) {
+        setUser((prev) => ({
+          ...prev,
+          ...res.userProgression,
+          totalPoints: res.userProgression?.momentumPoints ?? res.userProgression?.totalPoints ?? prev.totalPoints,
+          momentumPoints: res.userProgression?.momentumPoints ?? res.userProgression?.totalPoints ?? prev.momentumPoints,
+        }));
+      }
       if (res.state) syncFromBackend(res.state);
     } catch (err: any) {
       console.error('Quest toggle backend error:', err);
-      setQuests(previousQuests);
-      setUser(previousUser);
+      // Revert optimistic state with surgical delta rollback ONLY for this failing mutation
+      setQuests((prev) => prev.map((q) => (q.id === questId ? { ...q, completed: !isNowCompleted } : q)));
+      setUser((prevUser) => calculateProgressionDelta(prevUser, -xpChange, -xpChange));
       setVerifiedBannerMessage(`Failed to update habit: ${err?.message || 'Database error'}`);
+    } finally {
+      pendingQuestTogglesRef.current.delete(questId);
     }
   };
 
@@ -570,6 +701,9 @@ export default function App() {
 
     try {
       const res = await api.addQuest(newQuestData);
+      if (res.quest) {
+        setQuests((prev) => prev.map((q) => (q.id === optimisticQuest.id ? res.quest : q)));
+      }
       if (res.state) syncFromBackend(res.state);
     } catch (err: any) {
       console.error('Add quest error:', err);
@@ -614,41 +748,47 @@ export default function App() {
 
   // Task Handlers for TasksPage
   const handleToggleTaskComplete = async (taskId: string) => {
-    const target = tasks.find((t) => t.id === taskId);
+    // 0. Concurrency guard: Ignore repeated clicks while mutation is already pending for this task
+    if (pendingTaskTogglesRef.current.has(taskId)) return;
+
+    // Resolve real UUID if taskId was a temporary ID
+    let targetDbId = tempIdToRealUuidMap.current.get(taskId) || taskId;
+    if (pendingCreationPromisesRef.current.has(taskId)) {
+      try {
+        const createdTask = await pendingCreationPromisesRef.current.get(taskId);
+        if (createdTask?.id) {
+          targetDbId = createdTask.id;
+        }
+      } catch {
+        return; // Creation failed, abort toggle
+      }
+    }
+
+    const target = tasks.find((t) => t.id === taskId || t.id === targetDbId);
     if (!target) return;
+
+    pendingTaskTogglesRef.current.add(taskId);
+    if (targetDbId !== taskId) pendingTaskTogglesRef.current.add(targetDbId);
+
     const isNowCompleted = !target.completed;
     const xpReward = target.xpReward || 15;
     const xpChange = isNowCompleted ? xpReward : -xpReward;
 
-    const previousTasks = [...tasks];
-    const previousUser = { ...user };
-
-    // Optimistic UI updates
+    // 1. Optimistic UI updates
     setTasks((prev) =>
-      prev.map((t) => (t.id === taskId ? { ...t, completed: isNowCompleted } : t))
+      prev.map((t) => (t.id === taskId || t.id === targetDbId ? { ...t, completed: isNowCompleted } : t))
     );
 
     setUser((prevUser) => {
-      let newXp = prevUser.currentXp + xpChange;
-      let newLevel = prevUser.level;
-      let nextLevelXp = prevUser.nextLevelXp;
-
-      if (newXp >= nextLevelXp) {
-        newLevel += 1;
-        newXp = newXp - nextLevelXp;
-        nextLevelXp += 200;
-        setLevelUpLevel(newLevel);
+      const prog = calculateProgressionDelta(prevUser, xpChange, xpChange);
+      if (prog.level > prevUser.level) {
+        setLevelUpLevel(prog.level);
         setIsLevelUpOpen(true);
-      } else if (newXp < 0) {
-        newXp = 0;
       }
 
       return {
         ...prevUser,
-        currentXp: newXp,
-        level: newLevel,
-        nextLevelXp,
-        totalPoints: Math.max(0, prevUser.totalPoints + xpChange),
+        ...prog,
       };
     });
 
@@ -661,23 +801,43 @@ export default function App() {
       setTimeout(() => setXpToast(null), 2400);
     }
 
-    // Authoritative backend sync (cross-syncs tasks, quests, calendar & goals)
+    // 2. Authoritative backend sync (cross-syncs tasks, quests, calendar & goals)
     try {
-      const res = await api.toggleTask(taskId);
+      const res = await api.toggleTask(targetDbId, isNowCompleted);
+      if (res.task) {
+        setTasks((prev) =>
+          prev.map((t) => (t.id === taskId || t.id === targetDbId || t.id === res.task.id ? res.task : t))
+        );
+      }
+      if (res.userProgression) {
+        setUser((prev) => ({
+          ...prev,
+          ...res.userProgression,
+          totalPoints: res.userProgression?.momentumPoints ?? res.userProgression?.totalPoints ?? prev.totalPoints,
+          momentumPoints: res.userProgression?.momentumPoints ?? res.userProgression?.totalPoints ?? prev.momentumPoints,
+        }));
+      }
       if (res.state) syncFromBackend(res.state);
     } catch (err: any) {
       console.error('Task toggle backend error:', err);
-      // Revert optimistic state
-      setTasks(previousTasks);
-      setUser(previousUser);
+      // Revert optimistic state with surgical delta rollback ONLY for this failing mutation
+      setTasks((prev) =>
+        prev.map((t) => (t.id === taskId || t.id === targetDbId ? { ...t, completed: !isNowCompleted } : t))
+      );
+      setUser((prevUser) => calculateProgressionDelta(prevUser, -xpChange, -xpChange));
       setVerifiedBannerMessage(`Failed to update task: ${err?.message || 'Database error'}`);
+    } finally {
+      pendingTaskTogglesRef.current.delete(taskId);
+      pendingTaskTogglesRef.current.delete(targetDbId);
     }
   };
 
   const handleAddTask = async (newTaskData: Omit<TaskItem, 'id'>) => {
     const localToday = getTodayISO();
+    const clientTempId = `temp-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
     const taskWithClientDate: Omit<TaskItem, 'id'> = {
       ...newTaskData,
+      clientTempId,
       clientDate: newTaskData.clientDate || localToday,
       dueDate: newTaskData.dueDate || (newTaskData.dueText?.toLowerCase().includes('tomorrow')
         ? addDaysISO(localToday, 1)
@@ -686,45 +846,95 @@ export default function App() {
         : localToday),
     };
 
-    const previousTasks = [...tasks];
     const optimisticTask: TaskItem = {
-      id: `task-${Date.now()}`,
+      id: clientTempId,
       ...taskWithClientDate,
     };
     setTasks((prev) => [optimisticTask, ...prev]);
 
-    try {
+    const addPromise = (async () => {
       const res = await api.addTask(taskWithClientDate);
+      const realTask = res.task;
+      if (realTask) {
+        tempIdToRealUuidMap.current.set(clientTempId, realTask.id);
+        setTasks((prev) => {
+          const alreadyHasReal = prev.some((t) => t.id === realTask.id);
+          if (alreadyHasReal) {
+            return prev.filter((t) => t.id !== clientTempId);
+          }
+          return prev.map((t) => (t.id === clientTempId ? realTask : t));
+        });
+      }
       if (res.state) syncFromBackend(res.state);
+      return realTask;
+    })();
+
+    pendingCreationPromisesRef.current.set(clientTempId, addPromise);
+
+    try {
+      await addPromise;
     } catch (err: any) {
       console.error('Add task error:', err);
-      setTasks(previousTasks);
+      setTasks((prev) => prev.filter((t) => t.id !== clientTempId));
       setVerifiedBannerMessage(`Failed to create task: ${err?.message || 'Database error'}`);
+    } finally {
+      pendingCreationPromisesRef.current.delete(clientTempId);
     }
   };
 
   const handleUpdateTask = async (updatedTask: TaskItem) => {
-    const previousTasks = [...tasks];
-    setTasks((prev) => prev.map((t) => (t.id === updatedTask.id ? updatedTask : t)));
+    let effectiveTask = { ...updatedTask };
+    if (pendingCreationPromisesRef.current.has(updatedTask.id)) {
+      try {
+        const created = await pendingCreationPromisesRef.current.get(updatedTask.id);
+        if (created?.id) effectiveTask.id = created.id;
+      } catch {
+        return;
+      }
+    } else if (tempIdToRealUuidMap.current.has(updatedTask.id)) {
+      effectiveTask.id = tempIdToRealUuidMap.current.get(updatedTask.id)!;
+    }
+
+    setTasks((prev) =>
+      prev.map((t) => (t.id === updatedTask.id || t.id === effectiveTask.id ? effectiveTask : t))
+    );
     try {
-      const res = await api.updateTask(updatedTask);
+      const res = await api.updateTask(effectiveTask);
+      if (res.task) {
+        setTasks((prev) =>
+          prev.map((t) => (t.id === updatedTask.id || t.id === effectiveTask.id ? res.task : t))
+        );
+      }
       if (res.state) syncFromBackend(res.state);
     } catch (err: any) {
       console.error('Update task error:', err);
-      setTasks(previousTasks);
+      setTasks((prev) =>
+        prev.map((t) => (t.id === updatedTask.id || t.id === effectiveTask.id ? updatedTask : t))
+      );
       setVerifiedBannerMessage(`Failed to save task: ${err?.message || 'Database error'}`);
     }
   };
 
   const handleDeleteTask = async (taskId: string) => {
-    const previousTasks = [...tasks];
-    setTasks((prev) => prev.filter((t) => t.id !== taskId));
+    let effectiveTaskId = taskId;
+    if (pendingCreationPromisesRef.current.has(taskId)) {
+      try {
+        const created = await pendingCreationPromisesRef.current.get(taskId);
+        if (created?.id) effectiveTaskId = created.id;
+      } catch {
+        setTasks((prev) => prev.filter((t) => t.id !== taskId));
+        return;
+      }
+    } else if (tempIdToRealUuidMap.current.has(taskId)) {
+      effectiveTaskId = tempIdToRealUuidMap.current.get(taskId)!;
+    }
+
+    setTasks((prev) => prev.filter((t) => t.id !== taskId && t.id !== effectiveTaskId));
     try {
-      const res = await api.deleteTask(taskId);
+      const res = await api.deleteTask(effectiveTaskId);
       if (res.state) syncFromBackend(res.state);
     } catch (err: any) {
       console.error('Delete task error:', err);
-      setTasks(previousTasks);
       setVerifiedBannerMessage(`Failed to delete task: ${err?.message || 'Database error'}`);
     }
   };
@@ -903,17 +1113,32 @@ export default function App() {
     }
   };
 
+  // Render global visual skeleton overlay while authoritative state is being fetched
+  if (isInitialLoading) {
+    return <AppLoadingOverlay />;
+  }
+
   return (
-    <div className={`min-h-screen flex bg-[#F8FAFC] text-slate-900 dark:bg-[#08090B] dark:text-[#F5F7FF] font-sans transition-colors duration-200`}>
+    <div className={`min-h-screen flex bg-[#F8FAFC] text-slate-900 dark:bg-[#08090B] dark:text-[#F5F7FF] font-sans transition-colors duration-200 relative`}>
+      {/* Accessible Skip to Main Content Link */}
+      <a
+        href="#main-content"
+        className="sr-only focus:not-sr-only focus:fixed focus:top-4 focus:left-4 focus:z-50 focus:px-4 focus:py-2 focus:bg-[#7C6CFF] focus:text-white focus:rounded-xl focus:shadow-xl focus:text-sm focus:font-semibold focus:outline-none focus:ring-2 focus:ring-white"
+      >
+        Skip to main content
+      </a>
+
       {/* Full-screen Landing Welcome View if user logged out or requests landing */}
       {showLandingWelcome ? (
         <div className="flex-1 w-full min-h-screen">
-          <LandingWelcomePage
-            onOpenLogin={() => handleOpenAuth('login')}
-            onOpenSignUp={() => handleOpenAuth('signup')}
-            onContinueAsGuest={() => handleOpenAuth('guest_prompt')}
-            onDirectExplore={() => setShowLandingWelcome(false)}
-          />
+          <React.Suspense fallback={<div className="min-h-screen flex items-center justify-center p-6"><LoadingSkeleton type="card" count={2} /></div>}>
+            <LandingWelcomePage
+              onOpenLogin={() => handleOpenAuth('login')}
+              onOpenSignUp={() => handleOpenAuth('signup')}
+              onContinueAsGuest={() => handleOpenAuth('guest_prompt')}
+              onDirectExplore={() => setShowLandingWelcome(false)}
+            />
+          </React.Suspense>
         </div>
       ) : (
         <>
@@ -928,7 +1153,7 @@ export default function App() {
               onSetThemeMode={(mode) => handleUpdateAppearance({ theme: mode })}
               userLevel={user.level}
               currentUser={currentUser}
-              momentumPoints={(user as any).momentumPoints ?? 4320}
+              momentumPoints={user.momentumPoints ?? user.totalPoints ?? 0}
             />
           </div>
 
@@ -958,7 +1183,7 @@ export default function App() {
                     onSetThemeMode={(mode) => handleUpdateAppearance({ theme: mode })}
                     userLevel={user.level}
                     currentUser={currentUser}
-                    momentumPoints={(user as any).momentumPoints ?? 4320}
+                    momentumPoints={user.momentumPoints ?? user.totalPoints ?? 0}
                   />
                 </div>
               </div>
@@ -993,7 +1218,15 @@ export default function App() {
             )}
 
       {/* Main Content Area: Switch between Settings, AI Integration, AI Coach, Analytics, Rewards, Friends, Goals, Calendar, Tasks, and Dashboard */}
-      {activeTab === 'settings' ? (
+      <React.Suspense fallback={
+        <div className="flex-1 flex flex-col min-w-0 p-6 md:p-8 max-w-[1600px] mx-auto w-full space-y-6">
+          <LoadingSkeleton type="banner" count={1} />
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <LoadingSkeleton type="card" count={3} />
+          </div>
+        </div>
+      }>
+        {activeTab === 'settings' ? (
         <SettingsPage
           isDark={isDark}
           setIsDark={handleToggleTheme}
@@ -1018,7 +1251,7 @@ export default function App() {
           onSyncModels={handleSyncAIModels}
           isSyncing={isSyncingAI}
           lastSyncedTime={aiLastSyncedTime}
-          userEmail={user.email || 'iitangaming18@gmail.com'}
+          userEmail={currentUser?.email || user.email || ''}
         />
       ) : (activeTab === 'ai-coach' || activeTab === 'coach' || activeTab === 'aicoach' || activeTab === 'ai_coach') ? (
         <AiCoachPage
@@ -1031,7 +1264,7 @@ export default function App() {
           onSyncModels={handleSyncAIModels}
           isSyncingModels={isSyncingAI}
           lastSyncedTime={aiLastSyncedTime}
-          userEmail={user.email || 'iitangaming18@gmail.com'}
+          userEmail={currentUser?.email || user.email || ''}
           onAddTaskToToday={(taskTitle) => {
             handleAddTask({
               title: taskTitle,
@@ -1061,10 +1294,10 @@ export default function App() {
           isDark={isDark}
           setIsDark={handleToggleTheme}
           onToggleMobileMenu={() => setIsMobileMenuOpen(true)}
-          liveMomentumPoints={(user as any).momentumPoints ?? 4320}
-          livePointsThisWeek={(user as any).pointsThisWeek ?? 240}
-          liveStreakDays={(user as any).streakDays ?? user.streakDays}
-          liveWeeklyConsistency={(user as any).weeklyConsistency ?? 92}
+          liveMomentumPoints={user.momentumPoints ?? user.totalPoints ?? 0}
+          livePointsThisWeek={user.pointsThisWeek ?? 0}
+          liveStreakDays={user.streakDays ?? user.streak ?? 0}
+          liveWeeklyConsistency={user.weeklyConsistency ?? 0}
           liveLevel={user.level}
           liveCurrentXP={user.currentXp}
           liveMaxXP={user.nextLevelXp}
@@ -1140,7 +1373,7 @@ export default function App() {
           />
 
           {/* Page Container */}
-          <main className="flex-1 px-4 sm:px-6 lg:px-8 py-6 max-w-[1600px] w-full mx-auto">
+          <main id="main-content" tabIndex={-1} className="flex-1 px-4 sm:px-6 lg:px-8 py-6 max-w-[1600px] w-full mx-auto focus:outline-none">
             {/* 2-Column Responsive Layout */}
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
               
@@ -1185,6 +1418,7 @@ export default function App() {
           </main>
         </div>
       )}
+      </React.Suspense>
 
             {/* Team Expo Developer Footer */}
             <Footer className="pb-24 lg:pb-6" />

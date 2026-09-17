@@ -18,6 +18,7 @@ interface TaskRowProps {
   onToggleComplete: (id: string) => void;
   onUpdateTask: (task: TaskItem) => void;
   onDeleteTask: (id: string) => void;
+  defaultExpanded?: boolean;
 }
 
 export const TaskRow: React.FC<TaskRowProps> = ({
@@ -25,8 +26,9 @@ export const TaskRow: React.FC<TaskRowProps> = ({
   onToggleComplete,
   onUpdateTask,
   onDeleteTask,
+  defaultExpanded = false,
 }) => {
-  const [isExpanded, setIsExpanded] = useState(task.id === 'task-1'); // Default expand first task to show rich detail
+  const [isExpanded, setIsExpanded] = useState(defaultExpanded);
   const [isCompleting, setIsCompleting] = useState(false);
   const [showXpAnim, setShowXpAnim] = useState(false);
   const [showMenu, setShowMenu] = useState(false);

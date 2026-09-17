@@ -82,14 +82,14 @@ export const RewardsPage: React.FC<RewardsPageProps> = ({
   // Global search input in top bar
   const [globalSearch, setGlobalSearch] = useState('');
 
-  // Rewards State (fallback to defaults if live not provided)
-  const momentumPoints = liveMomentumPoints !== undefined ? liveMomentumPoints : initialMomentumPoints;
-  const pointsThisWeek = livePointsThisWeek !== undefined ? livePointsThisWeek : initialPointsThisWeek;
-  const streakDays = liveStreakDays !== undefined ? liveStreakDays : initialStreakDays;
-  const weeklyConsistency = liveWeeklyConsistency !== undefined ? liveWeeklyConsistency : initialWeeklyConsistency;
-  const level = liveLevel !== undefined ? liveLevel : initialLevel;
-  const currentXP = liveCurrentXP !== undefined ? liveCurrentXP : initialXP;
-  const maxXP = liveMaxXP !== undefined ? liveMaxXP : initialMaxXP;
+  // Rewards State (authoritative with safe defaults if loading)
+  const momentumPoints = liveMomentumPoints !== undefined ? liveMomentumPoints : 0;
+  const pointsThisWeek = livePointsThisWeek !== undefined ? livePointsThisWeek : 0;
+  const streakDays = liveStreakDays !== undefined ? liveStreakDays : 0;
+  const weeklyConsistency = liveWeeklyConsistency !== undefined ? liveWeeklyConsistency : 0;
+  const level = liveLevel !== undefined ? liveLevel : 1;
+  const currentXP = liveCurrentXP !== undefined ? liveCurrentXP : 0;
+  const maxXP = liveMaxXP !== undefined ? liveMaxXP : 500;
 
   const [localRewardsList, setLocalRewardsList] = useState<RewardItem[]>(initialFeaturedRewards);
   const rewardsList = liveRewards && liveRewards.length > 0 ? liveRewards : localRewardsList;

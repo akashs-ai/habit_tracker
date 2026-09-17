@@ -72,6 +72,9 @@ export interface UserProfile {
   totalPoints: number;
   momentumPoints?: number;
   questsDoneThisWeek: number;
+  pointsThisWeek?: number;
+  weeklyConsistency?: number;
+  rank?: string;
   xp?: number;
   avatarUrl?: string;
   bio?: string;
@@ -94,6 +97,7 @@ export interface TaskAttachment {
 
 export interface TaskItem {
   id: string;
+  clientTempId?: string;
   title: string;
   description?: string;
   completed: boolean;

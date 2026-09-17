@@ -88,8 +88,8 @@ export const Header: React.FC<HeaderProps> = ({
 
   const unreadCount = notifications.filter((n) => !n.read).length;
 
-  const displayName = currentUser?.fullName || (currentUser?.isGuest ? 'Guest Explorer' : 'Alex Das');
-  const displayEmail = currentUser?.email || 'iitangaming18@gmail.com';
+  const displayName = currentUser?.fullName || (currentUser?.isGuest ? 'Guest Explorer' : (currentUser?.email ? currentUser.email.split('@')[0] : 'Adventurer'));
+  const displayEmail = currentUser?.email || '';
   const displayAvatar = currentUser?.avatarUrl || (typeof window !== 'undefined' ? localStorage.getItem('liferpg_user_avatar') : null) || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop&q=80';
 
   return (

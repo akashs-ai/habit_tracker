@@ -463,10 +463,10 @@ export const TasksPage: React.FC<TasksPageProps> = ({
           {/* Right Column: Progress & Focus Widgets */}
           <div className="w-full lg:w-auto">
             <TasksRightPanel
-              completedCount={counts.completed || 3}
-              remainingCount={counts.today || 2}
-              overdueCount={counts.overdue || 1}
-              totalCount={counts.all || 8}
+              completedCount={counts.completed ?? 0}
+              remainingCount={counts.today ?? 0}
+              overdueCount={counts.overdue ?? 0}
+              totalCount={counts.all ?? 0}
             />
           </div>
 

@@ -9,10 +9,10 @@ interface TasksRightPanelProps {
 }
 
 export const TasksRightPanel: React.FC<TasksRightPanelProps> = ({
-  completedCount = 3,
-  remainingCount = 2,
-  overdueCount = 1,
-  totalCount = 8
+  completedCount = 0,
+  remainingCount = 0,
+  overdueCount = 0,
+  totalCount = 0
 }) => {
   // Focus Mode Timer State
   const [selectedDuration, setSelectedDuration] = useState(25); // minutes
@@ -53,8 +53,8 @@ export const TasksRightPanel: React.FC<TasksRightPanelProps> = ({
     return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
   };
 
-  // Donut chart math for 5/8 Tasks
-  const ratio = totalCount > 0 ? (completedCount + 2) / totalCount : 0.625; // 5/8 representation
+  // Donut chart math with safe zero handling
+  const ratio = totalCount > 0 ? Math.min(Math.max(completedCount / totalCount, 0), 1) : 0;
   const radius = 28;
   const circumference = 2 * Math.PI * radius;
   const strokeDashoffset = circumference - ratio * circumference;
@@ -102,7 +102,7 @@ export const TasksRightPanel: React.FC<TasksRightPanelProps> = ({
             </svg>
             <div className="absolute flex flex-col items-center justify-center text-center">
               <span className="text-base font-bold text-[#0F172A] dark:text-[#F8FAFC] leading-none">
-                5<span className="text-xs font-normal text-[#64748B]">/8</span>
+                {completedCount}<span className="text-xs font-normal text-[#64748B]">/{totalCount}</span>
               </span>
               <span className="text-[10px] text-[#64748B] dark:text-[#94A3B8]">Tasks</span>
             </div>

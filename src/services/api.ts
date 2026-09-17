@@ -35,7 +35,14 @@ import {
   fetchUserHabitsFromSupabase,
   toggleHabitCompletionInSupabase,
   createUserHabitInSupabase,
+  updateUserHabitInSupabase,
+  deleteUserHabitInSupabase,
 } from './supabaseData';
+import {
+  getStoredUserCache,
+  setStoredUserCache,
+  clearUserCache,
+} from './userCache';
 import {
   initialUserProfile,
   initialQuests,
@@ -353,7 +360,7 @@ export interface RewardTermsPolicy {
 
 export const api = {
   // --- Authentication ---
-  async getMe(): Promise<{ user: AuthUser; token: string; state: FullAppState }> {
+  async getMe(): Promise<{ user: AuthUser; token: string; state: FullAppState; fromCache?: boolean }> {
     // 1. Check Supabase session first if configured
     if (isSupabaseConfigured()) {
       try {
@@ -370,50 +377,56 @@ export const api = {
               throw new Error('Email not verified. Please verify your email first.');
             }
 
-            let profile: any = null;
-            let userProgression: UserProfile | undefined = undefined;
-            try {
-              const profData = await fetchUserProfileFromSupabase(sbUser.id);
-              if (profData) {
-                profile = profData.profile;
-                userProgression = profData.userProgression;
-              }
-            } catch (e) {
-              console.warn('Profile fetch note:', e);
-            }
-
-            const authUser = supabaseUserToAuthUser(sbUser, profile);
-            authUser.emailVerified = isEmailVerified;
             const token = sessionData.session.access_token;
             setStoredAuthToken(token);
 
-            let userTasks: TaskItem[] = [];
-            let userHabits: Quest[] = [];
-            try {
-              [userTasks, userHabits] = await Promise.all([
-                fetchUserTasksFromSupabase(sbUser.id),
-                fetchUserHabitsFromSupabase(sbUser.id),
-              ]);
-            } catch (taskErr) {
-              console.warn('Failed to load user tasks/habits from Supabase:', taskErr);
-            }
+            // Read client cache scoped strictly to this user
+            const cached = getStoredUserCache(sbUser.id);
 
-            const state = getDefaultAppState(authUser);
-            if (userProgression) {
-              state.user = {
-                ...state.user,
-                ...userProgression,
-              };
-            }
-            state.tasks = userTasks;
-            if (userHabits && userHabits.length > 0) {
-              state.quests = userHabits;
-            }
+            // Single parallel data-fetching pipeline directly to Supabase - NO redundant waterfalls
+            const [profData, userTasks, userHabits] = await Promise.all([
+              fetchUserProfileFromSupabase(sbUser.id).catch(() => null),
+              fetchUserTasksFromSupabase(sbUser.id).catch(() => []),
+              fetchUserHabitsFromSupabase(sbUser.id).catch(() => []),
+            ]);
+
+            const authUser = supabaseUserToAuthUser(sbUser, profData?.profile);
+            authUser.emailVerified = isEmailVerified;
+
+            // Assemble authoritative state (Supabase data + preserved user items)
+            const baseState = getDefaultAppState(authUser);
+            const state: FullAppState = {
+              user: profData?.userProgression
+                ? { ...baseState.user, ...profData.userProgression }
+                : (cached?.user ? { ...baseState.user, ...cached.user } : baseState.user),
+              quests: (userHabits && userHabits.length > 0)
+                ? userHabits
+                : (cached?.quests || baseState.quests),
+              tasks: userTasks,
+              calendarEvents: cached?.calendarEvents || baseState.calendarEvents,
+              goals: cached?.goals || cached?.detailedGoals || baseState.goals,
+              rewards: cached?.rewards || baseState.rewards,
+              badges: cached?.badges || baseState.badges,
+              collectionItems: cached?.collectionItems || cached?.collection || baseState.collectionItems,
+              waysToEarn: cached?.waysToEarn || baseState.waysToEarn,
+              claims: cached?.claims || baseState.claims,
+              notes: cached?.notes || baseState.notes,
+              attributes: cached?.attributes || baseState.attributes,
+              weeklyData: cached?.weeklyData || baseState.weeklyData,
+              aiAgents: cached?.aiAgents || baseState.aiAgents,
+            };
+
+            // Atomically update user-scoped cache
+            setStoredUserCache(sbUser.id, {
+              ...state,
+              authUser,
+            });
 
             return {
               user: authUser,
               token,
               state,
+              fromCache: false,
             };
           }
         }
@@ -991,13 +1004,20 @@ export const api = {
     if (isSupabaseConfigured()) {
       try {
         const sb = getSupabase();
-        if (sb) await sb.auth.signOut();
+        if (sb) {
+          const { data: { session } } = await sb.auth.getSession();
+          if (session?.user?.id) {
+            clearUserCache(session.user.id);
+          }
+          await sb.auth.signOut();
+        }
       } catch (e) {
         console.warn('Supabase signOut error:', e);
       }
     }
     setStoredAuthToken(null);
     clearLocalGuestSession();
+    clearUserCache();
   },
 
   async deleteAccount(): Promise<void> {
@@ -1097,36 +1117,40 @@ export const api = {
           const { data: { session } } = await sb.auth.getSession();
           if (session?.user?.id) {
             const userId = session.user.id;
+            const cached = getStoredUserCache(userId);
+
             const [profData, userTasks, userHabits] = await Promise.all([
               fetchUserProfileFromSupabase(userId).catch(() => null),
               fetchUserTasksFromSupabase(userId).catch(() => []),
               fetchUserHabitsFromSupabase(userId).catch(() => []),
             ]);
 
-            let backendState: FullAppState | null = null;
-            try {
-              const res = await authFetch('/api/state');
-              if (res.ok) {
-                const json = await safeResponseJson(res, 'Failed to load application state');
-                if (json?.data) backendState = json.data;
-              }
-            } catch {
-              // backend not reachable
-            }
-
             const authUser = supabaseUserToAuthUser(session.user, profData?.profile);
-            const baseState = backendState || getDefaultAppState(authUser);
-            baseState.tasks = userTasks;
-            if (userHabits && userHabits.length > 0) {
-              baseState.quests = userHabits;
-            }
-            if (profData?.userProgression) {
-              baseState.user = {
-                ...baseState.user,
-                ...profData.userProgression,
-              };
-            }
-            return baseState;
+            const baseState = getDefaultAppState(authUser);
+
+            const state: FullAppState = {
+              user: profData?.userProgression
+                ? { ...baseState.user, ...profData.userProgression }
+                : (cached?.user ? { ...baseState.user, ...cached.user } : baseState.user),
+              quests: (userHabits && userHabits.length > 0)
+                ? userHabits
+                : (cached?.quests || baseState.quests),
+              tasks: userTasks,
+              calendarEvents: cached?.calendarEvents || baseState.calendarEvents,
+              goals: cached?.goals || cached?.detailedGoals || baseState.goals,
+              rewards: cached?.rewards || baseState.rewards,
+              badges: cached?.badges || baseState.badges,
+              collectionItems: cached?.collectionItems || cached?.collection || baseState.collectionItems,
+              waysToEarn: cached?.waysToEarn || baseState.waysToEarn,
+              claims: cached?.claims || baseState.claims,
+              notes: cached?.notes || baseState.notes,
+              attributes: cached?.attributes || baseState.attributes,
+              weeklyData: cached?.weeklyData || baseState.weeklyData,
+              aiAgents: cached?.aiAgents || baseState.aiAgents,
+            };
+
+            setStoredUserCache(userId, { ...state, authUser });
+            return state;
           }
         }
       } catch (sbErr) {
@@ -1147,22 +1171,29 @@ export const api = {
   },
 
   // 2. Quests
-  async toggleQuest(questId: string): Promise<{ quest: Quest; state?: FullAppState }> {
+  async toggleQuest(questId: string, forceCompleted?: boolean): Promise<{ quest: Quest; userProgression?: Partial<UserProfile>; state?: FullAppState }> {
     if (isSupabaseConfigured()) {
       try {
         const sb = getSupabase();
         if (sb) {
           const { data: { session } } = await sb.auth.getSession();
           if (session?.user?.id) {
-            const updatedQuest = await toggleHabitCompletionInSupabase(session.user.id, questId);
+            const updatedQuest = await toggleHabitCompletionInSupabase(session.user.id, questId, forceCompleted);
 
-            authFetch('/api/quests/toggle', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ questId }),
-            }).catch(() => {});
+            // Update user cache locally with new quest state and progression
+            const cached = getStoredUserCache(session.user.id);
+            if (cached) {
+              const newQuests = cached.quests.map((q) => (q.id === updatedQuest.id ? updatedQuest : q));
+              const newUser = updatedQuest.userProgression
+                ? { ...cached.user, ...updatedQuest.userProgression }
+                : cached.user;
+              setStoredUserCache(session.user.id, { quests: newQuests, user: newUser });
+            }
 
-            return { quest: updatedQuest, state: await this.getState() };
+            return {
+              quest: updatedQuest,
+              userProgression: updatedQuest.userProgression,
+            };
           }
         }
       } catch (err: any) {
@@ -1174,7 +1205,7 @@ export const api = {
     const res = await authFetch('/api/quests/toggle', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ questId }),
+      body: JSON.stringify({ questId, forceCompleted }),
     });
     const json = await safeResponseJson(res, 'Failed to toggle quest');
     if (!res.ok || !json.success) throw new Error(json.error || 'Failed to toggle quest');
@@ -1189,14 +1220,11 @@ export const api = {
           const { data: { session } } = await sb.auth.getSession();
           if (session?.user?.id) {
             const newQuest = await createUserHabitInSupabase(session.user.id, questData);
-
-            authFetch('/api/quests', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify(questData),
-            }).catch(() => {});
-
-            return { quest: newQuest, state: await this.getState() };
+            const cached = getStoredUserCache(session.user.id);
+            if (cached) {
+              setStoredUserCache(session.user.id, { quests: [newQuest, ...cached.quests] });
+            }
+            return { quest: newQuest };
           }
         }
       } catch (err: any) {
@@ -1215,29 +1243,94 @@ export const api = {
     return { quest: json.data, state: json.state };
   },
 
-  // 3. Tasks
-  async toggleTask(taskId: string): Promise<{ task: TaskItem; state?: FullAppState }> {
+  async updateQuest(questId: string, updates: Partial<Quest>): Promise<{ quest: Quest; state?: FullAppState }> {
     if (isSupabaseConfigured()) {
       try {
         const sb = getSupabase();
         if (sb) {
           const { data: { session } } = await sb.auth.getSession();
           if (session?.user?.id) {
-            const { data: currentTask } = await sb
-              .from('tasks')
-              .select('completed')
-              .eq('id', taskId)
-              .eq('user_id', session.user.id)
-              .single();
+            const updated = await updateUserHabitInSupabase(session.user.id, questId, updates);
+            const cached = getStoredUserCache(session.user.id);
+            if (cached) {
+              setStoredUserCache(session.user.id, {
+                quests: cached.quests.map((q) => (q.id === questId ? updated : q)),
+              });
+            }
+            return { quest: updated };
+          }
+        }
+      } catch (err: any) {
+        console.error('Supabase updateQuest error:', err);
+        throw err;
+      }
+    }
 
-            const isNowCompleted = currentTask ? !currentTask.completed : true;
-            const task = await toggleUserTaskInSupabase(session.user.id, taskId, isNowCompleted);
-            
-            authFetch(`/api/tasks/${taskId}/toggle`, {
-              method: 'POST',
-            }).catch(() => {});
-            
-            return { task, state: await this.getState() };
+    const res = await authFetch(`/api/quests/${questId}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(updates),
+    });
+    const json = await safeResponseJson(res, 'Failed to update quest');
+    if (!res.ok || !json.success) throw new Error(json.error || 'Failed to update quest');
+    return { quest: json.data, state: json.state };
+  },
+
+  async deleteQuest(questId: string): Promise<void> {
+    if (isSupabaseConfigured()) {
+      try {
+        const sb = getSupabase();
+        if (sb) {
+          const { data: { session } } = await sb.auth.getSession();
+          if (session?.user?.id) {
+            await deleteUserHabitInSupabase(session.user.id, questId);
+            const cached = getStoredUserCache(session.user.id);
+            if (cached) {
+              setStoredUserCache(session.user.id, {
+                quests: cached.quests.filter((q) => q.id !== questId),
+              });
+            }
+            return;
+          }
+        }
+      } catch (err: any) {
+        console.error('Supabase deleteQuest error:', err);
+        throw err;
+      }
+    }
+
+    await authFetch(`/api/quests/${questId}`, {
+      method: 'DELETE',
+    });
+  },
+
+  // 3. Tasks
+  async toggleTask(taskId: string, forceCompleted?: boolean): Promise<{ task: TaskItem; userProgression?: Partial<UserProfile>; state?: FullAppState }> {
+    if (isSupabaseConfigured()) {
+      try {
+        const sb = getSupabase();
+        if (sb) {
+          const { data: { session } } = await sb.auth.getSession();
+          if (session?.user?.id) {
+            let isNowCompleted = forceCompleted;
+            if (isNowCompleted === undefined) {
+              const { data: currentTask } = await sb
+                .from('tasks')
+                .select('completed')
+                .eq('id', taskId)
+                .eq('user_id', session.user.id)
+                .single();
+              isNowCompleted = currentTask ? !currentTask.completed : true;
+            }
+
+            const { task, userProgression } = await toggleUserTaskInSupabase(session.user.id, taskId, isNowCompleted);
+            const cached = getStoredUserCache(session.user.id);
+            if (cached) {
+              const updatedTasks = cached.tasks.map((t) => (t.id === task.id ? task : t));
+              const newUser = userProgression ? { ...cached.user, ...userProgression } : cached.user;
+              setStoredUserCache(session.user.id, { tasks: updatedTasks, user: newUser });
+            }
+            return { task, userProgression };
           }
         }
       } catch (err: any) {
@@ -1248,6 +1341,8 @@ export const api = {
 
     const res = await authFetch(`/api/tasks/${taskId}/toggle`, {
       method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ taskId, forceCompleted }),
     });
     const json = await safeResponseJson(res, 'Failed to toggle task');
     if (!res.ok || !json.success) throw new Error(json.error || 'Failed to toggle task');
@@ -1262,12 +1357,14 @@ export const api = {
           const { data: { session } } = await sb.auth.getSession();
           if (session?.user?.id) {
             const task = await createUserTaskInSupabase(session.user.id, taskData);
-            authFetch('/api/tasks', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify(taskData),
-            }).catch(() => {});
-            return { task, state: await this.getState() };
+            const cached = getStoredUserCache(session.user.id);
+            if (cached) {
+              const cleanedTasks = cached.tasks.filter(
+                (t) => t.id !== task.id && (!task.clientTempId || t.id !== task.clientTempId)
+              );
+              setStoredUserCache(session.user.id, { tasks: [task, ...cleanedTasks] });
+            }
+            return { task };
           }
         }
       } catch (err: any) {
@@ -1283,7 +1380,8 @@ export const api = {
     });
     const json = await safeResponseJson(res, 'Failed to add task');
     if (!res.ok || !json.success) throw new Error(json.error || 'Failed to add task');
-    return { task: json.data, state: json.state };
+    const task: TaskItem = { ...json.data, clientTempId: (taskData as any).clientTempId };
+    return { task, state: json.state };
   },
 
   async updateTask(taskData: TaskItem): Promise<{ task: TaskItem; state?: FullAppState }> {
@@ -1294,12 +1392,12 @@ export const api = {
           const { data: { session } } = await sb.auth.getSession();
           if (session?.user?.id) {
             const task = await updateUserTaskInSupabase(session.user.id, taskData);
-            authFetch(`/api/tasks/${taskData.id}`, {
-              method: 'PUT',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify(taskData),
-            }).catch(() => {});
-            return { task, state: await this.getState() };
+            const cached = getStoredUserCache(session.user.id);
+            if (cached) {
+              const updatedTasks = cached.tasks.map((t) => (t.id === task.id ? task : t));
+              setStoredUserCache(session.user.id, { tasks: updatedTasks });
+            }
+            return { task };
           }
         }
       } catch (err: any) {
@@ -1318,7 +1416,7 @@ export const api = {
     return { task: json.data, state: json.state };
   },
 
-  async deleteTask(taskId: string): Promise<{ state?: FullAppState }> {
+  async deleteTask(taskId: string): Promise<{ success?: boolean; taskId?: string; state?: FullAppState }> {
     if (isSupabaseConfigured()) {
       try {
         const sb = getSupabase();
@@ -1326,10 +1424,12 @@ export const api = {
           const { data: { session } } = await sb.auth.getSession();
           if (session?.user?.id) {
             await deleteUserTaskInSupabase(session.user.id, taskId);
-            authFetch(`/api/tasks/${taskId}`, {
-              method: 'DELETE',
-            }).catch(() => {});
-            return { state: await this.getState() };
+            const cached = getStoredUserCache(session.user.id);
+            if (cached) {
+              const updatedTasks = cached.tasks.filter((t) => t.id !== taskId);
+              setStoredUserCache(session.user.id, { tasks: updatedTasks });
+            }
+            return { success: true, taskId };
           }
         }
       } catch (err: any) {

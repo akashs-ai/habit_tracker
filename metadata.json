@@ -1,6 +1,6 @@
 {
   "name": "LifeRPG",
-  "description": "LifeRPG - Daily productivity and habit tracker dashboard with RPG progression, Google Calendar sync, and multi-agent AI coaching with ChatGPT, Claude, and Gemini",
+  "description": "LifeRPG – Gamified Habit Tracker & Daily RPG Productivity with XP progression, streaks, 14-week consistency analytics, and AI multi-agent coaching",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

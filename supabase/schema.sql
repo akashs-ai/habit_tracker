@@ -851,12 +851,8 @@ BEGIN
     v_event_date := NEW.completed_date;
   END IF;
 
-  -- Determine user reference date: whichever is latest between the mutated date and remaining completions
-  SELECT MAX(completed_date) INTO v_max_user_date
-  FROM public.habit_completions
-  WHERE user_id = v_user_id;
-
-  v_user_ref_date := GREATEST(v_event_date, COALESCE(v_max_user_date, v_event_date));
+  -- User reference date: Anchored to at least CURRENT_DATE to prevent historical streak revival
+  v_user_ref_date := GREATEST(CURRENT_DATE, v_event_date);
 
   -- 1. Calculate & update overall user streak in public.profiles
   v_user_streak := public.calculate_user_streak(v_user_id, v_user_ref_date);
@@ -865,12 +861,8 @@ BEGIN
       updated_at = now()
   WHERE id = v_user_id;
 
-  -- Determine habit reference date: whichever is latest between the mutated date and remaining completions for this habit
-  SELECT MAX(completed_date) INTO v_max_habit_date
-  FROM public.habit_completions
-  WHERE habit_id = v_habit_id;
-
-  v_habit_ref_date := GREATEST(v_event_date, COALESCE(v_max_habit_date, v_event_date));
+  -- Habit reference date: Anchored to at least CURRENT_DATE
+  v_habit_ref_date := GREATEST(CURRENT_DATE, v_event_date);
 
   -- 2. Calculate & update individual habit streak in public.habits
   v_habit_streak := public.calculate_habit_streak(v_habit_id, v_habit_ref_date);
@@ -894,6 +886,77 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
 
+-- Authoritative progression synchronization function
+CREATE OR REPLACE FUNCTION public.apply_user_progression_delta(
+  p_user_id UUID,
+  p_xp_delta INT,
+  p_points_delta INT DEFAULT NULL
+)
+RETURNS JSONB AS $$
+DECLARE
+  v_points_delta INT := COALESCE(p_points_delta, p_xp_delta);
+  v_rec RECORD;
+  v_level INT;
+  v_xp INT;
+  v_next_xp INT;
+  v_points INT;
+  v_streak INT;
+BEGIN
+  IF p_user_id IS NULL THEN
+    RAISE EXCEPTION 'p_user_id cannot be null';
+  END IF;
+
+  IF auth.uid() IS NOT NULL AND auth.uid() != p_user_id THEN
+    RAISE EXCEPTION 'Unauthorized: Cannot modify progression for another user';
+  END IF;
+
+  SELECT level, xp, xp_to_next_level, momentum_points, streak_days
+  INTO v_rec
+  FROM public.profiles
+  WHERE id = p_user_id
+  FOR UPDATE;
+
+  IF NOT FOUND THEN
+    RETURN jsonb_build_object('error', 'Profile not found');
+  END IF;
+
+  v_level := GREATEST(1, COALESCE(v_rec.level, 1));
+  v_xp := COALESCE(v_rec.xp, 0) + p_xp_delta;
+  v_next_xp := COALESCE(v_rec.xp_to_next_level, 500 + (v_level - 1) * 200);
+  v_points := GREATEST(0, COALESCE(v_rec.momentum_points, 0) + v_points_delta);
+  v_streak := COALESCE(v_rec.streak_days, 0);
+
+  IF p_xp_delta > 0 THEN
+    WHILE v_xp >= v_next_xp LOOP
+      v_xp := v_xp - v_next_xp;
+      v_level := v_level + 1;
+      v_next_xp := 500 + (v_level - 1) * 200;
+    END LOOP;
+  ELSIF p_xp_delta < 0 THEN
+    IF v_xp < 0 THEN
+      v_xp := 0;
+    END IF;
+  END IF;
+
+  UPDATE public.profiles
+  SET level = v_level,
+      xp = v_xp,
+      xp_to_next_level = v_next_xp,
+      momentum_points = v_points,
+      updated_at = now()
+  WHERE id = p_user_id;
+
+  RETURN jsonb_build_object(
+    'level', v_level,
+    'currentXp', v_xp,
+    'nextLevelXp', v_next_xp,
+    'totalPoints', v_points,
+    'momentumPoints', v_points,
+    'streakDays', v_streak
+  );
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
+
 DROP TRIGGER IF EXISTS on_habit_completion_streak ON public.habit_completions;
 CREATE TRIGGER on_habit_completion_streak
   AFTER INSERT OR DELETE ON public.habit_completions
@@ -912,9 +975,14 @@ BEGIN
 END $$;
 
 -- ============================================================================
--- SUPABASE REALTIME REPLICATION PUBLICATION
+-- SUPABASE REALTIME REPLICATION PUBLICATION & REPLICA IDENTITY
 -- Enable live synchronization for collaborative and cross-device features
 -- ============================================================================
+ALTER TABLE public.habit_completions REPLICA IDENTITY FULL;
+ALTER TABLE public.habits REPLICA IDENTITY FULL;
+ALTER TABLE public.profiles REPLICA IDENTITY FULL;
+ALTER TABLE public.tasks REPLICA IDENTITY FULL;
+
 ALTER PUBLICATION supabase_realtime ADD TABLE public.habits;
 ALTER PUBLICATION supabase_realtime ADD TABLE public.habit_completions;
 ALTER PUBLICATION supabase_realtime ADD TABLE public.tasks;
@@ -932,3 +1000,9 @@ BEGIN
     ALTER PUBLICATION supabase_realtime ADD TABLE public.profiles;
   END IF;
 END $$;
+
+-- Security: Explicitly revoke execution from public and anon, grant to authenticated only
+REVOKE EXECUTE ON FUNCTION public.apply_user_progression_delta(UUID, INT, INT) FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION public.apply_user_progression_delta(UUID, INT, INT) FROM anon;
+GRANT EXECUTE ON FUNCTION public.apply_user_progression_delta(UUID, INT, INT) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.calculate_user_streak(UUID, DATE) TO authenticated;
