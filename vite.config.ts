@@ -18,18 +18,19 @@ export default defineConfig(() => {
       rollupOptions: {
         output: {
           manualChunks(id) {
-            if (id.includes('node_modules')) {
-              if (id.includes('react') || id.includes('react-dom')) {
-                return 'vendor-react';
+            const normalizedId = id.replace(/\\/g, '/');
+            if (normalizedId.includes('/node_modules/')) {
+              if (/[\\/]node_modules[\\/](framer-motion|motion|motion-dom|motion-utils)[\\/]/.test(normalizedId)) {
+                return 'vendor-motion';
               }
-              if (id.includes('lucide-react')) {
+              if (/[\\/]node_modules[\\/]lucide-react[\\/]/.test(normalizedId)) {
                 return 'vendor-icons';
               }
-              if (id.includes('@supabase')) {
-                return 'vendor-supabase';
+              if (/[\\/]node_modules[\\/](react|react-dom|scheduler)[\\/]/.test(normalizedId)) {
+                return 'vendor-react';
               }
-              if (id.includes('motion')) {
-                return 'vendor-motion';
+              if (/[\\/]node_modules[\\/]@supabase[\\/]/.test(normalizedId)) {
+                return 'vendor-supabase';
               }
               return 'vendor-deps';
             }
