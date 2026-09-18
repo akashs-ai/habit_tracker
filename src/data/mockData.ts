@@ -10,6 +10,20 @@ export const initialUserProfile: UserProfile = {
   questsDoneThisWeek: 5,
 };
 
+export const freshUserProfile: UserProfile = {
+  name: 'Adventurer',
+  level: 1,
+  currentXp: 0,
+  nextLevelXp: 500,
+  streakDays: 0,
+  streak: 0,
+  totalPoints: 0,
+  momentumPoints: 0,
+  questsDoneThisWeek: 0,
+  pointsThisWeek: 0,
+  weeklyConsistency: 0,
+};
+
 export const initialQuests: Quest[] = [
   {
     id: 'quest-1',
@@ -96,6 +110,45 @@ export const initialAttributes: Attribute[] = [
   },
 ];
 
+export const freshAttributes: Attribute[] = [
+  {
+    id: 'attr-1',
+    name: 'Intellect',
+    level: 1,
+    percentage: 0,
+    color: '#7C6CFF',
+    bgLight: '#EEECFF',
+    iconName: 'Sparkles',
+  },
+  {
+    id: 'attr-2',
+    name: 'Discipline',
+    level: 1,
+    percentage: 0,
+    color: '#F97316',
+    bgLight: '#FFF7ED',
+    iconName: 'Flame',
+  },
+  {
+    id: 'attr-3',
+    name: 'Strength',
+    level: 1,
+    percentage: 0,
+    color: '#EA580C',
+    bgLight: '#FFEDD5',
+    iconName: 'BicepsFlexed',
+  },
+  {
+    id: 'attr-4',
+    name: 'Knowledge',
+    level: 1,
+    percentage: 0,
+    color: '#3B82F6',
+    bgLight: '#EFF6FF',
+    iconName: 'BookOpen',
+  },
+];
+
 export const weeklyProgressData: WeeklyData[] = [
   { day: 'Monday', dayShort: 'Mon', xp: 180, heightPercent: 45 },
   { day: 'Tuesday', dayShort: 'Tue', xp: 260, heightPercent: 68 },
@@ -104,6 +157,16 @@ export const weeklyProgressData: WeeklyData[] = [
   { day: 'Friday', dayShort: 'Fri', xp: 190, heightPercent: 48 },
   { day: 'Saturday', dayShort: 'Sat', xp: 140, heightPercent: 35 },
   { day: 'Sunday', dayShort: 'Sun', xp: 220, heightPercent: 58 },
+];
+
+export const freshWeeklyData: WeeklyData[] = [
+  { day: 'Monday', dayShort: 'Mon', xp: 0, heightPercent: 0 },
+  { day: 'Tuesday', dayShort: 'Tue', xp: 0, heightPercent: 0 },
+  { day: 'Wednesday', dayShort: 'Wed', xp: 0, heightPercent: 0 },
+  { day: 'Thursday', dayShort: 'Thu', xp: 0, heightPercent: 0 },
+  { day: 'Friday', dayShort: 'Fri', xp: 0, heightPercent: 0 },
+  { day: 'Saturday', dayShort: 'Sat', xp: 0, heightPercent: 0 },
+  { day: 'Sunday', dayShort: 'Sun', xp: 0, heightPercent: 0 },
 ];
 
 export const leaderboardFriends: FriendLeaderboardItem[] = [

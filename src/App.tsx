@@ -12,9 +12,13 @@ import { AddNoteModal } from './components/AddNoteModal';
 import { MobileBottomNav } from './components/MobileBottomNav';
 import { 
   initialUserProfile, 
+  freshUserProfile,
   initialQuests, 
+  initialTasks,
   initialAttributes, 
+  freshAttributes,
   weeklyProgressData, 
+  freshWeeklyData,
   leaderboardFriends, 
   initialGoals, 
   initialNotes,
@@ -116,29 +120,50 @@ export default function App() {
   const [isInitialLoading, setIsInitialLoading] = useState(() => !initialCached);
 
   // Core Synchronized Data States
-  const [user, setUser] = useState(() => initialCached?.user || initialUserProfile);
+  const isAuthUserCached = Boolean(initialCached?.authUser && !initialCached.authUser.isGuest);
+
+  const [user, setUser] = useState(() => {
+    if (initialCached?.user) return initialCached.user;
+    return isAuthUserCached ? freshUserProfile : initialUserProfile;
+  });
   const [quests, setQuests] = useState<Quest[]>(() => {
-    if (initialCached?.authUser && !initialCached.authUser.isGuest) {
-      return Array.isArray(initialCached.quests)
-        ? initialCached.quests.filter((q) => !q.id.startsWith('quest-'))
+    if (isAuthUserCached) {
+      return Array.isArray(initialCached?.quests)
+        ? initialCached!.quests.filter((q) => !q.id.startsWith('quest-'))
         : [];
     }
     return initialCached?.quests || initialQuests;
   });
   const [tasks, setTasks] = useState<TaskItem[]>(() => {
-    if (initialCached?.authUser && !initialCached.authUser.isGuest) {
-      return Array.isArray(initialCached.tasks)
-        ? initialCached.tasks.filter((t) => !t.id.startsWith('task-'))
+    if (isAuthUserCached) {
+      return Array.isArray(initialCached?.tasks)
+        ? initialCached!.tasks.filter((t) => !t.id.startsWith('task-'))
         : [];
     }
-    return initialCached?.tasks ?? [];
+    return initialCached?.tasks || initialTasks;
   });
-  const [calendarEvents, setCalendarEvents] = useState<CalendarEvent[]>(() => initialCached?.calendarEvents || initialCalendarEvents);
-  const [detailedGoals, setDetailedGoals] = useState<DetailedGoal[]>(() => initialCached?.goals || initialGoalsData);
-  const [attributes, setAttributes] = useState(() => initialCached?.attributes || initialAttributes);
-  const [weeklyData, setWeeklyData] = useState(() => initialCached?.weeklyData || weeklyProgressData);
+  const [calendarEvents, setCalendarEvents] = useState<CalendarEvent[]>(() => {
+    if (initialCached?.calendarEvents) return initialCached.calendarEvents;
+    return isAuthUserCached ? [] : initialCalendarEvents;
+  });
+  const [detailedGoals, setDetailedGoals] = useState<DetailedGoal[]>(() => {
+    if (initialCached?.goals) return initialCached.goals;
+    if (initialCached?.detailedGoals) return initialCached.detailedGoals;
+    return isAuthUserCached ? [] : initialGoalsData;
+  });
+  const [attributes, setAttributes] = useState(() => {
+    if (initialCached?.attributes) return initialCached.attributes;
+    return isAuthUserCached ? freshAttributes : initialAttributes;
+  });
+  const [weeklyData, setWeeklyData] = useState(() => {
+    if (initialCached?.weeklyData) return initialCached.weeklyData;
+    return isAuthUserCached ? freshWeeklyData : weeklyProgressData;
+  });
   const [friends] = useState(leaderboardFriends);
-  const [notes, setNotes] = useState<QuickNote[]>(() => initialCached?.notes || initialNotes);
+  const [notes, setNotes] = useState<QuickNote[]>(() => {
+    if (initialCached?.notes) return initialCached.notes;
+    return isAuthUserCached ? [] : initialNotes;
+  });
   const [rewards, setRewards] = useState<RewardItem[]>(() => initialCached?.rewards || initialFeaturedRewards);
   const [badges, setBadges] = useState<RewardBadge[]>(() => initialCached?.badges || initialBadges);
   const [collection, setCollection] = useState<CollectionItem[]>(() => {
@@ -148,7 +173,9 @@ export default function App() {
     return initialCollectionItems;
   });
   const lastPointsUpdateTimestampRef = useRef<number>(0);
-  const [notifications, setNotifications] = useState<AppNotification[]>(initialNotifications);
+  const [notifications, setNotifications] = useState<AppNotification[]>(() => {
+    return isAuthUserCached ? [] : initialNotifications;
+  });
 
   // Notification action handlers
   const handleMarkNotificationAsRead = (id: string) => {
@@ -288,8 +315,18 @@ export default function App() {
         collectionItems: cached.collectionItems || cached.collection || [],
       } as BackendState, { allowTaskSync: true });
     } else {
-      setTasks([]);
-      setQuests([]);
+      // Clean slate for brand-new or uncached user
+      const isAuth = !authUser.isGuest;
+      setUser(isAuth ? { ...freshUserProfile, name: authUser.fullName || authUser.username || 'Adventurer' } : initialUserProfile);
+      setQuests(isAuth ? [] : [...initialQuests]);
+      setTasks(isAuth ? [] : [...initialTasks]);
+      setDetailedGoals(isAuth ? [] : [...initialGoalsData]);
+      setCalendarEvents(isAuth ? [] : [...initialCalendarEvents]);
+      setNotes(isAuth ? [] : [...initialNotes]);
+      setAttributes(isAuth ? [...freshAttributes] : [...initialAttributes]);
+      setWeeklyData(isAuth ? [...freshWeeklyData] : [...weeklyProgressData]);
+      setCollection([]);
+      setNotifications(isAuth ? [] : [...initialNotifications]);
       setIsInitialLoading(true);
     }
 
@@ -317,10 +354,15 @@ export default function App() {
       clearUserCache();
     }
     setCurrentUser(null);
+    setUser(freshUserProfile);
     setTasks([]);
     setQuests([]);
     setDetailedGoals([]);
     setCalendarEvents([]);
+    setNotes([]);
+    setAttributes([...freshAttributes]);
+    setWeeklyData([...freshWeeklyData]);
+    setNotifications([]);
     setCollection([]);
     setRewards(initialFeaturedRewards);
     setShowLandingWelcome(true);
@@ -368,10 +410,15 @@ export default function App() {
           } else if (event === 'SIGNED_OUT') {
             setCurrentUser(null);
             setStoredAuthToken(null);
+            setUser(freshUserProfile);
             setTasks([]);
             setQuests([]);
             setDetailedGoals([]);
             setCalendarEvents([]);
+            setNotes([]);
+            setAttributes([...freshAttributes]);
+            setWeeklyData([...freshWeeklyData]);
+            setNotifications([]);
             setCollection([]);
             setRewards(initialFeaturedRewards);
             setShowLandingWelcome(true);

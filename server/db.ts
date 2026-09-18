@@ -36,9 +36,12 @@ import {
 } from '../src/types';
 import { 
   initialUserProfile, 
+  freshUserProfile,
   initialQuests, 
   initialAttributes, 
+  freshAttributes,
   weeklyProgressData, 
+  freshWeeklyData,
   initialNotes 
 } from '../src/data/mockData';
 import { initialCalendarEvents } from '../src/data/calendarMockData';
@@ -746,108 +749,145 @@ class LifeRpgDatabase {
 
   public createStarterStore(name: string, isGuest: boolean): AppStoreData {
     const todayStr = getTodayDateStr();
-    const starterQuests: Quest[] = [
-      {
-        id: `quest-${Date.now()}-1`,
-        title: 'Morning Focus Sprint',
-        subtitle: '25 min deep work sprint',
-        category: 'focus',
-        durationMinutes: 25,
-        xpReward: 35,
-        attribute: 'Intellect',
-        completed: false,
-      },
-      {
-        id: `quest-${Date.now()}-2`,
-        title: 'Daily Reflection & Plan',
-        subtitle: 'Review priorities for the day',
-        category: 'personal',
-        durationMinutes: 10,
-        xpReward: 20,
-        attribute: 'Discipline',
-        completed: false,
-      },
-    ];
 
-    const starterTasks: TaskItem[] = [
-      {
-        id: `task-${Date.now()}-1`,
-        title: isGuest ? 'Explore LifeRPG Dashboard' : 'Complete your initial onboarding quest',
-        description: 'Check out habits, tasks, calendar, and AI coaching guidance.',
-        completed: false,
-        viewCategory: 'today',
-        dueText: 'Today',
-        dueDate: todayStr,
-        clientDate: todayStr,
-        dueTime: '11:00 AM',
-        labels: ['Discipline', 'Onboarding'],
-        priority: 'high',
-        xpReward: 30,
-      },
-      {
-        id: `task-${Date.now()}-2`,
-        title: 'Check in with AI Coach',
-        description: 'Ask AI Coach for habit strategies and productivity momentum.',
-        completed: false,
-        viewCategory: 'today',
-        dueText: 'Today',
-        dueDate: todayStr,
-        clientDate: todayStr,
-        dueTime: '02:00 PM',
-        labels: ['Focus'],
-        priority: 'medium',
-        xpReward: 20,
-      },
-    ];
+    if (isGuest) {
+      const starterQuests: Quest[] = [
+        {
+          id: `quest-${Date.now()}-1`,
+          title: 'Morning Focus Sprint',
+          subtitle: '25 min deep work sprint',
+          category: 'focus',
+          durationMinutes: 25,
+          xpReward: 35,
+          attribute: 'Intellect',
+          completed: false,
+        },
+        {
+          id: `quest-${Date.now()}-2`,
+          title: 'Daily Reflection & Plan',
+          subtitle: 'Review priorities for the day',
+          category: 'personal',
+          durationMinutes: 10,
+          xpReward: 20,
+          attribute: 'Discipline',
+          completed: false,
+        },
+      ];
 
+      const starterTasks: TaskItem[] = [
+        {
+          id: `task-${Date.now()}-1`,
+          title: 'Explore LifeRPG Dashboard',
+          description: 'Check out habits, tasks, calendar, and AI coaching guidance.',
+          completed: false,
+          viewCategory: 'today',
+          dueText: 'Today',
+          dueDate: todayStr,
+          clientDate: todayStr,
+          dueTime: '11:00 AM',
+          labels: ['Discipline', 'Onboarding'],
+          priority: 'high',
+          xpReward: 30,
+        },
+        {
+          id: `task-${Date.now()}-2`,
+          title: 'Check in with AI Coach',
+          description: 'Ask AI Coach for habit strategies and productivity momentum.',
+          completed: false,
+          viewCategory: 'today',
+          dueText: 'Today',
+          dueDate: todayStr,
+          clientDate: todayStr,
+          dueTime: '02:00 PM',
+          labels: ['Focus'],
+          priority: 'medium',
+          xpReward: 20,
+        },
+      ];
+
+      return {
+        user: {
+          name,
+          level: 1,
+          currentXp: 0,
+          nextLevelXp: 500,
+          streakDays: 0,
+          streak: 0,
+          totalPoints: 0,
+          questsDoneThisWeek: 0,
+          momentumPoints: 50,
+          pointsThisWeek: 0,
+          weeklyConsistency: 100,
+        },
+        quests: starterQuests,
+        tasks: starterTasks,
+        calendarEvents: createLiveAnchoredEvents(todayStr),
+        goals: initialGoalsData.slice(0, 2),
+        rewards: initialFeaturedRewards,
+        badges: initialBadges,
+        collectionItems: initialCollectionItems,
+        waysToEarn: initialWaysToEarn,
+        claims: [],
+        notes: [
+          {
+            id: `note-${Date.now()}`,
+            type: 'purple',
+            title: 'Guest Explorer Note',
+            content: 'You are currently in Guest Mode. Check off tasks, complete quests, and earn XP. Click "Create Account" when ready to permanently preserve your progress!',
+            bullets: [
+              'Complete daily quests to build streaks',
+              'Time-box tasks on the Calendar',
+              'Earn Momentum Points to redeem rewards',
+            ],
+          },
+        ],
+        attributes: initialAttributes,
+        weeklyData: weeklyProgressData,
+        activityHistory: [
+          {
+            date: todayStr,
+            habitsCompleted: 0,
+            tasksCompleted: 0,
+            xpEarned: 0,
+            momentumPointsEarned: 0,
+          },
+        ],
+        termsPolicy: REWARD_TERMS_POLICY,
+        aiAgents: defaultAIAgents,
+        lastUpdated: new Date().toISOString(),
+      };
+    }
+
+    // Authenticated users: pure zero-state across all application entities
     return {
       user: {
+        ...freshUserProfile,
         name,
+        displayName: name,
         level: 1,
         currentXp: 0,
-        nextLevelXp: 300,
-        streakDays: 1,
+        nextLevelXp: 500,
+        streakDays: 0,
+        streak: 0,
         totalPoints: 0,
+        momentumPoints: 0,
         questsDoneThisWeek: 0,
-        momentumPoints: isGuest ? 50 : 150,
-        pointsThisWeek: isGuest ? 50 : 150,
-        weeklyConsistency: 100,
+        pointsThisWeek: 0,
+        weeklyConsistency: 0,
       },
-      quests: starterQuests,
-      tasks: starterTasks,
-      calendarEvents: createLiveAnchoredEvents(todayStr),
-      goals: initialGoalsData.slice(0, 2),
+      quests: [],
+      tasks: [],
+      calendarEvents: [],
+      goals: [],
       rewards: initialFeaturedRewards,
       badges: initialBadges,
-      collectionItems: initialCollectionItems,
+      collectionItems: [],
       waysToEarn: initialWaysToEarn,
       claims: [],
-      notes: [
-        {
-          id: `note-${Date.now()}`,
-          type: 'purple',
-          title: isGuest ? 'Guest Explorer Note' : 'Welcome to LifeRPG',
-          content: isGuest
-            ? 'You are currently in Guest Mode. Check off tasks, complete quests, and earn XP. Click "Create Account" when ready to permanently preserve your progress!'
-            : 'Track habits, set big goals, unlock rewards, and chat with your AI Coach.',
-          bullets: [
-            'Complete daily quests to build streaks',
-            'Time-box tasks on the Calendar',
-            'Earn Momentum Points to redeem rewards',
-          ],
-        },
-      ],
-      attributes: initialAttributes,
-      weeklyData: weeklyProgressData,
-      activityHistory: [
-        {
-          date: todayStr,
-          habitsCompleted: 0,
-          tasksCompleted: 0,
-          xpEarned: 0,
-          momentumPointsEarned: 0,
-        },
-      ],
+      notes: [],
+      attributes: freshAttributes,
+      weeklyData: freshWeeklyData,
+      activityHistory: [],
       termsPolicy: REWARD_TERMS_POLICY,
       aiAgents: defaultAIAgents,
       lastUpdated: new Date().toISOString(),

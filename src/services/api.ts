@@ -48,9 +48,12 @@ import {
 } from './userCache';
 import {
   initialUserProfile,
+  freshUserProfile,
   initialQuests,
   initialAttributes,
+  freshAttributes,
   weeklyProgressData,
+  freshWeeklyData,
   initialNotes,
   initialTasks,
 } from '../data/mockData';
@@ -262,28 +265,65 @@ export function supabaseUserToAuthUser(sbUser: any, profile?: any): AuthUser {
 }
 
 export function getDefaultAppState(user?: AuthUser): FullAppState {
-  const memberName = user?.fullName || user?.username || 'Adventurer';
-  const isGuest = Boolean(user?.isGuest);
+  const isGuest = !user || Boolean(user.isGuest);
+  const memberName = user?.fullName || user?.username || (isGuest ? 'Adventurer Guest' : 'Adventurer');
+
+  if (isGuest) {
+    return {
+      user: {
+        ...initialUserProfile,
+        name: memberName,
+        momentumPoints: 50,
+        pointsThisWeek: 0,
+        weeklyConsistency: 100,
+      },
+      quests: [...initialQuests],
+      tasks: [...initialTasks],
+      calendarEvents: [...initialCalendarEvents],
+      goals: [...initialGoalsData],
+      rewards: [...initialFeaturedRewards],
+      badges: [...initialBadges],
+      collectionItems: [...initialCollectionItems],
+      waysToEarn: [...initialWaysToEarn],
+      claims: [],
+      notes: [...initialNotes],
+      attributes: [...initialAttributes],
+      weeklyData: [...weeklyProgressData],
+      aiAgents: [...initialAIModels],
+    };
+  }
+
+  // Authenticated users with zero application records receive pure zero-state
   return {
     user: {
-      ...initialUserProfile,
+      ...freshUserProfile,
       name: memberName,
-      momentumPoints: isGuest ? 50 : 0,
+      displayName: memberName,
+      username: user?.username || '',
+      avatarUrl: user?.avatarUrl,
+      level: 1,
+      currentXp: 0,
+      nextLevelXp: 500,
+      streakDays: 0,
+      streak: 0,
+      totalPoints: 0,
+      momentumPoints: 0,
+      questsDoneThisWeek: 0,
       pointsThisWeek: 0,
-      weeklyConsistency: isGuest ? 100 : 0,
+      weeklyConsistency: 0,
     },
-    quests: isGuest ? [...initialQuests] : [],
-    tasks: isGuest ? [...initialTasks] : [],
-    calendarEvents: [...initialCalendarEvents],
-    goals: [...initialGoalsData],
+    quests: [],
+    tasks: [],
+    calendarEvents: [],
+    goals: [],
     rewards: [...initialFeaturedRewards],
     badges: [...initialBadges],
-    collectionItems: user ? [] : [...initialCollectionItems],
+    collectionItems: [],
     waysToEarn: [...initialWaysToEarn],
     claims: [],
-    notes: [...initialNotes],
-    attributes: [...initialAttributes],
-    weeklyData: [...weeklyProgressData],
+    notes: [],
+    attributes: [...freshAttributes],
+    weeklyData: [...freshWeeklyData],
     aiAgents: [...initialAIModels],
   };
 }
