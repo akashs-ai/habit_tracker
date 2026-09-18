@@ -71,6 +71,15 @@ export function getStoredUserCache(userId: string): CachedUserData | null {
     if (!raw) return null;
     const parsed: CachedUserData = JSON.parse(raw);
     if (!parsed || parsed.userId !== userId) return null;
+    // Sanitize any mock tasks or mock quests that might have previously leaked into authenticated user cache
+    if (parsed.authUser && !parsed.authUser.isGuest) {
+      if (Array.isArray(parsed.tasks)) {
+        parsed.tasks = parsed.tasks.filter((t) => !t.id.startsWith('task-'));
+      }
+      if (Array.isArray(parsed.quests)) {
+        parsed.quests = parsed.quests.filter((q) => !q.id.startsWith('quest-'));
+      }
+    }
     return parsed;
   } catch (err) {
     console.warn('Failed to read user cache:', err);
@@ -93,12 +102,19 @@ export function setStoredUserCache(userId: string, state: Partial<CachedUserData
   if (!userId || typeof window === 'undefined') return;
   try {
     const existing = getStoredUserCache(userId);
+    const authUser = state.authUser || existing?.authUser;
+    const isAuth = Boolean(authUser && !authUser.isGuest);
+    const rawTasks = Array.isArray(state.tasks) ? state.tasks : (existing?.tasks || []);
+    const sanitizedTasks = isAuth ? rawTasks.filter((t) => !t.id.startsWith('task-')) : rawTasks;
+    const rawQuests = Array.isArray(state.quests) ? state.quests : (existing?.quests || []);
+    const sanitizedQuests = isAuth ? rawQuests.filter((q) => !q.id.startsWith('quest-')) : rawQuests;
+
     const updated: CachedUserData = {
       userId,
-      authUser: state.authUser || existing?.authUser,
+      authUser,
       user: state.user || existing?.user || ({} as any),
-      quests: state.quests || existing?.quests || [],
-      tasks: state.tasks || existing?.tasks || [],
+      quests: sanitizedQuests,
+      tasks: sanitizedTasks,
       calendarEvents: state.calendarEvents || existing?.calendarEvents || [],
       goals: state.goals || existing?.goals || [],
       detailedGoals: state.detailedGoals || existing?.detailedGoals || state.goals || existing?.goals,

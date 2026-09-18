@@ -117,8 +117,22 @@ export default function App() {
 
   // Core Synchronized Data States
   const [user, setUser] = useState(() => initialCached?.user || initialUserProfile);
-  const [quests, setQuests] = useState<Quest[]>(() => initialCached?.quests || initialQuests);
-  const [tasks, setTasks] = useState<TaskItem[]>(() => initialCached?.tasks ?? []);
+  const [quests, setQuests] = useState<Quest[]>(() => {
+    if (initialCached?.authUser && !initialCached.authUser.isGuest) {
+      return Array.isArray(initialCached.quests)
+        ? initialCached.quests.filter((q) => !q.id.startsWith('quest-'))
+        : [];
+    }
+    return initialCached?.quests || initialQuests;
+  });
+  const [tasks, setTasks] = useState<TaskItem[]>(() => {
+    if (initialCached?.authUser && !initialCached.authUser.isGuest) {
+      return Array.isArray(initialCached.tasks)
+        ? initialCached.tasks.filter((t) => !t.id.startsWith('task-'))
+        : [];
+    }
+    return initialCached?.tasks ?? [];
+  });
   const [calendarEvents, setCalendarEvents] = useState<CalendarEvent[]>(() => initialCached?.calendarEvents || initialCalendarEvents);
   const [detailedGoals, setDetailedGoals] = useState<DetailedGoal[]>(() => initialCached?.goals || initialGoalsData);
   const [attributes, setAttributes] = useState(() => initialCached?.attributes || initialAttributes);
@@ -167,11 +181,24 @@ export default function App() {
   const [xpToast, setXpToast] = useState<{ show: boolean; xp: number; attribute: string } | null>(null);
 
   // Reconcile complete authoritative backend state into React
-  const syncFromBackend = (data: BackendState) => {
+  const syncFromBackend = (data: BackendState, options?: { allowTaskSync?: boolean }) => {
     if (!data) return;
     if (data.user) setUser(data.user);
-    if (data.quests) setQuests(data.quests);
-    if (data.tasks) setTasks(data.tasks);
+    // For authenticated users, Supabase is the sole authoritative source for quests/habits and tasks.
+    // Never allow unscoped Express state or mutation side-effects to overwrite authenticated habits/tasks.
+    const isAuthUser = Boolean(currentUser && !currentUser.isGuest);
+    const shouldSyncQuests = Array.isArray(data.quests) && (!isAuthUser || options?.allowTaskSync);
+    if (shouldSyncQuests) {
+      const finalQuests = isAuthUser ? data.quests.filter((q) => !q.id.startsWith('quest-')) : data.quests;
+      setQuests(finalQuests);
+    }
+
+    const shouldSyncTasks = Array.isArray(data.tasks) && (!isAuthUser || options?.allowTaskSync);
+    if (shouldSyncTasks) {
+      const finalTasks = isAuthUser ? data.tasks.filter((t) => !t.id.startsWith('task-')) : data.tasks;
+      setTasks(finalTasks);
+    }
+
     if (data.calendarEvents) setCalendarEvents(data.calendarEvents);
     if (data.goals) {
       setDetailedGoals(data.goals);
@@ -259,8 +286,10 @@ export default function App() {
         ...cached,
         claims: cached.claims || [],
         collectionItems: cached.collectionItems || cached.collection || [],
-      } as BackendState);
+      } as BackendState, { allowTaskSync: true });
     } else {
+      setTasks([]);
+      setQuests([]);
       setIsInitialLoading(true);
     }
 
@@ -268,7 +297,7 @@ export default function App() {
     setShowLandingWelcome(false);
     try {
       const state = await api.getState();
-      syncFromBackend(state);
+      syncFromBackend(state, { allowTaskSync: true });
     } catch (err) {
       console.warn('Sync state after auth:', err);
     } finally {
@@ -364,7 +393,7 @@ export default function App() {
               setCurrentUser(meRes.user);
               setShowLandingWelcome(false);
               if (meRes.state) {
-                syncFromBackend(meRes.state);
+                syncFromBackend(meRes.state, { allowTaskSync: true });
               }
             } else {
               setCurrentUser(null);
@@ -385,7 +414,7 @@ export default function App() {
               ...cached,
               claims: cached.claims || [],
               collectionItems: cached.collectionItems || cached.collection || [],
-            } as BackendState);
+            } as BackendState, { allowTaskSync: true });
           } else {
             // No session and no valid cache: show landing page
             setCurrentUser(null);

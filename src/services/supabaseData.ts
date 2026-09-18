@@ -1,6 +1,6 @@
 import { TaskItem, TaskPriority, UserProfile, AuthUser, Quest, RewardItem, CollectionItem } from '../types';
 import { getSupabase } from '../lib/supabase';
-import { initialUserProfile, initialQuests } from '../data/mockData';
+import { initialUserProfile } from '../data/mockData';
 import { getLiveTodayISO, getStartOfWeek, formatDateISO } from '../utils/dateUtils';
 import { calculateProgressionDelta, getXpRequiredForLevel } from '../utils/progression';
 
@@ -767,38 +767,9 @@ export async function fetchUserHabitsFromSupabase(userId: string): Promise<Quest
     throw new Error(`Failed to load habits from database: ${error.message}`);
   }
 
-  // If newly registered user has no habits in Supabase yet, seed starter habits
   if (!habits || habits.length === 0) {
-    const starterPayload = initialQuests.map((q) => ({
-      user_id: userId,
-      title: q.title,
-      description: serializeHabitDescription({
-        subtitle: q.subtitle,
-        durationMinutes: q.durationMinutes,
-        attribute: q.attribute,
-        questCategory: q.category,
-        isStarted: q.isStarted,
-      }),
-      category: mapQuestCategoryToDbCategory(q.category),
-      difficulty: 'medium',
-      xp_reward: q.xpReward,
-      streak: 0,
-      best_streak: 0,
-    }));
-
-    const { data: inserted, error: insertError } = await sb
-      .from('habits')
-      .insert(starterPayload)
-      .select('*');
-
-    if (insertError) {
-      console.warn('Error seeding starter habits in Supabase:', insertError);
-    } else if (inserted) {
-      habits = inserted;
-    }
+    return [];
   }
-
-  if (!habits) return [];
 
   // Fetch today's completions for this user
   const todayDate = getLiveTodayISO();

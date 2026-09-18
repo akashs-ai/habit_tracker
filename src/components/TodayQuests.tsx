@@ -186,104 +186,125 @@ export const TodayQuests: React.FC<TodayQuestsProps> = ({
         </div>
       </div>
 
-      {/* 4 Quest Cards Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {filteredQuests.map((quest) => {
-          const style = getCardStyle(quest.category);
-          const CategoryIcon = style.icon;
+      {/* 4 Quest Cards Grid / Clean Empty State */}
+      {filteredQuests.length > 0 ? (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          {filteredQuests.map((quest) => {
+            const style = getCardStyle(quest.category);
+            const CategoryIcon = style.icon;
 
-          return (
-            <div
-              key={quest.id}
-              id={`quest-card-${quest.id}`}
-              className={`relative flex flex-col justify-between p-4 rounded-2xl border transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md ${style.bg} ${style.border} ${
-                quest.completed ? 'opacity-70' : ''
-              }`}
-            >
-              {/* Pushpin / Tape decorative element */}
-              <div className="absolute -top-1.5 left-1/2 -translate-x-1/2 flex items-center justify-center">
-                <div className={`w-3.5 h-3.5 rounded-full ${style.pinColor} ring-2 ring-white dark:ring-[#111113] shadow-xs opacity-90`} />
-              </div>
-
-              <div>
-                {/* Card Top: Category Tag + Time + Menu */}
-                <div className="flex items-center justify-between mt-1 mb-3">
-                  <span
-                    className={`flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-md uppercase tracking-wider ${style.tagBg} ${style.tagText}`}
-                  >
-                    <CategoryIcon className="w-3 h-3" />
-                    <span>{quest.category} · {quest.durationMinutes} MIN</span>
-                  </span>
-
-                  <button className="text-[#9CA3AF] hover:text-[#4B5563] dark:hover:text-[#D1D5DB] transition-colors p-1">
-                    <MoreVertical className="w-3.5 h-3.5" />
-                  </button>
+            return (
+              <div
+                key={quest.id}
+                id={`quest-card-${quest.id}`}
+                className={`relative flex flex-col justify-between p-4 rounded-2xl border transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md ${style.bg} ${style.border} ${
+                  quest.completed ? 'opacity-70' : ''
+                }`}
+              >
+                {/* Pushpin / Tape decorative element */}
+                <div className="absolute -top-1.5 left-1/2 -translate-x-1/2 flex items-center justify-center">
+                  <div className={`w-3.5 h-3.5 rounded-full ${style.pinColor} ring-2 ring-white dark:ring-[#111113] shadow-xs opacity-90`} />
                 </div>
 
-                {/* Quest Title & Description */}
-                <div className="mb-4">
-                  <h3
-                    className={`font-semibold text-base text-[#111827] dark:text-[#FAFAFA] leading-snug mb-1 ${
-                      quest.completed ? 'line-through text-[#9CA3AF]' : ''
-                    }`}
-                  >
-                    {quest.title}
-                  </h3>
-                  <p className="text-xs text-[#6B7280] dark:text-[#A1A1AA] leading-relaxed">
-                    {quest.subtitle}
-                  </p>
-                </div>
-              </div>
+                <div>
+                  {/* Card Top: Category Tag + Time + Menu */}
+                  <div className="flex items-center justify-between mt-1 mb-3">
+                    <span
+                      className={`flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-md uppercase tracking-wider ${style.tagBg} ${style.tagText}`}
+                    >
+                      <CategoryIcon className="w-3 h-3" />
+                      <span>{quest.category} · {quest.durationMinutes} MIN</span>
+                    </span>
 
-              <div>
-                {/* Rewards & Attribute Indicator */}
-                <div className="flex items-center justify-between text-xs font-semibold py-2.5 border-t border-[#E5E7EB]/50 dark:border-[#2E2E38]/50 mb-3">
-                  <div className="flex items-center gap-1 text-[#D97706] dark:text-[#FBBF24]">
-                    <Crown className="w-3.5 h-3.5 fill-[#D97706] dark:fill-[#FBBF24]" />
-                    <span>+{quest.xpReward} XP</span>
+                    <button className="text-[#9CA3AF] hover:text-[#4B5563] dark:hover:text-[#D1D5DB] transition-colors p-1">
+                      <MoreVertical className="w-3.5 h-3.5" />
+                    </button>
                   </div>
 
-                  <div className="flex items-center gap-1 text-[#4B5563] dark:text-[#D1D5DB] text-[11px]">
-                    {getAttributeIcon(quest.attribute)}
-                    <span>{quest.attribute}</span>
-                  </div>
-                </div>
-
-                {/* Action Button: Start Quest or Mark Complete */}
-                {quest.category === 'focus' && !quest.completed ? (
-                  <button
-                    onClick={(e) => handleQuestAction(e, quest)}
-                    className="w-full flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl bg-[#111827] dark:bg-[#FAFAFA] hover:bg-[#1F2937] dark:hover:bg-white active:scale-95 text-white dark:text-[#111827] text-xs font-semibold transition-all shadow-xs"
-                  >
-                    <span>Start Quest</span>
-                    <ArrowRight className="w-3.5 h-3.5" />
-                  </button>
-                ) : (
-                  <button
-                    onClick={(e) => handleQuestAction(e, quest)}
-                    className={`w-full flex items-center justify-center gap-2 py-2 px-3 rounded-xl text-xs font-semibold border transition-all active:scale-95 ${
-                      quest.completed
-                        ? 'bg-[#22C55E] border-[#22C55E] text-white shadow-xs'
-                        : 'bg-white/80 dark:bg-[#1C1C20] border-[#E5E7EB] dark:border-[#34343A] text-[#374151] dark:text-[#E4E4E7] hover:border-[#7C6CFF] hover:text-[#7C6CFF]'
-                    }`}
-                  >
-                    <div
-                      className={`w-4 h-4 rounded-full flex items-center justify-center border transition-all ${
-                        quest.completed
-                          ? 'border-white bg-white text-[#22C55E] scale-110'
-                          : 'border-[#9CA3AF] bg-transparent'
+                  {/* Quest Title & Description */}
+                  <div className="mb-4">
+                    <h3
+                      className={`font-semibold text-base text-[#111827] dark:text-[#FAFAFA] leading-snug mb-1 ${
+                        quest.completed ? 'line-through text-[#9CA3AF]' : ''
                       }`}
                     >
-                      {quest.completed && <Check className="w-3 h-3 stroke-[3]" />}
+                      {quest.title}
+                    </h3>
+                    <p className="text-xs text-[#6B7280] dark:text-[#A1A1AA] leading-relaxed">
+                      {quest.subtitle}
+                    </p>
+                  </div>
+                </div>
+
+                <div>
+                  {/* Rewards & Attribute Indicator */}
+                  <div className="flex items-center justify-between text-xs font-semibold py-2.5 border-t border-[#E5E7EB]/50 dark:border-[#2E2E38]/50 mb-3">
+                    <div className="flex items-center gap-1 text-[#D97706] dark:text-[#FBBF24]">
+                      <Crown className="w-3.5 h-3.5 fill-[#D97706] dark:fill-[#FBBF24]" />
+                      <span>+{quest.xpReward} XP</span>
                     </div>
-                    <span>{quest.completed ? 'Completed' : 'Mark Complete'}</span>
-                  </button>
-                )}
+
+                    <div className="flex items-center gap-1 text-[#4B5563] dark:text-[#D1D5DB] text-[11px]">
+                      {getAttributeIcon(quest.attribute)}
+                      <span>{quest.attribute}</span>
+                    </div>
+                  </div>
+
+                  {/* Action Button: Start Quest or Mark Complete */}
+                  {quest.category === 'focus' && !quest.completed ? (
+                    <button
+                      onClick={(e) => handleQuestAction(e, quest)}
+                      className="w-full flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl bg-[#111827] dark:bg-[#FAFAFA] hover:bg-[#1F2937] dark:hover:bg-white active:scale-95 text-white dark:text-[#111827] text-xs font-semibold transition-all shadow-xs"
+                    >
+                      <span>Start Quest</span>
+                      <ArrowRight className="w-3.5 h-3.5" />
+                    </button>
+                  ) : (
+                    <button
+                      onClick={(e) => handleQuestAction(e, quest)}
+                      className={`w-full flex items-center justify-center gap-2 py-2 px-3 rounded-xl text-xs font-semibold border transition-all active:scale-95 ${
+                        quest.completed
+                          ? 'bg-[#22C55E] border-[#22C55E] text-white shadow-xs'
+                          : 'bg-white/80 dark:bg-[#1C1C20] border-[#E5E7EB] dark:border-[#34343A] text-[#374151] dark:text-[#E4E4E7] hover:border-[#7C6CFF] hover:text-[#7C6CFF]'
+                      }`}
+                    >
+                      <div
+                        className={`w-4 h-4 rounded-full flex items-center justify-center border transition-all ${
+                          quest.completed
+                            ? 'border-white bg-white text-[#22C55E] scale-110'
+                            : 'border-[#9CA3AF] bg-transparent'
+                        }`}
+                      >
+                        {quest.completed && <Check className="w-3 h-3 stroke-[3]" />}
+                      </div>
+                      <span>{quest.completed ? 'Completed' : 'Mark Complete'}</span>
+                    </button>
+                  )}
+                </div>
               </div>
-            </div>
-          );
-        })}
-      </div>
+            );
+          })}
+        </div>
+      ) : (
+        <div className="bg-white dark:bg-[#121214] border border-[#E2E8F0] dark:border-[#27272A] rounded-2xl p-10 text-center flex flex-col items-center justify-center">
+          <div className="w-12 h-12 rounded-2xl bg-[#EEF2FF] dark:bg-[#1E1B4B] flex items-center justify-center text-[#6366F1] mb-3">
+            <Sparkles className="w-6 h-6" />
+          </div>
+          <h3 className="text-base font-semibold text-[#0F172A] dark:text-[#F8FAFC]">
+            {activeFilter === 'all' ? 'No quests for today' : `No ${activeFilter} quests found`}
+          </h3>
+          <p className="text-xs text-[#64748B] dark:text-[#94A3B8] max-w-xs mt-1">
+            Build lasting habits by adding your first daily quest.
+          </p>
+          <button
+            onClick={onOpenAddModal}
+            className="mt-4 px-4 py-2 bg-[#7C6CFF] hover:bg-[#6D5CEB] text-white rounded-xl text-xs font-semibold shadow-xs transition-colors flex items-center gap-1.5"
+          >
+            <Plus className="w-3.5 h-3.5" />
+            <span>Add Quest</span>
+          </button>
+        </div>
+      )}
     </section>
   );
 };

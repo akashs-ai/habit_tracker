@@ -263,16 +263,17 @@ export function supabaseUserToAuthUser(sbUser: any, profile?: any): AuthUser {
 
 export function getDefaultAppState(user?: AuthUser): FullAppState {
   const memberName = user?.fullName || user?.username || 'Adventurer';
+  const isGuest = Boolean(user?.isGuest);
   return {
     user: {
       ...initialUserProfile,
       name: memberName,
-      momentumPoints: 50,
+      momentumPoints: isGuest ? 50 : 0,
       pointsThisWeek: 0,
-      weeklyConsistency: 100,
+      weeklyConsistency: isGuest ? 100 : 0,
     },
-    quests: [...initialQuests],
-    tasks: [...initialTasks],
+    quests: isGuest ? [...initialQuests] : [],
+    tasks: isGuest ? [...initialTasks] : [],
     calendarEvents: [...initialCalendarEvents],
     goals: [...initialGoalsData],
     rewards: [...initialFeaturedRewards],
@@ -403,9 +404,7 @@ export const api = {
               user: profData?.userProgression
                 ? { ...baseState.user, ...profData.userProgression }
                 : (cached?.user ? { ...baseState.user, ...cached.user } : baseState.user),
-              quests: (userHabits && userHabits.length > 0)
-                ? userHabits
-                : (cached?.quests || baseState.quests),
+              quests: userHabits,
               tasks: userTasks,
               calendarEvents: cached?.calendarEvents || baseState.calendarEvents,
               goals: cached?.goals || cached?.detailedGoals || baseState.goals,
@@ -1145,9 +1144,7 @@ export const api = {
               user: profData?.userProgression
                 ? { ...baseState.user, ...profData.userProgression }
                 : (cached?.user ? { ...baseState.user, ...cached.user } : baseState.user),
-              quests: (userHabits && userHabits.length > 0)
-                ? userHabits
-                : (cached?.quests || baseState.quests),
+              quests: userHabits,
               tasks: userTasks,
               calendarEvents: cached?.calendarEvents || baseState.calendarEvents,
               goals: cached?.goals || cached?.detailedGoals || baseState.goals,

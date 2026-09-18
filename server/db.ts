@@ -39,7 +39,6 @@ import {
   initialQuests, 
   initialAttributes, 
   weeklyProgressData, 
-  initialTasks, 
   initialNotes 
 } from '../src/data/mockData';
 import { initialCalendarEvents } from '../src/data/calendarMockData';
@@ -1650,6 +1649,9 @@ class LifeRpgDatabase {
         // Ensure policy is updated to latest
         parsed.termsPolicy = REWARD_TERMS_POLICY;
         parsed.weeklyData = formatWeeklyWithToday(parsed.weeklyData);
+        // The server default/in-memory state must never contain demo tasks or demo quests
+        parsed.tasks = [];
+        parsed.quests = [];
 
         // Ensure calendar events are populated with active live dates
         const hasLiveEvents = parsed.calendarEvents?.some((e: CalendarEvent) => e.date === todayStr);
@@ -1714,8 +1716,8 @@ class LifeRpgDatabase {
         pointsThisWeek: initialPointsThisWeek,
         weeklyConsistency: initialWeeklyConsistency,
       },
-      quests: initialQuests,
-      tasks: initialTasks,
+      quests: [],
+      tasks: [],
       calendarEvents: createLiveAnchoredEvents(todayStr),
       goals: initialGoalsData,
       rewards: initialFeaturedRewards,
