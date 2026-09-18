@@ -62,6 +62,7 @@ export const supabase = {
 export interface RealtimeSubscriptionOptions {
   table: string;
   filter?: string;
+  channelName?: string;
   onInsert?: (payload: any) => void;
   onUpdate?: (payload: any) => void;
   onDelete?: (payload: any) => void;
@@ -74,7 +75,7 @@ export function subscribeToUserTable(
   const client = getSupabase();
   if (!client || !userId) return null;
 
-  const channelName = `user_${options.table}_${userId}`;
+  const channelName = options.channelName || `user_${options.table}_${userId}`;
   const filter = options.filter || `user_id=eq.${userId}`;
 
   const channel = client

@@ -40,6 +40,27 @@ import {
   fetchUserRewardsFromSupabase,
   claimUserRewardInSupabase,
   activateUserRewardInSupabase,
+  fetchUserFriendsFromSupabase,
+  fetchFriendRequestsFromSupabase,
+  fetchSuggestedFriendsFromSupabase,
+  sendFriendRequestInSupabase,
+  acceptFriendRequestInSupabase,
+  declineFriendRequestInSupabase,
+  cancelFriendRequestInSupabase,
+  removeFriendInSupabase,
+  searchUsersInSupabase,
+  fetchFriendsProgressFromSupabase,
+  fetchUserGoalsFromSupabase,
+  createGoalInSupabase,
+  updateGoalInSupabase,
+  deleteGoalInSupabase,
+  toggleGoalSubtaskInSupabase,
+  toggleGoalMilestoneInSupabase,
+  fetchUserCalendarEventsFromSupabase,
+  createCalendarEventInSupabase,
+  updateCalendarEventInSupabase,
+  deleteCalendarEventInSupabase,
+  mapCalendarRowToCalendarEvent,
 } from './supabaseData';
 import {
   getStoredUserCache,
@@ -325,6 +346,7 @@ export function getDefaultAppState(user?: AuthUser): FullAppState {
     attributes: [...freshAttributes],
     weeklyData: [...freshWeeklyData],
     aiAgents: [...initialAIModels],
+    friends: [],
   };
 }
 
@@ -364,6 +386,7 @@ export interface FullAppState {
   tasks: TaskItem[];
   calendarEvents: CalendarEvent[];
   goals: DetailedGoal[];
+  detailedGoals?: DetailedGoal[];
   rewards: RewardItem[];
   badges: RewardBadge[];
   collectionItems: CollectionItem[];
@@ -382,6 +405,7 @@ export interface FullAppState {
   attributes: Attribute[];
   weeklyData: WeeklyData[];
   aiAgents?: AIIntegrationModel[];
+  friends?: FriendUser[];
 }
 
 export type BackendState = FullAppState & {
@@ -428,11 +452,14 @@ export const api = {
             const cached = getStoredUserCache(sbUser.id);
 
             // Single parallel data-fetching pipeline directly to Supabase - NO redundant waterfalls
-            const [profData, userTasks, userHabits, userRewards] = await Promise.all([
+            const [profData, userTasks, userHabits, userRewards, userFriends, userGoals, userCalendar] = await Promise.all([
               fetchUserProfileFromSupabase(sbUser.id).catch(() => null),
               fetchUserTasksFromSupabase(sbUser.id).catch(() => []),
               fetchUserHabitsFromSupabase(sbUser.id).catch(() => []),
               fetchUserRewardsFromSupabase(sbUser.id).catch(() => ({ rewards: [], claims: [], collection: [] })),
+              fetchUserFriendsFromSupabase(sbUser.id).catch(() => []),
+              fetchUserGoalsFromSupabase(sbUser.id).catch(() => []),
+              fetchUserCalendarEventsFromSupabase(sbUser.id).catch(() => []),
             ]);
 
             const authUser = supabaseUserToAuthUser(sbUser, profData?.profile);
@@ -446,8 +473,9 @@ export const api = {
                 : (cached?.user ? { ...baseState.user, ...cached.user } : baseState.user),
               quests: userHabits,
               tasks: userTasks,
-              calendarEvents: cached?.calendarEvents || baseState.calendarEvents,
-              goals: cached?.goals || cached?.detailedGoals || baseState.goals,
+              calendarEvents: userCalendar,
+              goals: userGoals,
+              detailedGoals: userGoals,
               rewards: Array.isArray(userRewards?.rewards) && userRewards.rewards.length > 0
                 ? userRewards.rewards
                 : (Array.isArray(cached?.rewards) && cached.rewards.length > 0 ? cached.rewards : baseState.rewards),
@@ -465,6 +493,7 @@ export const api = {
               attributes: cached?.attributes || baseState.attributes,
               weeklyData: cached?.weeklyData || baseState.weeklyData,
               aiAgents: cached?.aiAgents || baseState.aiAgents,
+              friends: userFriends,
             };
 
             // Atomically update user-scoped cache
@@ -1170,11 +1199,13 @@ export const api = {
             const userId = session.user.id;
             const cached = getStoredUserCache(userId);
 
-            const [profData, userTasks, userHabits, userRewards] = await Promise.all([
+            const [profData, userTasks, userHabits, userRewards, userGoals, userCalendar] = await Promise.all([
               fetchUserProfileFromSupabase(userId).catch(() => null),
               fetchUserTasksFromSupabase(userId).catch(() => []),
               fetchUserHabitsFromSupabase(userId).catch(() => []),
               fetchUserRewardsFromSupabase(userId).catch(() => ({ rewards: [], claims: [], collection: [] })),
+              fetchUserGoalsFromSupabase(userId).catch(() => []),
+              fetchUserCalendarEventsFromSupabase(userId).catch(() => []),
             ]);
 
             const authUser = supabaseUserToAuthUser(session.user, profData?.profile);
@@ -1186,8 +1217,9 @@ export const api = {
                 : (cached?.user ? { ...baseState.user, ...cached.user } : baseState.user),
               quests: userHabits,
               tasks: userTasks,
-              calendarEvents: cached?.calendarEvents || baseState.calendarEvents,
-              goals: cached?.goals || cached?.detailedGoals || baseState.goals,
+              calendarEvents: userCalendar,
+              goals: userGoals,
+              detailedGoals: userGoals,
               rewards: Array.isArray(userRewards?.rewards) && userRewards.rewards.length > 0
                 ? userRewards.rewards
                 : (Array.isArray(cached?.rewards) && cached.rewards.length > 0 ? cached.rewards : baseState.rewards),
@@ -1505,7 +1537,30 @@ export const api = {
   },
 
   // 4. Calendar Events
-  async addCalendarEvent(eventData: Omit<CalendarEvent, 'id'>): Promise<{ event: CalendarEvent; state: FullAppState }> {
+  async addCalendarEvent(eventData: Omit<CalendarEvent, 'id'> & { id?: string }): Promise<{ event: CalendarEvent; state?: FullAppState }> {
+    if (isSupabaseConfigured()) {
+      try {
+        const sb = getSupabase();
+        if (sb) {
+          const { data: { session } } = await sb.auth.getSession();
+          if (session?.user?.id) {
+            const event = await createCalendarEventInSupabase(session.user.id, eventData);
+            const cached = getStoredUserCache(session.user.id);
+            if (cached) {
+              const cleanedEvents = (cached.calendarEvents || []).filter((e) => e.id !== event.id);
+              setStoredUserCache(session.user.id, {
+                calendarEvents: [event, ...cleanedEvents],
+              });
+            }
+            return { event };
+          }
+        }
+      } catch (err: any) {
+        console.error('Supabase addCalendarEvent error:', err);
+        throw err;
+      }
+    }
+
     const res = await authFetch('/api/calendar/events', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -1516,7 +1571,30 @@ export const api = {
     return { event: json.data, state: json.state };
   },
 
-  async updateCalendarEvent(eventData: CalendarEvent): Promise<{ event: CalendarEvent; state: FullAppState }> {
+  async updateCalendarEvent(eventData: CalendarEvent): Promise<{ event: CalendarEvent; state?: FullAppState }> {
+    if (isSupabaseConfigured()) {
+      try {
+        const sb = getSupabase();
+        if (sb) {
+          const { data: { session } } = await sb.auth.getSession();
+          if (session?.user?.id) {
+            const event = await updateCalendarEventInSupabase(session.user.id, eventData);
+            const cached = getStoredUserCache(session.user.id);
+            if (cached) {
+              const updatedEvents = (cached.calendarEvents || []).map((e) => (e.id === event.id ? event : e));
+              setStoredUserCache(session.user.id, {
+                calendarEvents: updatedEvents,
+              });
+            }
+            return { event };
+          }
+        }
+      } catch (err: any) {
+        console.error('Supabase updateCalendarEvent error:', err);
+        throw err;
+      }
+    }
+
     const res = await authFetch(`/api/calendar/events/${eventData.id}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
@@ -1527,7 +1605,30 @@ export const api = {
     return { event: json.data, state: json.state };
   },
 
-  async deleteCalendarEvent(eventId: string): Promise<{ state: FullAppState }> {
+  async deleteCalendarEvent(eventId: string): Promise<{ state?: FullAppState }> {
+    if (isSupabaseConfigured()) {
+      try {
+        const sb = getSupabase();
+        if (sb) {
+          const { data: { session } } = await sb.auth.getSession();
+          if (session?.user?.id) {
+            await deleteCalendarEventInSupabase(session.user.id, eventId);
+            const cached = getStoredUserCache(session.user.id);
+            if (cached) {
+              const filtered = (cached.calendarEvents || []).filter((e) => e.id !== eventId);
+              setStoredUserCache(session.user.id, {
+                calendarEvents: filtered,
+              });
+            }
+            return {};
+          }
+        }
+      } catch (err: any) {
+        console.error('Supabase deleteCalendarEvent error:', err);
+        throw err;
+      }
+    }
+
     const res = await authFetch(`/api/calendar/events/${eventId}`, {
       method: 'DELETE',
     });
@@ -1536,7 +1637,34 @@ export const api = {
     return { state: json.state };
   },
 
-  async toggleCalendarEvent(eventId: string): Promise<{ event: CalendarEvent; state: FullAppState }> {
+  async toggleCalendarEvent(eventId: string): Promise<{ event?: CalendarEvent; state?: FullAppState }> {
+    if (isSupabaseConfigured()) {
+      try {
+        const sb = getSupabase();
+        if (sb) {
+          const { data: { session } } = await sb.auth.getSession();
+          if (session?.user?.id) {
+            const { data: current } = await sb
+              .from('calendar_events')
+              .select('*')
+              .eq('id', eventId)
+              .eq('user_id', session.user.id)
+              .single();
+            if (current) {
+              const updated = await updateCalendarEventInSupabase(session.user.id, {
+                ...mapCalendarRowToCalendarEvent(current),
+              });
+              return { event: updated };
+            }
+            return {};
+          }
+        }
+      } catch (err: any) {
+        console.error('Supabase toggleCalendarEvent error:', err);
+        throw err;
+      }
+    }
+
     const res = await authFetch(`/api/calendar/events/${eventId}/toggle`, {
       method: 'POST',
     });
@@ -1546,7 +1674,31 @@ export const api = {
   },
 
   // 5. Goals
-  async addGoal(goalData: Omit<DetailedGoal, 'id'>): Promise<{ goal: DetailedGoal; state: FullAppState }> {
+  async addGoal(goalData: Omit<DetailedGoal, 'id'>): Promise<{ goal: DetailedGoal; state?: FullAppState }> {
+    if (isSupabaseConfigured()) {
+      try {
+        const sb = getSupabase();
+        if (sb) {
+          const { data: { session } } = await sb.auth.getSession();
+          if (session?.user?.id) {
+            const goal = await createGoalInSupabase(session.user.id, goalData);
+            const cached = getStoredUserCache(session.user.id);
+            if (cached) {
+              const cleanedGoals = (cached.goals || []).filter((g) => g.id !== goal.id);
+              setStoredUserCache(session.user.id, {
+                goals: [goal, ...cleanedGoals],
+                detailedGoals: [goal, ...cleanedGoals],
+              });
+            }
+            return { goal };
+          }
+        }
+      } catch (err: any) {
+        console.error('Supabase addGoal error:', err);
+        throw err;
+      }
+    }
+
     const res = await authFetch('/api/goals', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -1557,7 +1709,31 @@ export const api = {
     return { goal: json.data, state: json.state };
   },
 
-  async updateGoal(goalData: DetailedGoal): Promise<{ goal: DetailedGoal; state: FullAppState }> {
+  async updateGoal(goalData: DetailedGoal): Promise<{ goal: DetailedGoal; state?: FullAppState }> {
+    if (isSupabaseConfigured()) {
+      try {
+        const sb = getSupabase();
+        if (sb) {
+          const { data: { session } } = await sb.auth.getSession();
+          if (session?.user?.id) {
+            const goal = await updateGoalInSupabase(session.user.id, goalData);
+            const cached = getStoredUserCache(session.user.id);
+            if (cached) {
+              const updatedGoals = (cached.goals || []).map((g) => (g.id === goal.id ? goal : g));
+              setStoredUserCache(session.user.id, {
+                goals: updatedGoals,
+                detailedGoals: updatedGoals,
+              });
+            }
+            return { goal };
+          }
+        }
+      } catch (err: any) {
+        console.error('Supabase updateGoal error:', err);
+        throw err;
+      }
+    }
+
     const res = await authFetch(`/api/goals/${goalData.id}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
@@ -1568,7 +1744,31 @@ export const api = {
     return { goal: json.data, state: json.state };
   },
 
-  async deleteGoal(goalId: string): Promise<{ state: FullAppState }> {
+  async deleteGoal(goalId: string): Promise<{ state?: FullAppState }> {
+    if (isSupabaseConfigured()) {
+      try {
+        const sb = getSupabase();
+        if (sb) {
+          const { data: { session } } = await sb.auth.getSession();
+          if (session?.user?.id) {
+            await deleteGoalInSupabase(session.user.id, goalId);
+            const cached = getStoredUserCache(session.user.id);
+            if (cached) {
+              const remainingGoals = (cached.goals || []).filter((g) => g.id !== goalId);
+              setStoredUserCache(session.user.id, {
+                goals: remainingGoals,
+                detailedGoals: remainingGoals,
+              });
+            }
+            return {};
+          }
+        }
+      } catch (err: any) {
+        console.error('Supabase deleteGoal error:', err);
+        throw err;
+      }
+    }
+
     const res = await authFetch(`/api/goals/${goalId}`, {
       method: 'DELETE',
     });
@@ -1577,7 +1777,31 @@ export const api = {
     return { state: json.state };
   },
 
-  async toggleGoalSubtask(goalId: string, subtaskId: string): Promise<{ goal: DetailedGoal; state: FullAppState }> {
+  async toggleGoalSubtask(goalId: string, subtaskId: string): Promise<{ goal: DetailedGoal; state?: FullAppState }> {
+    if (isSupabaseConfigured()) {
+      try {
+        const sb = getSupabase();
+        if (sb) {
+          const { data: { session } } = await sb.auth.getSession();
+          if (session?.user?.id) {
+            const goal = await toggleGoalSubtaskInSupabase(session.user.id, goalId, subtaskId);
+            const cached = getStoredUserCache(session.user.id);
+            if (cached) {
+              const updatedGoals = (cached.goals || []).map((g) => (g.id === goal.id ? goal : g));
+              setStoredUserCache(session.user.id, {
+                goals: updatedGoals,
+                detailedGoals: updatedGoals,
+              });
+            }
+            return { goal };
+          }
+        }
+      } catch (err: any) {
+        console.error('Supabase toggleGoalSubtask error:', err);
+        throw err;
+      }
+    }
+
     const res = await authFetch(`/api/goals/${goalId}/subtask-toggle`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -1588,7 +1812,31 @@ export const api = {
     return { goal: json.data, state: json.state };
   },
 
-  async toggleGoalMilestone(goalId: string, milestoneId: string): Promise<{ goal: DetailedGoal; state: FullAppState }> {
+  async toggleGoalMilestone(goalId: string, milestoneId: string): Promise<{ goal: DetailedGoal; state?: FullAppState }> {
+    if (isSupabaseConfigured()) {
+      try {
+        const sb = getSupabase();
+        if (sb) {
+          const { data: { session } } = await sb.auth.getSession();
+          if (session?.user?.id) {
+            const goal = await toggleGoalMilestoneInSupabase(session.user.id, goalId, milestoneId);
+            const cached = getStoredUserCache(session.user.id);
+            if (cached) {
+              const updatedGoals = (cached.goals || []).map((g) => (g.id === goal.id ? goal : g));
+              setStoredUserCache(session.user.id, {
+                goals: updatedGoals,
+                detailedGoals: updatedGoals,
+              });
+            }
+            return { goal };
+          }
+        }
+      } catch (err: any) {
+        console.error('Supabase toggleGoalMilestone error:', err);
+        throw err;
+      }
+    }
+
     const res = await authFetch(`/api/goals/${goalId}/milestone-toggle`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -1957,6 +2205,38 @@ export const api = {
     consistencyStreaks: any[];
     summary: { friendsCount: number; requestsCount: number; onlineCount: number };
   }> {
+    if (isSupabaseConfigured()) {
+      try {
+        const sb = getSupabase();
+        if (sb) {
+          const { data: { session } } = await sb.auth.getSession();
+          if (session?.user?.id) {
+            const progress = await fetchFriendsProgressFromSupabase(session.user.id);
+            const reqs = await fetchFriendRequestsFromSupabase(session.user.id);
+            const cached = getStoredUserCache(session.user.id);
+            if (cached) {
+              setStoredUserCache(session.user.id, {
+                friends: progress.friends,
+              });
+            }
+            return {
+              friends: progress.friends,
+              leaderboard: progress.leaderboard,
+              xpComparison: progress.xpComparison,
+              consistencyStreaks: progress.consistencyStreaks,
+              summary: {
+                ...progress.summary,
+                requestsCount: reqs.length,
+              },
+            };
+          }
+        }
+      } catch (err: any) {
+        console.error('Supabase getFriendsData error:', err);
+        throw err;
+      }
+    }
+
     const res = await authFetch('/api/friends');
     const json = await safeResponseJson(res, 'Failed to fetch friends data');
     if (!res.ok || !json.success) throw new Error(json.error || 'Failed to fetch friends data');
@@ -1970,6 +2250,21 @@ export const api = {
   },
 
   async getFriendRequests(): Promise<FriendRequest[]> {
+    if (isSupabaseConfigured()) {
+      try {
+        const sb = getSupabase();
+        if (sb) {
+          const { data: { session } } = await sb.auth.getSession();
+          if (session?.user?.id) {
+            return await fetchFriendRequestsFromSupabase(session.user.id);
+          }
+        }
+      } catch (err: any) {
+        console.error('Supabase getFriendRequests error:', err);
+        throw err;
+      }
+    }
+
     const res = await authFetch('/api/friends/requests');
     const json = await safeResponseJson(res, 'Failed to fetch friend requests');
     if (!res.ok || !json.success) throw new Error(json.error || 'Failed to fetch friend requests');
@@ -1977,6 +2272,21 @@ export const api = {
   },
 
   async getSuggestedFriends(): Promise<SuggestedFriend[]> {
+    if (isSupabaseConfigured()) {
+      try {
+        const sb = getSupabase();
+        if (sb) {
+          const { data: { session } } = await sb.auth.getSession();
+          if (session?.user?.id) {
+            return await fetchSuggestedFriendsFromSupabase(session.user.id);
+          }
+        }
+      } catch (err: any) {
+        console.error('Supabase getSuggestedFriends error:', err);
+        throw err;
+      }
+    }
+
     const res = await authFetch('/api/friends/suggestions');
     const json = await safeResponseJson(res, 'Failed to fetch suggested friends');
     if (!res.ok || !json.success) throw new Error(json.error || 'Failed to fetch suggested friends');
@@ -1984,6 +2294,21 @@ export const api = {
   },
 
   async searchUsers(query: string): Promise<any[]> {
+    if (isSupabaseConfigured()) {
+      try {
+        const sb = getSupabase();
+        if (sb) {
+          const { data: { session } } = await sb.auth.getSession();
+          if (session?.user?.id) {
+            return await searchUsersInSupabase(query, session.user.id);
+          }
+        }
+      } catch (err: any) {
+        console.error('Supabase searchUsers error:', err);
+        throw err;
+      }
+    }
+
     const res = await authFetch(`/api/friends/search?q=${encodeURIComponent(query)}`);
     const json = await safeResponseJson(res, 'Failed to search users');
     if (!res.ok || !json.success) throw new Error(json.error || 'Failed to search users');
@@ -1997,6 +2322,50 @@ export const api = {
     email?: string;
     reason?: string;
   }): Promise<{ message: string; data: any; progress: any }> {
+    if (isSupabaseConfigured()) {
+      try {
+        const sb = getSupabase();
+        if (sb) {
+          const { data: { session } } = await sb.auth.getSession();
+          if (session?.user?.id) {
+            let targetId = payload.recipientId;
+
+            // Resolve recipient if identifier was provided as username or name
+            if (!targetId && (payload.username || payload.name || payload.email)) {
+              const query = (payload.username || payload.name || payload.email)!.trim();
+              const { data: foundProfile, error: pLookupErr } = await sb
+                .from('profiles')
+                .select('id, username')
+                .or(`username.ilike.%${query}%,display_name.ilike.%${query}%`)
+                .limit(1)
+                .maybeSingle();
+
+              if (pLookupErr || !foundProfile) {
+                throw new Error(`User "${query}" was not found. Please verify the username.`);
+              }
+              targetId = foundProfile.id;
+            }
+
+            if (!targetId) {
+              throw new Error('Please specify a valid user to send a friend request to.');
+            }
+
+            const rpcResult = await sendFriendRequestInSupabase(targetId, payload.reason);
+            const progress = await fetchFriendsProgressFromSupabase(session.user.id);
+
+            return {
+              message: 'Friend request sent successfully.',
+              data: rpcResult,
+              progress,
+            };
+          }
+        }
+      } catch (err: any) {
+        console.error('Supabase sendFriendRequest error:', err);
+        throw err;
+      }
+    }
+
     const res = await authFetch('/api/friends/requests', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -2008,6 +2377,32 @@ export const api = {
   },
 
   async acceptFriendRequest(requestId: string): Promise<{ message: string; progress: any }> {
+    if (isSupabaseConfigured()) {
+      try {
+        const sb = getSupabase();
+        if (sb) {
+          const { data: { session } } = await sb.auth.getSession();
+          if (session?.user?.id) {
+            await acceptFriendRequestInSupabase(requestId);
+            const progress = await fetchFriendsProgressFromSupabase(session.user.id);
+            const cached = getStoredUserCache(session.user.id);
+            if (cached) {
+              setStoredUserCache(session.user.id, {
+                friends: progress.friends,
+              });
+            }
+            return {
+              message: 'Friend request accepted.',
+              progress,
+            };
+          }
+        }
+      } catch (err: any) {
+        console.error('Supabase acceptFriendRequest error:', err);
+        throw err;
+      }
+    }
+
     const res = await authFetch(`/api/friends/requests/${requestId}/accept`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -2018,6 +2413,26 @@ export const api = {
   },
 
   async declineFriendRequest(requestId: string): Promise<{ message: string; progress: any }> {
+    if (isSupabaseConfigured()) {
+      try {
+        const sb = getSupabase();
+        if (sb) {
+          const { data: { session } } = await sb.auth.getSession();
+          if (session?.user?.id) {
+            await declineFriendRequestInSupabase(requestId);
+            const progress = await fetchFriendsProgressFromSupabase(session.user.id);
+            return {
+              message: 'Friend request declined.',
+              progress,
+            };
+          }
+        }
+      } catch (err: any) {
+        console.error('Supabase declineFriendRequest error:', err);
+        throw err;
+      }
+    }
+
     const res = await authFetch(`/api/friends/requests/${requestId}/decline`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -2027,7 +2442,60 @@ export const api = {
     return json;
   },
 
+  async cancelFriendRequest(requestId: string): Promise<{ message: string; progress?: any }> {
+    if (isSupabaseConfigured()) {
+      try {
+        const sb = getSupabase();
+        if (sb) {
+          const { data: { session } } = await sb.auth.getSession();
+          if (session?.user?.id) {
+            await cancelFriendRequestInSupabase(requestId);
+            const progress = await fetchFriendsProgressFromSupabase(session.user.id);
+            return {
+              message: 'Friend request cancelled.',
+              progress,
+            };
+          }
+        }
+      } catch (err: any) {
+        console.error('Supabase cancelFriendRequest error:', err);
+        throw err;
+      }
+    }
+
+    const res = await authFetch(`/api/friends/requests/${requestId}/cancel`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+    });
+    const json = await safeResponseJson(res, 'Failed to cancel friend request');
+    if (!res.ok || !json.success) throw new Error(json.error || 'Failed to cancel friend request');
+    return json;
+  },
+
   async removeFriend(friendId: string): Promise<{ success: boolean; progress: any }> {
+    if (isSupabaseConfigured()) {
+      try {
+        const sb = getSupabase();
+        if (sb) {
+          const { data: { session } } = await sb.auth.getSession();
+          if (session?.user?.id) {
+            await removeFriendInSupabase(friendId);
+            const progress = await fetchFriendsProgressFromSupabase(session.user.id);
+            const cached = getStoredUserCache(session.user.id);
+            if (cached) {
+              setStoredUserCache(session.user.id, {
+                friends: progress.friends,
+              });
+            }
+            return { success: true, progress };
+          }
+        }
+      } catch (err: any) {
+        console.error('Supabase removeFriend error:', err);
+        throw err;
+      }
+    }
+
     const res = await authFetch(`/api/friends/${friendId}`, {
       method: 'DELETE',
     });

@@ -29,7 +29,8 @@ import {
   UpcomingTogetherItem,
   SocialGroup,
   SocialChallenge,
-  FriendTabType
+  FriendTabType,
+  AuthUser
 } from '../../types';
 import { 
   initialFriendsList, 
@@ -41,6 +42,8 @@ import {
   initialSocialChallenges
 } from '../../data/friendsMockData';
 import { api } from '../../services/api';
+import { getStoredUserCache } from '../../services/userCache';
+import { isSupabaseConfigured, subscribeToUserTable } from '../../lib/supabase';
 import { FriendsSummaryCards } from './FriendsSummaryCards';
 import { LeaderboardCard } from './LeaderboardCard';
 import { XPComparisonCard } from './XPComparisonCard';
@@ -63,25 +66,36 @@ interface FriendsPageProps {
   isDark: boolean;
   setIsDark: (dark: boolean) => void;
   onToggleMobileMenu: () => void;
+  authUser?: AuthUser | null;
 }
 
 export const FriendsPage: React.FC<FriendsPageProps> = ({
   isDark,
   setIsDark,
   onToggleMobileMenu,
+  authUser,
 }) => {
+  // Auth boundary determination
+  const isAuth = Boolean(authUser && !authUser.isGuest);
+
   // Navigation & Tabs State
   const [activeTab, setActiveTab] = useState<FriendTabType>('overview');
   const [searchQuery, setSearchQuery] = useState('');
 
-  // Data States
-  const [friends, setFriends] = useState<FriendUser[]>(initialFriendsList);
-  const [requests, setRequests] = useState<FriendRequest[]>(initialFriendRequests);
-  const [suggestions, setSuggestions] = useState<SuggestedFriend[]>(initialSuggestedFriends);
-  const [activities, setActivities] = useState<FriendActivity[]>(initialRecentActivity);
-  const [upcomingTogether, setUpcomingTogether] = useState<UpcomingTogetherItem[]>(initialUpcomingTogether);
-  const [groups, setGroups] = useState<SocialGroup[]>(initialSocialGroups);
-  const [challenges, setChallenges] = useState<SocialChallenge[]>(initialSocialChallenges);
+  // Data States - clean separation between authenticated zero-state and guest explorer fixtures
+  const [friends, setFriends] = useState<FriendUser[]>(() => {
+    if (isAuth) {
+      const cached = authUser?.id ? getStoredUserCache(authUser.id) : null;
+      return cached?.friends || [];
+    }
+    return initialFriendsList;
+  });
+  const [requests, setRequests] = useState<FriendRequest[]>(() => (isAuth ? [] : initialFriendRequests));
+  const [suggestions, setSuggestions] = useState<SuggestedFriend[]>(() => (isAuth ? [] : initialSuggestedFriends));
+  const [activities, setActivities] = useState<FriendActivity[]>(() => (isAuth ? [] : initialRecentActivity));
+  const [upcomingTogether, setUpcomingTogether] = useState<UpcomingTogetherItem[]>(() => (isAuth ? [] : initialUpcomingTogether));
+  const [groups, setGroups] = useState<SocialGroup[]>(() => (isAuth ? [] : initialSocialGroups));
+  const [challenges, setChallenges] = useState<SocialChallenge[]>(() => (isAuth ? [] : initialSocialChallenges));
   const [friendsProgress, setFriendsProgress] = useState<{
     leaderboard?: any[];
     xpComparison?: any[];
@@ -116,7 +130,7 @@ export const FriendsPage: React.FC<FriendsPageProps> = ({
 
       if (friendsRes.status === 'fulfilled' && friendsRes.value) {
         const data = friendsRes.value;
-        if (data.friends && Array.isArray(data.friends)) {
+        if (Array.isArray(data.friends)) {
           setFriends(data.friends);
         }
         setFriendsProgress({
@@ -134,16 +148,68 @@ export const FriendsPage: React.FC<FriendsPageProps> = ({
         setSuggestions(suggestionsRes.value);
       }
     } catch (err) {
-      console.warn('Using local state fallback for friends data', err);
+      console.warn('Friends data sync notice:', err);
+      if (!isAuth) {
+        setFriends(initialFriendsList);
+      }
     } finally {
       if (showIndicator) setIsRefreshing(false);
     }
-  }, []);
+  }, [isAuth]);
 
   // Initial fetch on mount
   useEffect(() => {
     loadFriendsData();
   }, [loadFriendsData]);
+
+  // Real-time synchronization for authenticated friendships and friend_requests
+  useEffect(() => {
+    if (!isAuth || !authUser?.id || !isSupabaseConfigured()) return;
+
+    const channels = [
+      subscribeToUserTable(authUser.id, {
+        table: 'friend_requests',
+        channelName: `user_friend_requests_recv_${authUser.id}`,
+        filter: `receiver_id=eq.${authUser.id}`,
+        onInsert: () => loadFriendsData(),
+        onUpdate: () => loadFriendsData(),
+        onDelete: () => loadFriendsData(),
+      }),
+      subscribeToUserTable(authUser.id, {
+        table: 'friend_requests',
+        channelName: `user_friend_requests_sent_${authUser.id}`,
+        filter: `sender_id=eq.${authUser.id}`,
+        onUpdate: () => loadFriendsData(),
+        onDelete: () => loadFriendsData(),
+      }),
+      subscribeToUserTable(authUser.id, {
+        table: 'friendships',
+        channelName: `user_friendships_u1_${authUser.id}`,
+        filter: `user_id1=eq.${authUser.id}`,
+        onInsert: () => loadFriendsData(),
+        onDelete: () => loadFriendsData(),
+      }),
+      subscribeToUserTable(authUser.id, {
+        table: 'friendships',
+        channelName: `user_friendships_u2_${authUser.id}`,
+        filter: `user_id2=eq.${authUser.id}`,
+        onInsert: () => loadFriendsData(),
+        onDelete: () => loadFriendsData(),
+      }),
+    ];
+
+    return () => {
+      channels.forEach((channel) => {
+        if (channel) {
+          try {
+            channel.unsubscribe();
+          } catch (e) {
+            // ignore cleanup errors
+          }
+        }
+      });
+    };
+  }, [isAuth, authUser?.id, loadFriendsData]);
 
   // Handlers connected to real backend endpoints
   const handleAcceptRequest = async (request: FriendRequest) => {
@@ -152,23 +218,27 @@ export const FriendsPage: React.FC<FriendsPageProps> = ({
       showToast(`Accepted friend request from ${request.name}!`);
       await loadFriendsData();
     } catch (err: any) {
-      // Fallback optimistic update
-      setRequests((prev) => prev.filter((r) => r.id !== request.id));
-      const newFriend: FriendUser = {
-        id: request.id.startsWith('req-') ? request.id.replace('req-', 'f-') : `f-${Date.now()}`,
-        name: request.name,
-        username: request.username,
-        avatarUrl: request.avatarUrl,
-        level: 8,
-        xp: 1800,
-        consistencyDays: 12,
-        status: 'online',
-        activityStatus: 'Online',
-        isFriend: true,
-        tags: ['Accountability', 'Consistency'],
-      };
-      setFriends((prev) => [newFriend, ...prev]);
-      showToast(`Accepted friend request from ${request.name}!`);
+      if (isAuth) {
+        showToast(err?.message || 'Failed to accept friend request');
+      } else {
+        // Fallback optimistic update for guest explorer mode only
+        setRequests((prev) => prev.filter((r) => r.id !== request.id));
+        const newFriend: FriendUser = {
+          id: request.id.startsWith('req-') ? request.id.replace('req-', 'f-') : `f-${Date.now()}`,
+          name: request.name,
+          username: request.username,
+          avatarUrl: request.avatarUrl,
+          level: 8,
+          xp: 1800,
+          consistencyDays: 12,
+          status: 'online',
+          activityStatus: 'Online',
+          isFriend: true,
+          tags: ['Accountability', 'Consistency'],
+        };
+        setFriends((prev) => [newFriend, ...prev]);
+        showToast(`Accepted friend request from ${request.name}!`);
+      }
     }
   };
 
@@ -178,8 +248,12 @@ export const FriendsPage: React.FC<FriendsPageProps> = ({
       showToast('Declined friend request');
       await loadFriendsData();
     } catch (err: any) {
-      setRequests((prev) => prev.filter((r) => r.id !== requestId));
-      showToast('Declined friend request');
+      if (isAuth) {
+        showToast(err?.message || 'Failed to decline friend request');
+      } else {
+        setRequests((prev) => prev.filter((r) => r.id !== requestId));
+        showToast('Declined friend request');
+      }
     }
   };
 
@@ -195,8 +269,7 @@ export const FriendsPage: React.FC<FriendsPageProps> = ({
       setSuggestions((prev) => prev.filter((s) => s.id !== suggested.id));
       await loadFriendsData();
     } catch (err: any) {
-      setSuggestions((prev) => prev.filter((s) => s.id !== suggested.id));
-      showToast(err?.message || `Sent friend request to ${suggested.name}!`);
+      showToast(err?.message || `Failed to send friend request to ${suggested.name}`);
     }
   };
 
@@ -211,22 +284,41 @@ export const FriendsPage: React.FC<FriendsPageProps> = ({
       showToast(`Friend request sent to ${user.name || user.username}!`);
       await loadFriendsData();
     } catch (err: any) {
-      // Optimistic fallback
-      const newFriend: FriendUser = {
-        id: user.id || `f-${Date.now()}`,
-        name: user.name || 'Friend',
-        username: user.username || 'user',
-        avatarUrl: user.avatarUrl || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150',
-        level: user.level || 10,
-        xp: user.xp || 2400,
-        consistencyDays: user.consistencyDays || 15,
-        status: user.status || 'online',
-        activityStatus: 'Online',
-        isFriend: true,
-        tags: ['Accountability'],
-      };
-      setFriends((prev) => [newFriend, ...prev]);
-      showToast(`Connected with ${newFriend.name}!`);
+      if (isAuth) {
+        showToast(err?.message || 'Failed to send friend request');
+      } else {
+        // Optimistic fallback for guest explorer mode
+        const newFriend: FriendUser = {
+          id: user.id || `f-${Date.now()}`,
+          name: user.name || 'Friend',
+          username: user.username || 'user',
+          avatarUrl: user.avatarUrl || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150',
+          level: user.level || 10,
+          xp: user.xp || 2400,
+          consistencyDays: user.consistencyDays || 15,
+          status: user.status || 'online',
+          activityStatus: 'Online',
+          isFriend: true,
+          tags: ['Accountability'],
+        };
+        setFriends((prev) => [newFriend, ...prev]);
+        showToast(`Connected with ${newFriend.name}!`);
+      }
+    }
+  };
+
+  const handleRemoveFriend = async (friendId: string) => {
+    try {
+      await api.removeFriend(friendId);
+      showToast('Removed friend');
+      await loadFriendsData();
+    } catch (err: any) {
+      if (isAuth) {
+        showToast(err?.message || 'Failed to remove friend');
+      } else {
+        setFriends((prev) => prev.filter((f) => f.id !== friendId));
+        showToast('Removed friend');
+      }
     }
   };
 
@@ -435,11 +527,13 @@ export const FriendsPage: React.FC<FriendsPageProps> = ({
 
               <XPComparisonCard 
                 data={friendsProgress?.xpComparison}
+                isAuth={isAuth}
               />
 
               <ConsistencyStreaksCard
                 streaks={friendsProgress?.consistencyStreaks}
                 onViewAll={() => setActiveTab('leaderboard')}
+                isAuth={isAuth}
               />
             </div>
 
@@ -487,63 +581,71 @@ export const FriendsPage: React.FC<FriendsPageProps> = ({
           <div className="space-y-4 animate-in fade-in duration-200">
             <div className="flex items-center justify-between">
               <h2 className="text-base font-bold text-white">All Friends ({friends.length})</h2>
-              <button 
-                onClick={() => setIsCompareModalOpen(true)}
-                className="px-3.5 py-1.5 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 text-xs font-semibold text-white flex items-center gap-1.5 transition-colors"
-              >
-                <span>Compare Progress</span>
-              </button>
+              {friends.length > 0 && (
+                <button 
+                  onClick={() => setIsCompareModalOpen(true)}
+                  className="px-3.5 py-1.5 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 text-xs font-semibold text-white flex items-center gap-1.5 transition-colors"
+                >
+                  <span>Compare Progress</span>
+                </button>
+              )}
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5">
-              {friends.map((friend) => (
-                <div 
-                  key={friend.id}
-                  onClick={() => setSelectedFriendForProfile(friend)}
-                  className="p-4 rounded-2xl bg-[#11161D] border border-white/6 hover:border-indigo-500/40 transition-all cursor-pointer group flex flex-col justify-between"
-                >
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="flex items-center gap-3 min-w-0">
-                      <div className="relative shrink-0">
-                        <img 
-                          src={friend.avatarUrl} 
-                          alt={friend.name}
-                          className="w-11 h-11 rounded-full object-cover border border-white/10"
-                          referrerPolicy="no-referrer"
-                        />
-                        {friend.status === 'online' && (
-                          <span className="absolute bottom-0 right-0 w-3 h-3 rounded-full bg-[#22C55E] border-2 border-[#11161D]" />
-                        )}
+            {friends.length === 0 ? (
+              <div className="p-12 text-center rounded-2xl bg-[#11161D] border border-white/6 text-xs text-[#687185]">
+                You haven't connected with any friends yet. Click "+ Add Friend" or invite others to build consistency together!
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5">
+                {friends.map((friend) => (
+                  <div 
+                    key={friend.id}
+                    onClick={() => setSelectedFriendForProfile(friend)}
+                    className="p-4 rounded-2xl bg-[#11161D] border border-white/6 hover:border-indigo-500/40 transition-all cursor-pointer group flex flex-col justify-between"
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex items-center gap-3 min-w-0">
+                        <div className="relative shrink-0">
+                          <img 
+                            src={friend.avatarUrl} 
+                            alt={friend.name}
+                            className="w-11 h-11 rounded-full object-cover border border-white/10"
+                            referrerPolicy="no-referrer"
+                          />
+                          {friend.status === 'online' && (
+                            <span className="absolute bottom-0 right-0 w-3 h-3 rounded-full bg-[#22C55E] border-2 border-[#11161D]" />
+                          )}
+                        </div>
+                        <div className="min-w-0">
+                          <h4 className="text-sm font-bold text-white group-hover:text-indigo-400 transition-colors truncate">
+                            {friend.name}
+                          </h4>
+                          <p className="text-xs text-[#687185]">@{friend.username}</p>
+                        </div>
                       </div>
-                      <div className="min-w-0">
-                        <h4 className="text-sm font-bold text-white group-hover:text-indigo-400 transition-colors truncate">
-                          {friend.name}
-                        </h4>
-                        <p className="text-xs text-[#687185]">@{friend.username}</p>
-                      </div>
+
+                      <span className="px-2 py-0.5 rounded-md bg-white/5 border border-white/10 text-[11px] font-bold text-[#9AA3B5]">
+                        Lv. {friend.level}
+                      </span>
                     </div>
 
-                    <span className="px-2 py-0.5 rounded-md bg-white/5 border border-white/10 text-[11px] font-bold text-[#9AA3B5]">
-                      Lv. {friend.level}
-                    </span>
-                  </div>
+                    <p className="text-xs text-[#9AA3B5] mt-3 line-clamp-2 leading-relaxed">
+                      {friend.bio || 'Building consistency every day.'}
+                    </p>
 
-                  <p className="text-xs text-[#9AA3B5] mt-3 line-clamp-2 leading-relaxed">
-                    {friend.bio || 'Building consistency every day.'}
-                  </p>
-
-                  <div className="flex items-center justify-between pt-3 mt-3 border-t border-white/5 text-xs">
-                    <span className="text-[#687185] flex items-center gap-1 font-semibold text-[#FB923C]">
-                      <Flame className="w-3.5 h-3.5" />
-                      {friend.consistencyDays}d streak
-                    </span>
-                    <span className="font-bold text-white tabular-nums">
-                      {friend.xp.toLocaleString()} XP
-                    </span>
+                    <div className="flex items-center justify-between pt-3 mt-3 border-t border-white/5 text-xs">
+                      <span className="text-[#687185] flex items-center gap-1 font-semibold text-[#FB923C]">
+                        <Flame className="w-3.5 h-3.5" />
+                        {friend.consistencyDays}d streak
+                      </span>
+                      <span className="font-bold text-white tabular-nums">
+                        {friend.xp.toLocaleString()} XP
+                      </span>
+                    </div>
                   </div>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            )}
           </div>
         )}
 
@@ -684,33 +786,39 @@ export const FriendsPage: React.FC<FriendsPageProps> = ({
             {/* Suggested Friends */}
             <div>
               <h2 className="text-base font-bold text-white mb-3">People with Similar Goals</h2>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5">
-                {suggestions.map((item) => (
-                  <div 
-                    key={item.id}
-                    className="p-4 rounded-2xl bg-[#11161D] border border-white/6 flex items-center justify-between gap-3"
-                  >
-                    <div className="flex items-center gap-3 min-w-0">
-                      <img 
-                        src={item.avatarUrl} 
-                        alt={item.name}
-                        className="w-10 h-10 rounded-full object-cover border border-white/10 shrink-0"
-                        referrerPolicy="no-referrer"
-                      />
-                      <div className="min-w-0">
-                        <p className="text-xs font-bold text-white truncate">{item.name}</p>
-                        <p className="text-[11px] text-[#9AA3B5] truncate mt-0.5">{item.sharedInterest}</p>
-                      </div>
-                    </div>
-                    <button
-                      onClick={() => handleAddSuggested(item)}
-                      className="px-3 py-1.5 rounded-lg bg-[#6366F1] hover:bg-[#7C7FF5] text-white text-xs font-semibold transition-colors shrink-0"
+              {suggestions.length === 0 ? (
+                <div className="p-8 text-center rounded-2xl bg-[#11161D] border border-white/6 text-xs text-[#687185]">
+                  No suggested peers at this moment. You can search or invite friends directly using the "+ Add Friend" button!
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5">
+                  {suggestions.map((item) => (
+                    <div 
+                      key={item.id}
+                      className="p-4 rounded-2xl bg-[#11161D] border border-white/6 flex items-center justify-between gap-3"
                     >
-                      Connect
-                    </button>
-                  </div>
-                ))}
-              </div>
+                      <div className="flex items-center gap-3 min-w-0">
+                        <img 
+                          src={item.avatarUrl} 
+                          alt={item.name}
+                          className="w-10 h-10 rounded-full object-cover border border-white/10 shrink-0"
+                          referrerPolicy="no-referrer"
+                        />
+                        <div className="min-w-0">
+                          <p className="text-xs font-bold text-white truncate">{item.name}</p>
+                          <p className="text-[11px] text-[#9AA3B5] truncate mt-0.5">{item.sharedInterest}</p>
+                        </div>
+                      </div>
+                      <button
+                        onClick={() => handleAddSuggested(item)}
+                        className="px-3 py-1.5 rounded-lg bg-[#6366F1] hover:bg-[#7C7FF5] text-white text-xs font-semibold transition-colors shrink-0"
+                      >
+                        Connect
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
 
             {/* Active Challenges */}
@@ -787,11 +895,15 @@ export const FriendsPage: React.FC<FriendsPageProps> = ({
           setSelectedFriendForProfile(null);
           setIsCompareModalOpen(true);
         }}
+        onRemoveFriend={handleRemoveFriend}
+        isAuth={isAuth}
       />
 
       <CompareFriendsModal
         isOpen={isCompareModalOpen}
         onClose={() => setIsCompareModalOpen(false)}
+        friends={friends}
+        isAuth={isAuth}
       />
 
       <CreateGroupModal
@@ -810,6 +922,7 @@ export const FriendsPage: React.FC<FriendsPageProps> = ({
         isOpen={isAddFriendModalOpen}
         onClose={() => setIsAddFriendModalOpen(false)}
         onAddFriend={handleAddFriendFromModal}
+        isAuth={isAuth}
       />
     </div>
   );

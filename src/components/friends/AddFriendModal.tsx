@@ -7,12 +7,14 @@ interface AddFriendModalProps {
   isOpen: boolean;
   onClose: () => void;
   onAddFriend: (user: Partial<FriendUser> & { id?: string; reason?: string }) => void;
+  isAuth?: boolean;
 }
 
 export const AddFriendModal: React.FC<AddFriendModalProps> = ({
   isOpen,
   onClose,
   onAddFriend,
+  isAuth = false,
 }) => {
   const [activeTab, setActiveTab] = useState<'search' | 'invite'>('search');
   const [searchQuery, setSearchQuery] = useState('');
@@ -79,7 +81,7 @@ export const AddFriendModal: React.FC<AddFriendModalProps> = ({
     if (!isOpen) return;
 
     if (!searchQuery.trim()) {
-      setSearchResults(fallbackFriends);
+      setSearchResults(isAuth ? [] : fallbackFriends);
       setIsSearching(false);
       return;
     }
@@ -90,8 +92,10 @@ export const AddFriendModal: React.FC<AddFriendModalProps> = ({
         const results = await api.searchUsers(searchQuery.trim());
         if (results && results.length > 0) {
           setSearchResults(results);
+        } else if (isAuth) {
+          setSearchResults([]);
         } else {
-          // Fallback filter
+          // Fallback filter for guest mode only
           const filtered = fallbackFriends.filter((p) =>
             p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
             p.username.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -100,20 +104,23 @@ export const AddFriendModal: React.FC<AddFriendModalProps> = ({
           setSearchResults(filtered);
         }
       } catch (err) {
-        // Fallback filter on network error
-        const filtered = fallbackFriends.filter((p) =>
-          p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          p.username.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          p.reason.toLowerCase().includes(searchQuery.toLowerCase())
-        );
-        setSearchResults(filtered);
+        if (isAuth) {
+          setSearchResults([]);
+        } else {
+          const filtered = fallbackFriends.filter((p) =>
+            p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            p.username.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            p.reason.toLowerCase().includes(searchQuery.toLowerCase())
+          );
+          setSearchResults(filtered);
+        }
       } finally {
         setIsSearching(false);
       }
     }, 250);
 
     return () => clearTimeout(timer);
-  }, [searchQuery, isOpen]);
+  }, [searchQuery, isOpen, isAuth]);
 
   if (!isOpen) return null;
 
@@ -272,7 +279,11 @@ export const AddFriendModal: React.FC<AddFriendModalProps> = ({
               })}
               {searchResults.length === 0 && !isSearching && (
                 <div className="py-8 text-center text-xs text-[#687185]">
-                  No people found matching "{searchQuery}". Try searching by exact username or use the Invite tab!
+                  {searchQuery.trim()
+                    ? `No people found matching "${searchQuery}". Try searching by exact username or use the Invite tab!`
+                    : isAuth
+                    ? 'Type a username or display name to search for other adventurers.'
+                    : 'Search for other adventurers by name or username.'}
                 </div>
               )}
             </div>

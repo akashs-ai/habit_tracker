@@ -33,31 +33,37 @@ export const OnlineNowCard: React.FC<OnlineNowCardProps> = ({
       </div>
 
       {/* Avatars Carousel / Row */}
-      <div className="mt-3 flex items-center justify-between gap-2 overflow-x-auto pb-1 scrollbar-none">
-        {onlineFriends.slice(0, 5).map((user) => (
-          <div 
-            key={user.id}
-            onClick={() => onSelectUser(user)}
-            className="flex flex-col items-center min-w-[56px] cursor-pointer group"
-          >
-            <div className="relative">
-              <img 
-                src={user.avatarUrl} 
-                alt={user.name}
-                className="w-10 h-10 sm:w-11 sm:h-11 rounded-full object-cover border-2 border-white/10 group-hover:border-[#6366F1] transition-all"
-                referrerPolicy="no-referrer"
-              />
-              <span className="absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full bg-[#22C55E] border-2 border-[#11161D]" />
+      {onlineFriends.length === 0 ? (
+        <div className="py-6 text-center text-xs text-[#687185]">
+          No friends online right now.
+        </div>
+      ) : (
+        <div className="mt-3 flex items-center justify-between gap-2 overflow-x-auto pb-1 scrollbar-none">
+          {onlineFriends.slice(0, 5).map((user) => (
+            <div 
+              key={user.id}
+              onClick={() => onSelectUser(user)}
+              className="flex flex-col items-center min-w-[56px] cursor-pointer group"
+            >
+              <div className="relative">
+                <img 
+                  src={user.avatarUrl} 
+                  alt={user.name}
+                  className="w-10 h-10 sm:w-11 sm:h-11 rounded-full object-cover border-2 border-white/10 group-hover:border-[#6366F1] transition-all"
+                  referrerPolicy="no-referrer"
+                />
+                <span className="absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full bg-[#22C55E] border-2 border-[#11161D]" />
+              </div>
+              <span className="text-[11px] font-semibold text-white mt-1.5 truncate max-w-[60px] text-center">
+                {user.name.split(' ')[0]}
+              </span>
+              <span className="text-[10px] text-[#687185] truncate max-w-[64px] text-center">
+                {user.activityStatus || 'Online'}
+              </span>
             </div>
-            <span className="text-[11px] font-semibold text-white mt-1.5 truncate max-w-[60px] text-center">
-              {user.name.split(' ')[0]}
-            </span>
-            <span className="text-[10px] text-[#687185] truncate max-w-[64px] text-center">
-              {user.activityStatus || 'Online'}
-            </span>
-          </div>
-        ))}
-      </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 };

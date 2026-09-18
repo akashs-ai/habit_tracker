@@ -55,6 +55,16 @@ export const GoalsPage: React.FC<GoalsPageProps> = ({
   const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
   const [activeCategoryFilter, setActiveCategoryFilter] = useState<GoalCategory | null>(null);
 
+  const activeDetailGoal = useMemo(() => {
+    if (!selectedGoalForDetail) return null;
+    return goals.find((g) => g.id === selectedGoalForDetail.id) || selectedGoalForDetail;
+  }, [goals, selectedGoalForDetail]);
+
+  const activeMilestoneGoal = useMemo(() => {
+    if (!goalForMilestone) return null;
+    return goals.find((g) => g.id === goalForMilestone.id) || goalForMilestone;
+  }, [goals, goalForMilestone]);
+
   // Counts for tabs
   const counts = useMemo(() => {
     return {
@@ -389,7 +399,7 @@ export const GoalsPage: React.FC<GoalsPageProps> = ({
       />
 
       <GoalDetailModal
-        goal={selectedGoalForDetail}
+        goal={activeDetailGoal}
         isOpen={!!selectedGoalForDetail}
         onClose={() => setSelectedGoalForDetail(null)}
         onUpdateGoal={onUpdateGoal}
@@ -398,7 +408,7 @@ export const GoalsPage: React.FC<GoalsPageProps> = ({
       />
 
       <AddMilestoneModal
-        goal={goalForMilestone}
+        goal={activeMilestoneGoal}
         isOpen={!!goalForMilestone}
         onClose={() => setGoalForMilestone(null)}
         onAddMilestone={handleAddMilestoneToGoal}

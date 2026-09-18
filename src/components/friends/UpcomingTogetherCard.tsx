@@ -67,7 +67,12 @@ export const UpcomingTogetherCard: React.FC<UpcomingTogetherCardProps> = ({
 
       {/* Items list */}
       <div className="space-y-3 mt-3">
-        {items.slice(0, 3).map((item, idx) => {
+        {items.length === 0 ? (
+          <div className="py-6 text-center text-xs text-[#687185]">
+            No upcoming group sessions. Schedule a session with your friends!
+          </div>
+        ) : (
+          items.slice(0, 3).map((item, idx) => {
           const isThird = idx === 2;
           const status = sessionStates[item.id];
           const isJoined = status === 'joined';
@@ -119,7 +124,7 @@ export const UpcomingTogetherCard: React.FC<UpcomingTogetherCardProps> = ({
               )}
             </div>
           );
-        })}
+        }))}
       </div>
     </div>
   );

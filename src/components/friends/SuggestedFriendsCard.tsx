@@ -40,7 +40,12 @@ export const SuggestedFriendsCard: React.FC<SuggestedFriendsCardProps> = ({
 
       {/* Suggested List */}
       <div className="space-y-3 mt-3">
-        {suggestions.slice(0, 3).map((item) => {
+        {suggestions.length === 0 ? (
+          <div className="py-6 text-center text-xs text-[#687185]">
+            No suggestions right now. Invite friends to connect!
+          </div>
+        ) : (
+          suggestions.slice(0, 3).map((item) => {
           const isAdded = addedIds[item.id];
 
           return (
@@ -80,7 +85,7 @@ export const SuggestedFriendsCard: React.FC<SuggestedFriendsCardProps> = ({
               </button>
             </div>
           );
-        })}
+        }))}
       </div>
     </div>
   );

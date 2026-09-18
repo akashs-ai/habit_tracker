@@ -45,7 +45,8 @@ import {
   CollectionItem,
   AIIntegrationModel,
   AppNotification,
-  UserSettingsProfile
+  UserSettingsProfile,
+  FriendUser
 } from './types';
 import { Sparkles, X, CheckCircle2 } from 'lucide-react';
 import { LoadingSkeleton } from './components/common/LoadingSkeleton';
@@ -72,7 +73,19 @@ import { getStoredAppearance, applyAppearanceToDOM } from './utils/appearanceMan
 import { subscribeToUserTable, isSupabaseConfigured, getSupabase } from './lib/supabase';
 import { initialAIModels } from './data/aiIntegrationMockData';
 import { getStoredUserCache, setStoredUserCache, clearUserCache, getLastActiveUserId } from './services/userCache';
-import { mapHabitRowToQuest, mapTaskRowToTaskItem } from './services/supabaseData';
+import {
+  mapHabitRowToQuest,
+  mapTaskRowToTaskItem,
+  fetchSingleGoalFromSupabase,
+  calculateGoalMetrics,
+  mapCalendarRowToCalendarEvent,
+} from './services/supabaseData';
+import {
+  markCalendarEventDeleted,
+  isCalendarEventDeleted,
+  reconcileCalendarEvents,
+  enqueueCalendarMutation,
+} from './utils/calendarMutationManager';
 import { calculateProgressionDelta } from './utils/progression';
 
 export default function App() {
@@ -143,13 +156,25 @@ export default function App() {
     return initialCached?.tasks || initialTasks;
   });
   const [calendarEvents, setCalendarEvents] = useState<CalendarEvent[]>(() => {
+    if (isAuthUserCached) {
+      const cachedEvts = initialCached?.calendarEvents;
+      return Array.isArray(cachedEvts)
+        ? cachedEvts.filter((e) => !e.id.startsWith('cal-') && !e.id.startsWith('evt-live-') && !e.id.startsWith('evt-demo-') && !e.id.startsWith('demo-'))
+        : [];
+    }
     if (initialCached?.calendarEvents) return initialCached.calendarEvents;
-    return isAuthUserCached ? [] : initialCalendarEvents;
+    return initialCalendarEvents;
   });
   const [detailedGoals, setDetailedGoals] = useState<DetailedGoal[]>(() => {
+    if (isAuthUserCached) {
+      const cachedGoals = initialCached?.goals || initialCached?.detailedGoals;
+      return Array.isArray(cachedGoals)
+        ? cachedGoals.filter((g) => !g.id.startsWith('goal-') && !g.id.startsWith('demo-'))
+        : [];
+    }
     if (initialCached?.goals) return initialCached.goals;
     if (initialCached?.detailedGoals) return initialCached.detailedGoals;
-    return isAuthUserCached ? [] : initialGoalsData;
+    return initialGoalsData;
   });
   const [attributes, setAttributes] = useState(() => {
     if (initialCached?.attributes) return initialCached.attributes;
@@ -159,7 +184,10 @@ export default function App() {
     if (initialCached?.weeklyData) return initialCached.weeklyData;
     return isAuthUserCached ? freshWeeklyData : weeklyProgressData;
   });
-  const [friends] = useState(leaderboardFriends);
+  const [friends, setFriends] = useState<FriendUser[]>(() => {
+    if (initialCached?.friends) return initialCached.friends;
+    return isAuthUserCached ? [] : leaderboardFriends;
+  });
   const [notes, setNotes] = useState<QuickNote[]>(() => {
     if (initialCached?.notes) return initialCached.notes;
     return isAuthUserCached ? [] : initialNotes;
@@ -226,11 +254,24 @@ export default function App() {
       setTasks(finalTasks);
     }
 
-    if (data.calendarEvents) setCalendarEvents(data.calendarEvents);
-    if (data.goals) {
-      setDetailedGoals(data.goals);
-    } else if (data.detailedGoals) {
-      setDetailedGoals(data.detailedGoals);
+    const shouldSyncCalendar = Array.isArray(data.calendarEvents) && (!isAuthUser || options?.allowTaskSync);
+    if (shouldSyncCalendar) {
+      const rawEvents = data.calendarEvents;
+      const filteredEvents = isAuthUser
+        ? rawEvents.filter((e) => !e.id.startsWith('cal-') && !e.id.startsWith('evt-live-') && !e.id.startsWith('evt-demo-') && !e.id.startsWith('demo-'))
+        : rawEvents;
+      setCalendarEvents((prev) => reconcileCalendarEvents(prev, filteredEvents));
+    }
+
+    const shouldSyncGoals =
+      (Array.isArray(data.goals) || Array.isArray(data.detailedGoals)) &&
+      (!isAuthUser || options?.allowTaskSync);
+    if (shouldSyncGoals) {
+      const rawGoals = Array.isArray(data.goals) ? data.goals : (data.detailedGoals || []);
+      const finalGoals = isAuthUser
+        ? rawGoals.filter((g) => !g.id.startsWith('goal-') && !g.id.startsWith('demo-'))
+        : rawGoals;
+      setDetailedGoals(finalGoals);
     }
     if (data.rewards) setRewards(data.rewards);
     if (data.badges) setBadges(data.badges);
@@ -240,6 +281,10 @@ export default function App() {
     if (data.attributes) setAttributes(data.attributes);
     if (data.weeklyData) setWeeklyData(data.weeklyData);
     if (data.aiAgents && data.aiAgents.length > 0) setAiAgents(data.aiAgents);
+    if (Array.isArray(data.friends)) {
+      const finalFriends = isAuthUser ? data.friends.filter((f) => !f.id.startsWith('friend-')) : data.friends;
+      setFriends(finalFriends);
+    }
   };
 
   const handleSyncAIModels = async () => {
@@ -327,6 +372,7 @@ export default function App() {
       setWeeklyData(isAuth ? [...freshWeeklyData] : [...weeklyProgressData]);
       setCollection([]);
       setNotifications(isAuth ? [] : [...initialNotifications]);
+      setFriends(isAuth ? [] : [...leaderboardFriends]);
       setIsInitialLoading(true);
     }
 
@@ -365,6 +411,7 @@ export default function App() {
     setNotifications([]);
     setCollection([]);
     setRewards(initialFeaturedRewards);
+    setFriends([]);
     setShowLandingWelcome(true);
   };
 
@@ -421,6 +468,7 @@ export default function App() {
             setNotifications([]);
             setCollection([]);
             setRewards(initialFeaturedRewards);
+            setFriends([]);
             setShowLandingWelcome(true);
           }
         });
@@ -678,6 +726,88 @@ export default function App() {
           }
         },
       }),
+      subscribeToUserTable(currentUser.id, {
+        table: 'goals',
+        onInsert: (payload: any) => {
+          if (!payload?.id) return;
+          fetchSingleGoalFromSupabase(currentUser.id, payload.id).then((freshGoal) => {
+            if (freshGoal) {
+              setDetailedGoals((prev) =>
+                prev.some((g) => g.id === freshGoal.id)
+                  ? prev.map((g) => (g.id === freshGoal.id ? freshGoal : g))
+                  : [freshGoal, ...prev]
+              );
+            }
+          });
+        },
+        onUpdate: (payload: any) => {
+          if (!payload?.id) return;
+          fetchSingleGoalFromSupabase(currentUser.id, payload.id).then((freshGoal) => {
+            if (freshGoal) {
+              setDetailedGoals((prev) =>
+                prev.map((g) => (g.id === freshGoal.id ? freshGoal : g))
+              );
+            }
+          });
+        },
+        onDelete: (payload: any) => {
+          if (!payload?.id) return;
+          setDetailedGoals((prev) => prev.filter((g) => g.id !== payload.id));
+        },
+      }),
+      subscribeToUserTable(currentUser.id, {
+        table: 'goal_milestones',
+        onInsert: (payload: any) => {
+          if (!payload?.goal_id) return;
+          fetchSingleGoalFromSupabase(currentUser.id, payload.goal_id).then((freshGoal) => {
+            if (freshGoal) {
+              setDetailedGoals((prev) =>
+                prev.map((g) => (g.id === freshGoal.id ? freshGoal : g))
+              );
+            }
+          });
+        },
+        onUpdate: (payload: any) => {
+          if (!payload?.goal_id) return;
+          fetchSingleGoalFromSupabase(currentUser.id, payload.goal_id).then((freshGoal) => {
+            if (freshGoal) {
+              setDetailedGoals((prev) =>
+                prev.map((g) => (g.id === freshGoal.id ? freshGoal : g))
+              );
+            }
+          });
+        },
+        onDelete: (payload: any) => {
+          if (!payload?.goal_id) return;
+          fetchSingleGoalFromSupabase(currentUser.id, payload.goal_id).then((freshGoal) => {
+            if (freshGoal) {
+              setDetailedGoals((prev) =>
+                prev.map((g) => (g.id === freshGoal.id ? freshGoal : g))
+              );
+            }
+          });
+        },
+      }),
+      subscribeToUserTable(currentUser.id, {
+        table: 'calendar_events',
+        onInsert: (payload: any) => {
+          if (!payload?.id) return;
+          if (isCalendarEventDeleted(payload.id)) return;
+          const mappedEvent = mapCalendarRowToCalendarEvent(payload);
+          setCalendarEvents((prev) => reconcileCalendarEvents(prev, [mappedEvent]));
+        },
+        onUpdate: (payload: any) => {
+          if (!payload?.id) return;
+          if (isCalendarEventDeleted(payload.id)) return;
+          const mappedEvent = mapCalendarRowToCalendarEvent(payload);
+          setCalendarEvents((prev) => reconcileCalendarEvents(prev, [mappedEvent]));
+        },
+        onDelete: (payload: any) => {
+          if (!payload?.id) return;
+          markCalendarEventDeleted(payload.id);
+          setCalendarEvents((prev) => prev.filter((e) => e.id !== payload.id));
+        },
+      }),
     ];
 
     return () => {
@@ -795,6 +925,8 @@ export default function App() {
   const pendingTaskTogglesRef = useRef<Set<string>>(new Set());
   const pendingCreationPromisesRef = useRef<Map<string, Promise<TaskItem>>>(new Map());
   const tempIdToRealUuidMap = useRef<Map<string, string>>(new Map());
+  const calendarTempIdToRealUuidMap = useRef<Map<string, string>>(new Map());
+  const pendingCalendarCreationPromisesRef = useRef<Map<string, Promise<CalendarEvent>>>(new Map());
 
   // Handle Quest Complete / Toggle (Home)
   const handleToggleQuestComplete = async (questId: string) => {
@@ -1115,11 +1247,13 @@ export default function App() {
 
   // Calendar Handlers
   const handleAddCalendarEvent = async (newEventData: Omit<CalendarEvent, 'id'> & { id?: string }) => {
+    const isProvidedUUID = Boolean(newEventData.id && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(newEventData.id));
     const eventId = newEventData.id || `evt-${Date.now()}`;
     const optimisticEvent: CalendarEvent = {
       ...newEventData,
       id: eventId,
     };
+
     setCalendarEvents((prev) => {
       if (prev.some(e => e.id === eventId || (e.title === newEventData.title && e.date === newEventData.date && e.startTime === newEventData.startTime))) {
         return prev;
@@ -1127,41 +1261,114 @@ export default function App() {
       return [optimisticEvent, ...prev];
     });
 
-    try {
-      const res = await api.addCalendarEvent(newEventData);
+    const addPromise = (async () => {
+      const res = await enqueueCalendarMutation(eventId, async () => {
+        return await api.addCalendarEvent(newEventData);
+      });
+      const realEvent = res.event;
+      if (realEvent) {
+        if (!isProvidedUUID) {
+          calendarTempIdToRealUuidMap.current.set(eventId, realEvent.id);
+        }
+        setCalendarEvents((prev) => {
+          const alreadyHasReal = prev.some((e) => e.id === realEvent.id);
+          if (alreadyHasReal) {
+            return prev.filter((e) => e.id !== eventId);
+          }
+          return prev.map((e) => (e.id === eventId ? realEvent : e));
+        });
+      }
       if (res.state) syncFromBackend(res.state);
-    } catch (err) {
+      return realEvent;
+    })();
+
+    pendingCalendarCreationPromisesRef.current.set(eventId, addPromise);
+
+    try {
+      await addPromise;
+    } catch (err: any) {
       console.error('Add calendar event error:', err);
+      setCalendarEvents((prev) => prev.filter((e) => e.id !== eventId));
+      setVerifiedBannerMessage(`Failed to create calendar event: ${err?.message || 'Database error'}`);
+    } finally {
+      pendingCalendarCreationPromisesRef.current.delete(eventId);
     }
   };
 
   const handleUpdateCalendarEvent = async (updatedEvent: CalendarEvent) => {
+    let effectiveEvent = { ...updatedEvent };
+    if (pendingCalendarCreationPromisesRef.current.has(updatedEvent.id)) {
+      try {
+        const created = await pendingCalendarCreationPromisesRef.current.get(updatedEvent.id);
+        if (created?.id) effectiveEvent.id = created.id;
+      } catch {
+        return;
+      }
+    } else if (calendarTempIdToRealUuidMap.current.has(updatedEvent.id)) {
+      effectiveEvent.id = calendarTempIdToRealUuidMap.current.get(updatedEvent.id)!;
+    }
+
+    const previousEvents = calendarEvents;
     setCalendarEvents((prev) =>
-      prev.map((e) => (e.id === updatedEvent.id ? updatedEvent : e))
+      prev.map((e) => (e.id === updatedEvent.id || e.id === effectiveEvent.id ? effectiveEvent : e))
     );
+
     try {
-      const res = await api.updateCalendarEvent(updatedEvent);
+      const res = await enqueueCalendarMutation(effectiveEvent.id, async () => {
+        return await api.updateCalendarEvent(effectiveEvent);
+      });
+      if (res.event) {
+        setCalendarEvents((prev) =>
+          prev.map((e) => (e.id === updatedEvent.id || e.id === effectiveEvent.id ? res.event! : e))
+        );
+      }
       if (res.state) syncFromBackend(res.state);
-    } catch (err) {
+    } catch (err: any) {
       console.error('Update calendar event error:', err);
+      setCalendarEvents(previousEvents);
+      setVerifiedBannerMessage(`Failed to update calendar event: ${err?.message || 'Database error'}`);
     }
   };
 
   const handleDeleteCalendarEvent = async (eventId: string) => {
-    setCalendarEvents((prev) => prev.filter((e) => e.id !== eventId));
+    let effectiveEventId = eventId;
+    if (pendingCalendarCreationPromisesRef.current.has(eventId)) {
+      try {
+        const created = await pendingCalendarCreationPromisesRef.current.get(eventId);
+        if (created?.id) effectiveEventId = created.id;
+      } catch {
+        return;
+      }
+    } else if (calendarTempIdToRealUuidMap.current.has(eventId)) {
+      effectiveEventId = calendarTempIdToRealUuidMap.current.get(eventId)!;
+    }
+
+    markCalendarEventDeleted(eventId);
+    if (effectiveEventId !== eventId) {
+      markCalendarEventDeleted(effectiveEventId);
+    }
+
+    const previousEvents = calendarEvents;
+    setCalendarEvents((prev) => prev.filter((e) => e.id !== eventId && e.id !== effectiveEventId));
+
     try {
-      const res = await api.deleteCalendarEvent(eventId);
+      const res = await enqueueCalendarMutation(effectiveEventId, async () => {
+        return await api.deleteCalendarEvent(effectiveEventId);
+      });
       if (res.state) syncFromBackend(res.state);
-    } catch (err) {
+    } catch (err: any) {
       console.error('Delete calendar event error:', err);
+      setCalendarEvents(previousEvents);
+      setVerifiedBannerMessage(`Failed to delete calendar event: ${err?.message || 'Database error'}`);
     }
   };
 
   // Detailed Goals Handlers
   const handleAddDetailedGoal = async (newGoalData: Omit<DetailedGoal, 'id'>) => {
+    const tempId = `temp-goal-${Date.now()}`;
     const optimisticGoal: DetailedGoal = {
       ...newGoalData,
-      id: `goal-${Date.now()}`,
+      id: tempId,
       updatedAt: getLiveTodayISO(),
     };
     setDetailedGoals((prev) => [optimisticGoal, ...prev]);
@@ -1171,13 +1378,21 @@ export default function App() {
 
     try {
       const res = await api.addGoal(newGoalData);
-      if (res.state) syncFromBackend(res.state);
+      if (res.goal) {
+        setDetailedGoals((prev) =>
+          prev.map((g) => (g.id === tempId ? res.goal : g))
+        );
+      } else if (res.state) {
+        syncFromBackend(res.state, { allowTaskSync: true });
+      }
     } catch (err) {
       console.error('Add goal error:', err);
+      setDetailedGoals((prev) => prev.filter((g) => g.id !== tempId));
     }
   };
 
   const handleUpdateDetailedGoal = async (updatedGoal: DetailedGoal) => {
+    const previous = detailedGoals.find((g) => g.id === updatedGoal.id);
     setDetailedGoals((prev) =>
       prev.map((g) =>
         g.id === updatedGoal.id
@@ -1187,19 +1402,58 @@ export default function App() {
     );
     try {
       const res = await api.updateGoal(updatedGoal);
-      if (res.state) syncFromBackend(res.state);
+      if (res.goal) {
+        setDetailedGoals((prev) =>
+          prev.map((g) => (g.id === res.goal.id ? res.goal : g))
+        );
+      } else if (res.state) {
+        syncFromBackend(res.state, { allowTaskSync: true });
+      }
     } catch (err) {
       console.error('Update goal error:', err);
+      if (previous) {
+        setDetailedGoals((prev) =>
+          prev.map((g) => (g.id === previous.id ? previous : g))
+        );
+      }
     }
   };
 
   const handleDeleteDetailedGoal = async (goalId: string) => {
+    const previous = detailedGoals.find((g) => g.id === goalId);
     setDetailedGoals((prev) => prev.filter((g) => g.id !== goalId));
     try {
       const res = await api.deleteGoal(goalId);
-      if (res.state) syncFromBackend(res.state);
+      if (res.state) syncFromBackend(res.state, { allowTaskSync: true });
     } catch (err) {
       console.error('Delete goal error:', err);
+      if (previous) {
+        setDetailedGoals((prev) => [previous, ...prev]);
+      }
+    }
+  };
+
+  const handleToggleGoalSubtask = async (goalId: string, subtaskId: string) => {
+    const target = detailedGoals.find((g) => g.id === goalId);
+    if (!target) return;
+
+    const updatedSubtasks = (target.subtasks || []).map((st) =>
+      st.id === subtaskId ? { ...st, completed: !st.completed } : st
+    );
+    const metrics = calculateGoalMetrics({ ...target, subtasks: updatedSubtasks });
+    const optimistic: DetailedGoal = { ...target, subtasks: updatedSubtasks, ...metrics };
+    setDetailedGoals((prev) => prev.map((g) => (g.id === goalId ? optimistic : g)));
+
+    try {
+      const res = await api.toggleGoalSubtask(goalId, subtaskId);
+      if (res.goal) {
+        setDetailedGoals((prev) => prev.map((g) => (g.id === res.goal.id ? res.goal : g)));
+      } else if (res.state) {
+        syncFromBackend(res.state, { allowTaskSync: true });
+      }
+    } catch (err) {
+      console.error('Toggle goal subtask error:', err);
+      setDetailedGoals((prev) => prev.map((g) => (g.id === goalId ? target : g)));
     }
   };
 
@@ -1560,6 +1814,7 @@ export default function App() {
           isDark={isDark}
           setIsDark={handleToggleTheme}
           onToggleMobileMenu={() => setIsMobileMenuOpen(true)}
+          authUser={currentUser}
         />
       ) : activeTab === 'goals' ? (
         <GoalsPage
@@ -1567,6 +1822,7 @@ export default function App() {
           onAddGoal={handleAddDetailedGoal}
           onUpdateGoal={handleUpdateDetailedGoal}
           onDeleteGoal={handleDeleteDetailedGoal}
+          onToggleSubtask={handleToggleGoalSubtask}
           isDark={isDark}
           setIsDark={handleToggleTheme}
           onToggleMobileMenu={() => setIsMobileMenuOpen(true)}

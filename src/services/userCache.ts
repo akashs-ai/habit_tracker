@@ -12,7 +12,8 @@ import {
   Attribute, 
   WeeklyData, 
   AIIntegrationModel, 
-  AuthUser 
+  AuthUser,
+  FriendUser
 } from '../types';
 
 const CACHE_KEY_PREFIX = 'liferpg_user_cache_';
@@ -50,6 +51,7 @@ export interface CachedUserData {
   attributes: Attribute[];
   weeklyData: WeeklyData[];
   aiAgents?: AIIntegrationModel[];
+  friends?: FriendUser[];
   cachedAt: number;
 }
 
@@ -71,13 +73,24 @@ export function getStoredUserCache(userId: string): CachedUserData | null {
     if (!raw) return null;
     const parsed: CachedUserData = JSON.parse(raw);
     if (!parsed || parsed.userId !== userId) return null;
-    // Sanitize any mock tasks or mock quests that might have previously leaked into authenticated user cache
+    // Sanitize any mock tasks, quests, goals, or calendar events that might have previously leaked into authenticated user cache
     if (parsed.authUser && !parsed.authUser.isGuest) {
       if (Array.isArray(parsed.tasks)) {
         parsed.tasks = parsed.tasks.filter((t) => !t.id.startsWith('task-'));
       }
       if (Array.isArray(parsed.quests)) {
         parsed.quests = parsed.quests.filter((q) => !q.id.startsWith('quest-'));
+      }
+      if (Array.isArray(parsed.goals)) {
+        parsed.goals = parsed.goals.filter((g) => !g.id.startsWith('goal-'));
+      }
+      if (Array.isArray(parsed.detailedGoals)) {
+        parsed.detailedGoals = parsed.detailedGoals.filter((g) => !g.id.startsWith('goal-'));
+      }
+      if (Array.isArray(parsed.calendarEvents)) {
+        parsed.calendarEvents = parsed.calendarEvents.filter(
+          (e) => !e.id.startsWith('cal-') && !e.id.startsWith('evt-live-') && !e.id.startsWith('evt-demo-') && !e.id.startsWith('demo-')
+        );
       }
     }
     return parsed;
@@ -108,6 +121,18 @@ export function setStoredUserCache(userId: string, state: Partial<CachedUserData
     const sanitizedTasks = isAuth ? rawTasks.filter((t) => !t.id.startsWith('task-')) : rawTasks;
     const rawQuests = Array.isArray(state.quests) ? state.quests : (existing?.quests || []);
     const sanitizedQuests = isAuth ? rawQuests.filter((q) => !q.id.startsWith('quest-')) : rawQuests;
+    const rawGoals = Array.isArray(state.goals)
+      ? state.goals
+      : (Array.isArray(state.detailedGoals)
+          ? state.detailedGoals
+          : (existing?.goals || existing?.detailedGoals || []));
+    const sanitizedGoals = isAuth ? rawGoals.filter((g) => !g.id.startsWith('goal-')) : rawGoals;
+    const rawCalendarEvents = Array.isArray(state.calendarEvents) ? state.calendarEvents : (existing?.calendarEvents || []);
+    const sanitizedCalendarEvents = isAuth
+      ? rawCalendarEvents.filter(
+          (e) => !e.id.startsWith('cal-') && !e.id.startsWith('evt-live-') && !e.id.startsWith('evt-demo-') && !e.id.startsWith('demo-')
+        )
+      : rawCalendarEvents;
 
     const updated: CachedUserData = {
       userId,
@@ -115,9 +140,9 @@ export function setStoredUserCache(userId: string, state: Partial<CachedUserData
       user: state.user || existing?.user || ({} as any),
       quests: sanitizedQuests,
       tasks: sanitizedTasks,
-      calendarEvents: state.calendarEvents || existing?.calendarEvents || [],
-      goals: state.goals || existing?.goals || [],
-      detailedGoals: state.detailedGoals || existing?.detailedGoals || state.goals || existing?.goals,
+      calendarEvents: sanitizedCalendarEvents,
+      goals: sanitizedGoals,
+      detailedGoals: sanitizedGoals,
       rewards: state.rewards || existing?.rewards || [],
       badges: state.badges || existing?.badges || [],
       collectionItems: state.collectionItems || existing?.collectionItems || state.collection || existing?.collection || [],
@@ -128,6 +153,7 @@ export function setStoredUserCache(userId: string, state: Partial<CachedUserData
       attributes: state.attributes || existing?.attributes || [],
       weeklyData: state.weeklyData || existing?.weeklyData || [],
       aiAgents: state.aiAgents || existing?.aiAgents || [],
+      friends: state.friends || existing?.friends || [],
       cachedAt: Date.now(),
     };
     localStorage.setItem(getUserCacheKey(userId), JSON.stringify(updated));

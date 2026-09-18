@@ -2,19 +2,27 @@ import React, { useState } from 'react';
 import { X, ChevronDown, TrendingUp, Info } from 'lucide-react';
 import { compareProgressPoints } from '../../data/friendsMockData';
 
+import { FriendUser } from '../../types';
+
 interface CompareFriendsModalProps {
   isOpen: boolean;
   onClose: () => void;
+  friends?: FriendUser[];
+  isAuth?: boolean;
 }
 
 export const CompareFriendsModal: React.FC<CompareFriendsModalProps> = ({
   isOpen,
   onClose,
+  friends = [],
+  isAuth = false,
 }) => {
   const [metric, setMetric] = useState<'XP' | 'Consistency' | 'Completion'>('XP');
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
 
   if (!isOpen) return null;
+
+  const hasFriends = !isAuth || friends.length > 0;
 
   // Chart coordinates mapping
   // X: 5 points: Jan 1 (50), Jan 8 (135), Jan 15 (220), Jan 22 (305), Jan 31 (390) - width 440
@@ -102,118 +110,133 @@ export const CompareFriendsModal: React.FC<CompareFriendsModalProps> = ({
           </div>
         </div>
 
-        {/* Legend */}
-        <div className="flex flex-wrap items-center gap-4 mt-5 text-xs text-[#9AA3B5]">
-          <div className="flex items-center gap-1.5">
-            <span className="w-2.5 h-2.5 rounded-full bg-[#6366F1]" />
-            <span className="text-white font-medium">You</span>
+        {/* Content: Chart vs Empty State */}
+        {!hasFriends ? (
+          <div className="py-12 px-4 text-center my-4 bg-[#12161E] border border-white/5 rounded-xl">
+            <div className="w-12 h-12 rounded-2xl bg-indigo-500/10 border border-indigo-500/20 text-[#6366F1] flex items-center justify-center mx-auto mb-3">
+              <TrendingUp className="w-6 h-6" />
+            </div>
+            <h4 className="text-sm font-bold text-white mb-1">No Friends Added Yet</h4>
+            <p className="text-xs text-[#9AA3B5] max-w-sm mx-auto leading-relaxed">
+              Connect with accountability partners or invite friends to compare your progress, XP trajectories, and consistency over time.
+            </p>
           </div>
-          <div className="flex items-center gap-1.5">
-            <span className="w-2.5 h-2.5 rounded-full bg-[#38BDF8]" />
-            <span>Rohan</span>
-          </div>
-          <div className="flex items-center gap-1.5">
-            <span className="w-2.5 h-2.5 rounded-full bg-[#34D399]" />
-            <span>Sneha</span>
-          </div>
-          <div className="flex items-center gap-1.5">
-            <span className="w-2.5 h-2.5 rounded-full bg-[#FB923C]" />
-            <span>Kabir</span>
-          </div>
-        </div>
+        ) : (
+          <>
+            {/* Legend */}
+            <div className="flex flex-wrap items-center gap-4 mt-5 text-xs text-[#9AA3B5]">
+              <div className="flex items-center gap-1.5">
+                <span className="w-2.5 h-2.5 rounded-full bg-[#6366F1]" />
+                <span className="text-white font-medium">You</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <span className="w-2.5 h-2.5 rounded-full bg-[#38BDF8]" />
+                <span>{friends[0]?.name?.split(' ')[0] || 'Rohan'}</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <span className="w-2.5 h-2.5 rounded-full bg-[#34D399]" />
+                <span>{friends[1]?.name?.split(' ')[0] || 'Sneha'}</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <span className="w-2.5 h-2.5 rounded-full bg-[#FB923C]" />
+                <span>{friends[2]?.name?.split(' ')[0] || 'Kabir'}</span>
+              </div>
+            </div>
 
-        {/* SVG Multi-Line Chart */}
-        <div className="mt-4 bg-[#12161E] border border-white/5 rounded-xl p-4 relative overflow-hidden">
-          <svg className="w-full h-48 overflow-visible" viewBox="0 0 440 210">
-            {/* Horizontal Grid lines */}
-            <line x1="40" y1="30" x2="420" y2="30" stroke="rgba(255,255,255,0.06)" strokeDasharray="3 3" />
-            <text x="15" y="34" fill="#687185" fontSize="10" fontFamily="sans-serif">6k</text>
+            {/* SVG Multi-Line Chart */}
+            <div className="mt-4 bg-[#12161E] border border-white/5 rounded-xl p-4 relative overflow-hidden">
+              <svg className="w-full h-48 overflow-visible" viewBox="0 0 440 210">
+                {/* Horizontal Grid lines */}
+                <line x1="40" y1="30" x2="420" y2="30" stroke="rgba(255,255,255,0.06)" strokeDasharray="3 3" />
+                <text x="15" y="34" fill="#687185" fontSize="10" fontFamily="sans-serif">6k</text>
 
-            <line x1="40" y1="83" x2="420" y2="83" stroke="rgba(255,255,255,0.06)" strokeDasharray="3 3" />
-            <text x="15" y="87" fill="#687185" fontSize="10" fontFamily="sans-serif">4k</text>
+                <line x1="40" y1="83" x2="420" y2="83" stroke="rgba(255,255,255,0.06)" strokeDasharray="3 3" />
+                <text x="15" y="87" fill="#687185" fontSize="10" fontFamily="sans-serif">4k</text>
 
-            <line x1="40" y1="136" x2="420" y2="136" stroke="rgba(255,255,255,0.06)" strokeDasharray="3 3" />
-            <text x="15" y="140" fill="#687185" fontSize="10" fontFamily="sans-serif">2k</text>
+                <line x1="40" y1="136" x2="420" y2="136" stroke="rgba(255,255,255,0.06)" strokeDasharray="3 3" />
+                <text x="15" y="140" fill="#687185" fontSize="10" fontFamily="sans-serif">2k</text>
 
-            <line x1="40" y1="190" x2="420" y2="190" stroke="rgba(255,255,255,0.12)" />
-            <text x="18" y="193" fill="#687185" fontSize="10" fontFamily="sans-serif">0</text>
+                <line x1="40" y1="190" x2="420" y2="190" stroke="rgba(255,255,255,0.12)" />
+                <text x="18" y="193" fill="#687185" fontSize="10" fontFamily="sans-serif">0</text>
 
-            {/* Lines for each friend */}
-            {/* Rohan (cyan) */}
-            <polyline
-              fill="none"
-              stroke="#38BDF8"
-              strokeWidth="2.5"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              points={getPointsString('rohan')}
-            />
+                {/* Lines for each friend */}
+                {/* Friend 1 (cyan) */}
+                <polyline
+                  fill="none"
+                  stroke="#38BDF8"
+                  strokeWidth="2.5"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  points={getPointsString('rohan')}
+                />
 
-            {/* Sneha (emerald) */}
-            <polyline
-              fill="none"
-              stroke="#34D399"
-              strokeWidth="2.5"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              points={getPointsString('sneha')}
-            />
+                {/* Friend 2 (emerald) */}
+                <polyline
+                  fill="none"
+                  stroke="#34D399"
+                  strokeWidth="2.5"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  points={getPointsString('sneha')}
+                />
 
-            {/* Kabir (orange) */}
-            <polyline
-              fill="none"
-              stroke="#FB923C"
-              strokeWidth="2.5"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              points={getPointsString('kabir')}
-            />
+                {/* Friend 3 (orange) */}
+                <polyline
+                  fill="none"
+                  stroke="#FB923C"
+                  strokeWidth="2.5"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  points={getPointsString('kabir')}
+                />
 
-            {/* You (purple / high-contrast bold) */}
-            <polyline
-              fill="none"
-              stroke="#6366F1"
-              strokeWidth="3.5"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              points={getPointsString('you')}
-            />
+                {/* You (purple / high-contrast bold) */}
+                <polyline
+                  fill="none"
+                  stroke="#6366F1"
+                  strokeWidth="3.5"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  points={getPointsString('you')}
+                />
 
-            {/* Dots for You */}
-            {compareProgressPoints.map((pt, idx) => (
-              <circle
-                key={`dot-you-${idx}`}
-                cx={xCoords[idx]}
-                cy={getY(pt.you)}
-                r="4"
-                fill="#6366F1"
-                stroke="#0E1217"
-                strokeWidth="2"
-              />
-            ))}
+                {/* Dots for You */}
+                {compareProgressPoints.map((pt, idx) => (
+                  <circle
+                    key={`dot-you-${idx}`}
+                    cx={xCoords[idx]}
+                    cy={getY(pt.you)}
+                    r="4"
+                    fill="#6366F1"
+                    stroke="#0E1217"
+                    strokeWidth="2"
+                  />
+                ))}
 
-            {/* X-axis labels */}
-            {compareProgressPoints.map((pt, idx) => (
-              <text
-                key={pt.date}
-                x={xCoords[idx]}
-                y="206"
-                textAnchor="middle"
-                fill="#687185"
-                fontSize="10"
-                fontFamily="sans-serif"
-              >
-                {pt.date}
-              </text>
-            ))}
-          </svg>
-        </div>
+                {/* X-axis labels */}
+                {compareProgressPoints.map((pt, idx) => (
+                  <text
+                    key={pt.date}
+                    x={xCoords[idx]}
+                    y="206"
+                    textAnchor="middle"
+                    fill="#687185"
+                    fontSize="10"
+                    fontFamily="sans-serif"
+                  >
+                    {pt.date}
+                  </text>
+                ))}
+              </svg>
+            </div>
 
-        {/* Growth Insight */}
-        <div className="mt-4 p-3 rounded-xl bg-white/5 border border-white/5 flex items-center gap-2.5 text-xs text-[#9AA3B5]">
-          <Info className="w-4 h-4 text-[#6366F1] shrink-0" />
-          <span>Your consistency is improving steadily. You are closing the gap with Sneha and Rohan by 14% this month!</span>
-        </div>
+            {/* Growth Insight */}
+            <div className="mt-4 p-3 rounded-xl bg-white/5 border border-white/5 flex items-center gap-2.5 text-xs text-[#9AA3B5]">
+              <Info className="w-4 h-4 text-[#6366F1] shrink-0" />
+              <span>Your consistency is improving steadily. Keep logging tasks and completing quests with your friends!</span>
+            </div>
+          </>
+        )}
       </div>
     </div>
   );

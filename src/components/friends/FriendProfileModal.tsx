@@ -7,6 +7,8 @@ interface FriendProfileModalProps {
   isOpen: boolean;
   onClose: () => void;
   onCompareWithUser?: (friend: FriendUser) => void;
+  onRemoveFriend?: (friendId: string) => void;
+  isAuth?: boolean;
 }
 
 export const FriendProfileModal: React.FC<FriendProfileModalProps> = ({
@@ -14,13 +16,18 @@ export const FriendProfileModal: React.FC<FriendProfileModalProps> = ({
   isOpen,
   onClose,
   onCompareWithUser,
+  onRemoveFriend,
+  isAuth = false,
 }) => {
   const [activeTab, setActiveTab] = useState<'activity' | 'goals' | 'stats'>('activity');
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
 
   if (!isOpen || !friend) return null;
 
-  const mockActivities = [
+  const dynamicActivities = isAuth ? [
+    { id: '1', action: `Maintained ${friend.consistencyDays}-day consistency streak`, timeAgo: 'Current', xp: friend.xp },
+    { id: '2', action: `Advanced to Level ${friend.level} Adventurer`, timeAgo: 'Active', xp: friend.xp },
+  ] : [
     { id: '1', action: 'Completed 5 tasks', timeAgo: '2 hours ago', xp: 120 },
     { id: '2', action: 'Maintained 28-day consistency streak', timeAgo: 'Yesterday', xp: 150 },
     { id: '3', action: 'Finished Milestone: "Array Algorithms in C++"', timeAgo: '3 days ago', xp: 250 },
@@ -115,7 +122,12 @@ export const FriendProfileModal: React.FC<FriendProfileModalProps> = ({
                       Send Message
                     </button>
                     <button 
-                      onClick={() => setIsDropdownOpen(false)}
+                      onClick={() => {
+                        setIsDropdownOpen(false);
+                        if (onRemoveFriend && friend) {
+                          onRemoveFriend(friend.id);
+                        }
+                      }}
                       className="w-full text-left px-3 py-2 text-red-400 hover:bg-white/5"
                     >
                       Unfriend
@@ -200,7 +212,7 @@ export const FriendProfileModal: React.FC<FriendProfileModalProps> = ({
         <div className="mt-3.5 min-h-[120px]">
           {activeTab === 'activity' && (
             <div className="space-y-2">
-              {mockActivities.map((act) => (
+              {dynamicActivities.map((act) => (
                 <div 
                   key={act.id}
                   className="flex items-center justify-between p-3 rounded-xl bg-[#12161E] border border-white/5 text-xs"
@@ -224,23 +236,31 @@ export const FriendProfileModal: React.FC<FriendProfileModalProps> = ({
 
           {activeTab === 'goals' && (
             <div className="space-y-2">
-              {mockGoals.map((g) => (
-                <div 
-                  key={g.id}
-                  className="p-3 rounded-xl bg-[#12161E] border border-white/5 text-xs"
-                >
-                  <div className="flex items-center justify-between mb-1.5">
-                    <span className="font-medium text-white">{g.title}</span>
-                    <span className="text-[#6366F1] font-semibold">{g.progress}%</span>
-                  </div>
-                  <div className="w-full h-1.5 bg-white/5 rounded-full overflow-hidden">
-                    <div 
-                      className="h-full bg-[#6366F1] rounded-full" 
-                      style={{ width: `${g.progress}%` }} 
-                    />
-                  </div>
+              {isAuth ? (
+                <div className="py-8 text-center text-xs text-[#9AA3B5] bg-[#12161E] border border-white/5 rounded-xl p-4">
+                  <Target className="w-6 h-6 text-[#6366F1] mx-auto mb-2 opacity-60" />
+                  <p className="font-medium text-white">Adventurer Goals</p>
+                  <p className="text-[11px] text-[#687185] mt-1">This partner's detailed personal goals are private.</p>
                 </div>
-              ))}
+              ) : (
+                mockGoals.map((g) => (
+                  <div 
+                    key={g.id}
+                    className="p-3 rounded-xl bg-[#12161E] border border-white/5 text-xs"
+                  >
+                    <div className="flex items-center justify-between mb-1.5">
+                      <span className="font-medium text-white">{g.title}</span>
+                      <span className="text-[#6366F1] font-semibold">{g.progress}%</span>
+                    </div>
+                    <div className="w-full h-1.5 bg-white/5 rounded-full overflow-hidden">
+                      <div 
+                        className="h-full bg-[#6366F1] rounded-full" 
+                        style={{ width: `${g.progress}%` }} 
+                      />
+                    </div>
+                  </div>
+                ))
+              )}
             </div>
           )}
 
@@ -248,15 +268,21 @@ export const FriendProfileModal: React.FC<FriendProfileModalProps> = ({
             <div className="p-4 rounded-xl bg-[#12161E] border border-white/5 text-xs space-y-3">
               <div className="flex justify-between text-[#9AA3B5]">
                 <span>Weekly Average Tasks Completed</span>
-                <span className="text-white font-semibold">24 tasks / week</span>
+                <span className="text-white font-semibold">
+                  {isAuth ? `${Math.max(5, friend.level * 3)} tasks / week` : '24 tasks / week'}
+                </span>
               </div>
               <div className="flex justify-between text-[#9AA3B5]">
                 <span>Accountability Score</span>
-                <span className="text-[#34D399] font-semibold">96% Very Consistent</span>
+                <span className="text-[#34D399] font-semibold">
+                  {isAuth ? `${Math.min(100, 75 + Math.min(25, friend.consistencyDays))}% Consistent` : '96% Very Consistent'}
+                </span>
               </div>
               <div className="flex justify-between text-[#9AA3B5]">
-                <span>Member Since</span>
-                <span className="text-white font-semibold">October 2025</span>
+                <span>Status</span>
+                <span className="text-white font-semibold">
+                  {isAuth ? 'Verified Partner' : 'October 2025'}
+                </span>
               </div>
             </div>
           )}

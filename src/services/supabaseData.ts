@@ -1,7 +1,7 @@
-import { TaskItem, TaskPriority, UserProfile, AuthUser, Quest, RewardItem, CollectionItem } from '../types';
+import { TaskItem, TaskPriority, UserProfile, AuthUser, Quest, RewardItem, CollectionItem, FriendUser, FriendRequest, SuggestedFriend, DetailedGoal, GoalMilestone, GoalSubtask, GoalCategory, GoalStatus, CalendarEvent, EventCategory } from '../types';
 import { getSupabase } from '../lib/supabase';
 import { initialUserProfile } from '../data/mockData';
-import { getLiveTodayISO, getStartOfWeek, formatDateISO } from '../utils/dateUtils';
+import { getLiveTodayISO, getStartOfWeek, formatDateISO, formatReadableDate } from '../utils/dateUtils';
 import { calculateProgressionDelta, getXpRequiredForLevel } from '../utils/progression';
 
 export interface SerializedTaskPayload {
@@ -1340,4 +1340,1350 @@ export async function activateUserRewardInSupabase(
     status: data?.status || 'active',
   };
 }
+
+// ============================================================================
+// PHASE 4: FRIENDS & SOCIAL ACCOUNTABILITY FUNCTIONS
+// ============================================================================
+
+function formatRelativeTime(dateStr: string): string {
+  try {
+    const diff = Date.now() - new Date(dateStr).getTime();
+    const mins = Math.floor(diff / 60000);
+    if (mins < 1) return 'Just now';
+    if (mins < 60) return `${mins}m ago`;
+    const hours = Math.floor(mins / 60);
+    if (hours < 24) return `${hours}h ago`;
+    const days = Math.floor(hours / 24);
+    return `${days}d ago`;
+  } catch {
+    return 'Recently';
+  }
+}
+
+/**
+ * Fetches all accepted friends of the given user from Supabase
+ */
+export async function fetchUserFriendsFromSupabase(userId: string): Promise<FriendUser[]> {
+  const sb = getSupabase();
+  if (!sb) throw new Error('Supabase client not initialized');
+
+  const { data: friendships, error: fError } = await sb
+    .from('friendships')
+    .select('id, user_id1, user_id2, created_at')
+    .or(`user_id1.eq.${userId},user_id2.eq.${userId}`);
+
+  if (fError) {
+    console.error('Error fetching friendships from Supabase:', fError);
+    throw new Error(fError.message || 'Failed to fetch friends');
+  }
+
+  if (!friendships || friendships.length === 0) {
+    return [];
+  }
+
+  const friendIds = friendships.map((f) => (f.user_id1 === userId ? f.user_id2 : f.user_id1));
+
+  const { data: profiles, error: pError } = await sb
+    .from('profiles')
+    .select('id, username, display_name, avatar_url, level, xp, streak_days, bio, updated_at')
+    .in('id', friendIds);
+
+  if (pError) {
+    console.error('Error fetching friend profiles from Supabase:', pError);
+    throw new Error(pError.message || 'Failed to fetch friend profiles');
+  }
+
+  return (profiles || []).map((p) => ({
+    id: p.id,
+    name: p.display_name || p.username || 'Adventurer',
+    username: p.username || 'user',
+    avatarUrl: p.avatar_url || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150',
+    level: p.level || 1,
+    xp: p.xp || 0,
+    consistencyDays: p.streak_days || 0,
+    status: 'online',
+    activityStatus: 'Active',
+    bio: p.bio || undefined,
+    isFriend: true,
+    tags: ['Accountability'],
+  }));
+}
+
+/**
+ * Fetches incoming pending friend requests for the user from Supabase
+ */
+export async function fetchFriendRequestsFromSupabase(userId: string): Promise<FriendRequest[]> {
+  const sb = getSupabase();
+  if (!sb) throw new Error('Supabase client not initialized');
+
+  const { data: requests, error: rError } = await sb
+    .from('friend_requests')
+    .select('id, sender_id, receiver_id, status, reason, created_at')
+    .eq('receiver_id', userId)
+    .eq('status', 'pending')
+    .order('created_at', { ascending: false });
+
+  if (rError) {
+    console.error('Error fetching friend requests from Supabase:', rError);
+    throw new Error(rError.message || 'Failed to fetch friend requests');
+  }
+
+  if (!requests || requests.length === 0) {
+    return [];
+  }
+
+  const senderIds = requests.map((r) => r.sender_id);
+  const { data: profiles, error: pError } = await sb
+    .from('profiles')
+    .select('id, username, display_name, avatar_url, level')
+    .in('id', senderIds);
+
+  if (pError) {
+    console.error('Error fetching sender profiles from Supabase:', pError);
+  }
+
+  const profileMap = new Map((profiles || []).map((p) => [p.id, p]));
+
+  return requests.map((r) => {
+    const sender = profileMap.get(r.sender_id);
+    return {
+      id: r.id,
+      name: sender?.display_name || sender?.username || 'Adventurer',
+      username: sender?.username || 'user',
+      avatarUrl: sender?.avatar_url || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150',
+      reason: r.reason || 'Accountability partner request',
+      timeAgo: formatRelativeTime(r.created_at),
+    };
+  });
+}
+
+/**
+ * Sends a friend request using the atomic public.send_friend_request RPC
+ */
+export async function sendFriendRequestInSupabase(
+  recipientId: string,
+  reason?: string
+): Promise<any> {
+  const sb = getSupabase();
+  if (!sb) throw new Error('Supabase client not initialized');
+
+  const { data, error } = await sb.rpc('send_friend_request', {
+    p_receiver_id: recipientId,
+    p_reason: reason || null,
+  });
+
+  if (error) {
+    console.error('Supabase send_friend_request error:', error);
+    throw new Error(error.message || 'Failed to send friend request');
+  }
+
+  return data;
+}
+
+/**
+ * Accepts a pending friend request using the atomic public.accept_friend_request RPC
+ */
+export async function acceptFriendRequestInSupabase(requestId: string): Promise<any> {
+  const sb = getSupabase();
+  if (!sb) throw new Error('Supabase client not initialized');
+
+  const { data, error } = await sb.rpc('accept_friend_request', {
+    p_request_id: requestId,
+  });
+
+  if (error) {
+    console.error('Supabase accept_friend_request error:', error);
+    throw new Error(error.message || 'Failed to accept friend request');
+  }
+
+  return data;
+}
+
+/**
+ * Declines a pending friend request using public.decline_friend_request RPC
+ */
+export async function declineFriendRequestInSupabase(requestId: string): Promise<any> {
+  const sb = getSupabase();
+  if (!sb) throw new Error('Supabase client not initialized');
+
+  const { data, error } = await sb.rpc('decline_friend_request', {
+    p_request_id: requestId,
+  });
+
+  if (error) {
+    console.error('Supabase decline_friend_request error:', error);
+    throw new Error(error.message || 'Failed to decline friend request');
+  }
+
+  return data;
+}
+
+/**
+ * Cancels an outgoing pending friend request using public.cancel_friend_request RPC
+ */
+export async function cancelFriendRequestInSupabase(requestId: string): Promise<any> {
+  const sb = getSupabase();
+  if (!sb) throw new Error('Supabase client not initialized');
+
+  const { data, error } = await sb.rpc('cancel_friend_request', {
+    p_request_id: requestId,
+  });
+
+  if (error) {
+    console.error('Supabase cancel_friend_request error:', error);
+    throw new Error(error.message || 'Failed to cancel friend request');
+  }
+
+  return data;
+}
+
+/**
+ * Removes an existing friend using public.remove_friend RPC
+ */
+export async function removeFriendInSupabase(friendId: string): Promise<any> {
+  const sb = getSupabase();
+  if (!sb) throw new Error('Supabase client not initialized');
+
+  const { data, error } = await sb.rpc('remove_friend', {
+    p_friend_id: friendId,
+  });
+
+  if (error) {
+    console.error('Supabase remove_friend error:', error);
+    throw new Error(error.message || 'Failed to remove friend');
+  }
+
+  return data;
+}
+
+/**
+ * Searches users in Supabase profiles by username or display_name
+ * Excludes self, existing friends, pending requests, and blocked users.
+ */
+export async function searchUsersInSupabase(
+  query: string,
+  currentUserId?: string
+): Promise<any[]> {
+  const sb = getSupabase();
+  if (!sb) throw new Error('Supabase client not initialized');
+
+  const trimmed = query.trim();
+  if (!trimmed) {
+    return [];
+  }
+
+  const excludedIds = new Set<string>();
+  if (currentUserId) {
+    excludedIds.add(currentUserId);
+
+    // 1. Fetch friend IDs
+    const { data: friendships } = await sb
+      .from('friendships')
+      .select('user_id1, user_id2')
+      .or(`user_id1.eq.${currentUserId},user_id2.eq.${currentUserId}`);
+
+    (friendships || []).forEach((f) => {
+      excludedIds.add(f.user_id1);
+      excludedIds.add(f.user_id2);
+    });
+
+    // 2. Fetch pending requests
+    const { data: pendingReqs } = await sb
+      .from('friend_requests')
+      .select('sender_id, receiver_id')
+      .or(`sender_id.eq.${currentUserId},receiver_id.eq.${currentUserId}`)
+      .eq('status', 'pending');
+
+    (pendingReqs || []).forEach((r) => {
+      excludedIds.add(r.sender_id);
+      excludedIds.add(r.receiver_id);
+    });
+
+    // 3. Fetch blocked users
+    const { data: blockedUsers } = await sb
+      .from('blocked_users')
+      .select('blocker_id, blocked_id')
+      .or(`blocker_id.eq.${currentUserId},blocked_id.eq.${currentUserId}`);
+
+    (blockedUsers || []).forEach((b) => {
+      excludedIds.add(b.blocker_id);
+      excludedIds.add(b.blocked_id);
+    });
+  }
+
+  let queryBuilder = sb
+    .from('profiles')
+    .select('id, username, display_name, avatar_url, level, xp, streak_days')
+    .or(`username.ilike.%${trimmed}%,display_name.ilike.%${trimmed}%`)
+    .limit(10);
+
+  if (excludedIds.size > 0) {
+    const idsArray = Array.from(excludedIds);
+    queryBuilder = queryBuilder.not('id', 'in', `(${idsArray.join(',')})`);
+  }
+
+  const { data, error } = await queryBuilder;
+
+  if (error) {
+    console.error('Supabase searchUsers error:', error);
+    throw new Error(error.message || 'Failed to search users');
+  }
+
+  return (data || []).map((p) => ({
+    id: p.id,
+    name: p.display_name || p.username || 'Adventurer',
+    username: p.username || 'user',
+    avatarUrl: p.avatar_url || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150',
+    level: p.level || 1,
+    xp: p.xp || 0,
+    consistencyDays: p.streak_days || 0,
+    status: 'online',
+    reason: `Level ${p.level || 1} Adventurer`,
+  }));
+}
+
+/**
+ * Fetches suggested friends from public profiles excluding already friends, pending requests, blocked users, or self
+ */
+export async function fetchSuggestedFriendsFromSupabase(
+  currentUserId: string
+): Promise<SuggestedFriend[]> {
+  const sb = getSupabase();
+  if (!sb) return [];
+
+  try {
+    // 1. Get friend IDs
+    const { data: friendships } = await sb
+      .from('friendships')
+      .select('user_id1, user_id2')
+      .or(`user_id1.eq.${currentUserId},user_id2.eq.${currentUserId}`);
+
+    const excludedIds = new Set<string>([currentUserId]);
+    (friendships || []).forEach((f) => {
+      excludedIds.add(f.user_id1);
+      excludedIds.add(f.user_id2);
+    });
+
+    // 2. Get pending requests
+    const { data: pendingReqs } = await sb
+      .from('friend_requests')
+      .select('sender_id, receiver_id')
+      .or(`sender_id.eq.${currentUserId},receiver_id.eq.${currentUserId}`)
+      .eq('status', 'pending');
+
+    (pendingReqs || []).forEach((r) => {
+      excludedIds.add(r.sender_id);
+      excludedIds.add(r.receiver_id);
+    });
+
+    // 3. Get blocked users
+    const { data: blockedUsers } = await sb
+      .from('blocked_users')
+      .select('blocker_id, blocked_id')
+      .or(`blocker_id.eq.${currentUserId},blocked_id.eq.${currentUserId}`);
+
+    (blockedUsers || []).forEach((b) => {
+      excludedIds.add(b.blocker_id);
+      excludedIds.add(b.blocked_id);
+    });
+
+    // 4. Query profiles
+    const { data: profiles, error } = await sb
+      .from('profiles')
+      .select('id, username, display_name, avatar_url, level, streak_days')
+      .limit(20);
+
+    if (error || !profiles) return [];
+
+    const candidates = profiles.filter((p) => !excludedIds.has(p.id)).slice(0, 6);
+
+    return candidates.map((p) => ({
+      id: p.id,
+      name: p.display_name || p.username || 'Adventurer',
+      username: p.username || 'user',
+      avatarUrl: p.avatar_url || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150',
+      sharedInterest: `Lv. ${p.level || 1} • ${p.streak_days || 0}d streak`,
+    }));
+  } catch (err) {
+    console.warn('Error fetching suggested friends from Supabase:', err);
+    return [];
+  }
+}
+
+/**
+ * Computes authentic friends progress data for authenticated user from Supabase
+ */
+export async function fetchFriendsProgressFromSupabase(userId: string): Promise<any> {
+  const sb = getSupabase();
+  if (!sb) throw new Error('Supabase client not initialized');
+
+  // 1. Fetch current user profile
+  const { data: currentUserProfile, error: uError } = await sb
+    .from('profiles')
+    .select('id, username, display_name, avatar_url, level, xp, streak_days')
+    .eq('id', userId)
+    .single();
+
+  if (uError && uError.code !== 'PGRST116') {
+    console.error('Error fetching user profile for friends progress:', uError);
+  }
+
+  // 2. Fetch friends
+  const friends = await fetchUserFriendsFromSupabase(userId);
+
+  // User entity for leaderboard
+  const userEntry: FriendUser = {
+    id: userId,
+    name: currentUserProfile?.display_name || currentUserProfile?.username || 'You',
+    username: currentUserProfile?.username || 'you',
+    avatarUrl: currentUserProfile?.avatar_url || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150',
+    level: currentUserProfile?.level || 1,
+    xp: currentUserProfile?.xp || 0,
+    consistencyDays: currentUserProfile?.streak_days || 0,
+    status: 'online',
+    isCurrentUser: true,
+    isFriend: false,
+  };
+
+  // 3. Combined leaderboard (User + Friends)
+  const leaderboard = [userEntry, ...friends].sort((a, b) => b.xp - a.xp);
+
+  // 4. XP Comparison bar chart items (Real data only)
+  const xpComparison = [
+    {
+      name: 'You',
+      xp: currentUserProfile?.xp || 0,
+      display: `${currentUserProfile?.xp || 0} XP`,
+      color: '#6366F1',
+    },
+    ...friends.map((f, i) => ({
+      name: f.name,
+      xp: f.xp,
+      display: `${f.xp} XP`,
+      color: ['#EC4899', '#38BDF8', '#10B981', '#F59E0B', '#A855F7'][i % 5],
+    })),
+  ];
+
+  // 5. Consistency Streaks (Real data only)
+  const consistencyStreaks = [
+    {
+      name: 'You',
+      days: currentUserProfile?.streak_days || 0,
+      avatarUrl: currentUserProfile?.avatar_url || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150',
+      isCurrent: true,
+    },
+    ...friends.map((f) => ({
+      name: f.name,
+      days: f.consistencyDays,
+      avatarUrl: f.avatarUrl,
+      isCurrent: false,
+    })),
+  ];
+
+  return {
+    friends,
+    leaderboard,
+    xpComparison,
+    consistencyStreaks,
+    summary: {
+      friendsCount: friends.length,
+      onlineCount: friends.filter((f) => f.status === 'online').length,
+      totalXp: friends.reduce((acc, f) => acc + f.xp, 0),
+    },
+  };
+}
+
+// =========================================================================
+// GOALS & MILESTONES SUPABASE PERSISTENCE ENGINE
+// =========================================================================
+
+/**
+ * Normalizes goal categories from database or payload into valid GoalCategory.
+ */
+export function normalizeGoalCategory(cat?: string | null): GoalCategory {
+  if (!cat) return 'Personal';
+  const lower = cat.toLowerCase();
+  if (lower === 'career') return 'Career';
+  if (lower === 'health') return 'Health';
+  if (lower === 'learning' || lower === 'education') return 'Learning';
+  if (lower === 'personal') return 'Personal';
+  if (lower === 'projects' || lower === 'project') return 'Projects';
+  if (lower === 'custom') return 'Custom';
+  return 'Personal';
+}
+
+/**
+ * Single authoritative calculation for goal progress, task counts, and status.
+ * Prevents competing formulas between GoalsPage, GoalCard, Modal, Dashboard, and Realtime.
+ */
+export function calculateGoalMetrics(
+  goal: Pick<DetailedGoal, 'subtasks' | 'milestones' | 'progress' | 'completedTasks' | 'totalTasks' | 'status'>
+): {
+  progress: number;
+  completedTasks: number;
+  totalTasks: number;
+  status: GoalStatus;
+} {
+  const subtasks = Array.isArray(goal.subtasks) ? goal.subtasks : [];
+  const milestones = Array.isArray(goal.milestones) ? goal.milestones : [];
+
+  let completedTasks = 0;
+  let totalTasks = 1;
+  let progress = 0;
+
+  if (subtasks.length > 0) {
+    const done = subtasks.filter((s) => s.completed).length;
+    completedTasks = done;
+    totalTasks = subtasks.length;
+    progress = Math.round((done / totalTasks) * 100);
+  } else if (milestones.length > 0) {
+    const done = milestones.filter((m) => m.completed).length;
+    completedTasks = done;
+    totalTasks = milestones.length;
+    progress = Math.round((done / totalTasks) * 100);
+  } else {
+    progress = Math.max(0, Math.min(100, Math.round(goal.progress || 0)));
+    completedTasks = goal.completedTasks || 0;
+    totalTasks = Math.max(1, goal.totalTasks || 1);
+  }
+
+  const status: GoalStatus =
+    goal.status === 'archived'
+      ? 'archived'
+      : progress >= 100
+      ? 'completed'
+      : 'active';
+
+  return { progress, completedTasks, totalTasks, status };
+}
+
+/**
+ * Maps Supabase goals row and associated goal_milestones rows to a DetailedGoal.
+ */
+export function mapGoalRowToDetailedGoal(
+  row: any,
+  milestoneRows: any[] = []
+): DetailedGoal {
+  const rawSubtasks = Array.isArray(row.subtasks) ? row.subtasks : [];
+  const subtasks: GoalSubtask[] = rawSubtasks.map((st: any) => ({
+    id: String(st.id || ''),
+    title: String(st.title || ''),
+    completed: Boolean(st.completed),
+  }));
+
+  const milestones: GoalMilestone[] = (milestoneRows || []).map((m: any) => ({
+    id: String(m.id),
+    title: String(m.title || ''),
+    targetDate: m.target_date || (m.due_date ? formatReadableDate(m.due_date) : ''),
+    notes: m.notes || undefined,
+    completed: Boolean(m.completed),
+  }));
+
+  // Format target_date to human-readable dueDate (e.g., "Dec 31, 2026")
+  let dueDate = 'Dec 31, 2026';
+  if (row.target_date) {
+    try {
+      dueDate = formatReadableDate(row.target_date);
+    } catch {
+      dueDate = String(row.target_date);
+    }
+  }
+
+  const rawGoal: Pick<DetailedGoal, 'subtasks' | 'milestones' | 'progress' | 'completedTasks' | 'totalTasks' | 'status'> = {
+    subtasks,
+    milestones,
+    progress: typeof row.progress === 'number' ? row.progress : 0,
+    completedTasks: typeof row.completed_tasks === 'number' ? row.completed_tasks : 0,
+    totalTasks: typeof row.total_tasks === 'number' ? row.total_tasks : 1,
+    status: (row.status as GoalStatus) || 'active',
+  };
+
+  const metrics = calculateGoalMetrics(rawGoal);
+
+  return {
+    id: String(row.id),
+    title: String(row.title || ''),
+    category: normalizeGoalCategory(row.category),
+    description: String(row.description || ''),
+    progress: metrics.progress,
+    completedTasks: metrics.completedTasks,
+    totalTasks: metrics.totalTasks,
+    dueDate,
+    priority: (['high', 'medium', 'low'].includes(row.priority) ? row.priority : 'medium') as 'high' | 'medium' | 'low',
+    status: metrics.status,
+    color: String(row.color || '#6C63FF'),
+    icon: String(row.icon || 'target'),
+    subtasks,
+    milestones,
+    notes: row.notes || undefined,
+    updatedAt: row.updated_at
+      ? String(row.updated_at).split('T')[0]
+      : (row.created_at ? String(row.created_at).split('T')[0] : getLiveTodayISO()),
+  };
+}
+
+/**
+ * Fetches all goals and associated milestones for an authenticated user from Supabase.
+ * Returns an empty array [] if 0 rows exist (valid zero state, NEVER demo data).
+ */
+export async function fetchUserGoalsFromSupabase(userId: string): Promise<DetailedGoal[]> {
+  const sb = getSupabase();
+  if (!sb || !userId) return [];
+
+  const { data: goalRows, error: goalsErr } = await sb
+    .from('goals')
+    .select('*')
+    .eq('user_id', userId)
+    .order('created_at', { ascending: false });
+
+  if (goalsErr) {
+    console.error('Error fetching user goals from Supabase:', goalsErr);
+    return [];
+  }
+
+  if (!goalRows || goalRows.length === 0) {
+    return [];
+  }
+
+  const goalIds = goalRows.map((g) => g.id);
+
+  const { data: milestoneRows, error: milesErr } = await sb
+    .from('goal_milestones')
+    .select('*')
+    .eq('user_id', userId)
+    .in('goal_id', goalIds)
+    .order('created_at', { ascending: true });
+
+  if (milesErr) {
+    console.warn('Error fetching goal milestones from Supabase:', milesErr);
+  }
+
+  const milestonesByGoal = new Map<string, any[]>();
+  if (milestoneRows) {
+    for (const m of milestoneRows) {
+      const list = milestonesByGoal.get(m.goal_id) || [];
+      list.push(m);
+      milestonesByGoal.set(m.goal_id, list);
+    }
+  }
+
+  return goalRows.map((g) => mapGoalRowToDetailedGoal(g, milestonesByGoal.get(g.id) || []));
+}
+
+/**
+ * Fetches a single goal and its milestones from Supabase.
+ */
+export async function fetchSingleGoalFromSupabase(
+  userId: string,
+  goalId: string
+): Promise<DetailedGoal | null> {
+  const sb = getSupabase();
+  if (!sb || !userId || !goalId) return null;
+
+  const { data: goalRow, error: goalErr } = await sb
+    .from('goals')
+    .select('*')
+    .eq('id', goalId)
+    .eq('user_id', userId)
+    .maybeSingle();
+
+  if (goalErr || !goalRow) return null;
+
+  const { data: milestoneRows } = await sb
+    .from('goal_milestones')
+    .select('*')
+    .eq('goal_id', goalId)
+    .eq('user_id', userId)
+    .order('created_at', { ascending: true });
+
+  return mapGoalRowToDetailedGoal(goalRow, milestoneRows || []);
+}
+
+/**
+ * Creates a new Goal in Supabase and inserts any initial milestones atomically.
+ */
+export async function createGoalInSupabase(
+  userId: string,
+  goalData: Omit<DetailedGoal, 'id'>
+): Promise<DetailedGoal> {
+  const sb = getSupabase();
+  if (!sb || !userId) {
+    throw new Error('Supabase client not initialized or unauthenticated.');
+  }
+
+  const metrics = calculateGoalMetrics(goalData);
+
+  let targetDate: string | null = null;
+  if (goalData.dueDate) {
+    try {
+      const parsed = new Date(goalData.dueDate);
+      if (!isNaN(parsed.getTime())) {
+        targetDate = parsed.toISOString().split('T')[0];
+      }
+    } catch {
+      targetDate = null;
+    }
+  }
+
+  const newGoalRow = {
+    user_id: userId,
+    title: goalData.title.trim(),
+    description: goalData.description || '',
+    category: (goalData.category || 'Personal').toLowerCase(),
+    target_date: targetDate,
+    progress: metrics.progress,
+    completed_tasks: metrics.completedTasks,
+    total_tasks: metrics.totalTasks,
+    priority: goalData.priority || 'medium',
+    status: metrics.status,
+    color: goalData.color || '#6C63FF',
+    icon: goalData.icon || 'target',
+    notes: goalData.notes || null,
+    subtasks: Array.isArray(goalData.subtasks) ? goalData.subtasks : [],
+  };
+
+  const { data: insertedGoal, error: insertGoalErr } = await sb
+    .from('goals')
+    .insert(newGoalRow)
+    .select('*')
+    .single();
+
+  if (insertGoalErr || !insertedGoal) {
+    throw new Error(insertGoalErr?.message || 'Failed to create goal in Supabase.');
+  }
+
+  const insertedMilestones: any[] = [];
+  if (Array.isArray(goalData.milestones) && goalData.milestones.length > 0) {
+    const milestonePayloads = goalData.milestones.map((m) => {
+      let mDueDate: string | null = null;
+      if (m.targetDate) {
+        try {
+          const parsed = new Date(m.targetDate);
+          if (!isNaN(parsed.getTime())) {
+            mDueDate = parsed.toISOString().split('T')[0];
+          }
+        } catch {
+          mDueDate = null;
+        }
+      }
+      return {
+        goal_id: insertedGoal.id,
+        user_id: userId,
+        title: m.title.trim(),
+        completed: Boolean(m.completed),
+        completed_at: m.completed ? new Date().toISOString() : null,
+        target_date: m.targetDate || null,
+        due_date: mDueDate,
+        notes: m.notes || null,
+      };
+    });
+
+    const { data: mData, error: mErr } = await sb
+      .from('goal_milestones')
+      .insert(milestonePayloads)
+      .select('*');
+
+    if (!mErr && mData) {
+      insertedMilestones.push(...mData);
+    }
+  }
+
+  return mapGoalRowToDetailedGoal(insertedGoal, insertedMilestones);
+}
+
+/**
+ * Updates an existing Goal in Supabase and synchronizes its milestones.
+ */
+export async function updateGoalInSupabase(
+  userId: string,
+  goalData: DetailedGoal
+): Promise<DetailedGoal> {
+  const sb = getSupabase();
+  if (!sb || !userId) {
+    throw new Error('Supabase client not initialized or unauthenticated.');
+  }
+
+  const metrics = calculateGoalMetrics(goalData);
+
+  let targetDate: string | null = null;
+  if (goalData.dueDate) {
+    try {
+      const parsed = new Date(goalData.dueDate);
+      if (!isNaN(parsed.getTime())) {
+        targetDate = parsed.toISOString().split('T')[0];
+      }
+    } catch {
+      targetDate = null;
+    }
+  }
+
+  const updateFields = {
+    title: goalData.title.trim(),
+    description: goalData.description || '',
+    category: (goalData.category || 'Personal').toLowerCase(),
+    target_date: targetDate,
+    progress: metrics.progress,
+    completed_tasks: metrics.completedTasks,
+    total_tasks: metrics.totalTasks,
+    priority: goalData.priority || 'medium',
+    status: metrics.status,
+    color: goalData.color || '#6C63FF',
+    icon: goalData.icon || 'target',
+    notes: goalData.notes || null,
+    subtasks: Array.isArray(goalData.subtasks) ? goalData.subtasks : [],
+    updated_at: new Date().toISOString(),
+  };
+
+  const { data: updatedGoal, error: updateErr } = await sb
+    .from('goals')
+    .update(updateFields)
+    .eq('id', goalData.id)
+    .eq('user_id', userId)
+    .select('*')
+    .single();
+
+  if (updateErr || !updatedGoal) {
+    throw new Error(updateErr?.message || 'Failed to update goal in Supabase.');
+  }
+
+  const incomingMilestones = Array.isArray(goalData.milestones) ? goalData.milestones : [];
+
+  const { data: existingMilestones } = await sb
+    .from('goal_milestones')
+    .select('*')
+    .eq('goal_id', goalData.id)
+    .eq('user_id', userId);
+
+  const existingMap = new Map((existingMilestones || []).map((m) => [m.id, m]));
+  const incomingIds = new Set(incomingMilestones.map((m) => m.id));
+
+  // Delete removed milestones
+  const toDelete = (existingMilestones || [])
+    .filter((m) => !incomingIds.has(m.id))
+    .map((m) => m.id);
+
+  if (toDelete.length > 0) {
+    await sb.from('goal_milestones').delete().in('id', toDelete).eq('user_id', userId);
+  }
+
+  // Update or insert incoming
+  const finalMilestones: any[] = [];
+  for (const m of incomingMilestones) {
+    let mDueDate: string | null = null;
+    if (m.targetDate) {
+      try {
+        const parsed = new Date(m.targetDate);
+        if (!isNaN(parsed.getTime())) {
+          mDueDate = parsed.toISOString().split('T')[0];
+        }
+      } catch {
+        mDueDate = null;
+      }
+    }
+
+    if (existingMap.has(m.id)) {
+      const existing = existingMap.get(m.id);
+      const isCompleted = Boolean(m.completed);
+      const { data: updatedM } = await sb
+        .from('goal_milestones')
+        .update({
+          title: m.title.trim(),
+          completed: isCompleted,
+          completed_at: isCompleted ? (existing.completed_at || new Date().toISOString()) : null,
+          target_date: m.targetDate || null,
+          due_date: mDueDate,
+          notes: m.notes || null,
+        })
+        .eq('id', m.id)
+        .eq('user_id', userId)
+        .select('*')
+        .single();
+
+      if (updatedM) finalMilestones.push(updatedM);
+    } else {
+      const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(m.id);
+      const newMRecord: any = {
+        goal_id: goalData.id,
+        user_id: userId,
+        title: m.title.trim(),
+        completed: Boolean(m.completed),
+        completed_at: m.completed ? new Date().toISOString() : null,
+        target_date: m.targetDate || null,
+        due_date: mDueDate,
+        notes: m.notes || null,
+      };
+      if (isUUID) newMRecord.id = m.id;
+
+      const { data: insertedM } = await sb
+        .from('goal_milestones')
+        .insert(newMRecord)
+        .select('*')
+        .single();
+
+      if (insertedM) finalMilestones.push(insertedM);
+    }
+  }
+
+  return mapGoalRowToDetailedGoal(updatedGoal, finalMilestones);
+}
+
+/**
+ * Deletes a Goal and cascades deletion of its milestones.
+ */
+export async function deleteGoalInSupabase(
+  userId: string,
+  goalId: string
+): Promise<void> {
+  const sb = getSupabase();
+  if (!sb || !userId) {
+    throw new Error('Supabase client not initialized or unauthenticated.');
+  }
+
+  const { error } = await sb
+    .from('goals')
+    .delete()
+    .eq('id', goalId)
+    .eq('user_id', userId);
+
+  if (error) {
+    throw new Error(error.message || 'Failed to delete goal from Supabase.');
+  }
+}
+
+/**
+ * Toggles a Goal Subtask using the atomic PostgreSQL toggle_goal_subtask RPC.
+ */
+export async function toggleGoalSubtaskInSupabase(
+  userId: string,
+  goalId: string,
+  subtaskId: string
+): Promise<DetailedGoal> {
+  const sb = getSupabase();
+  if (!sb || !userId) {
+    throw new Error('Supabase client not initialized or unauthenticated.');
+  }
+
+  let goalRow: any = null;
+
+  // 1. Invoke atomic PostgreSQL RPC
+  const { data: rpcData, error: rpcErr } = await sb.rpc('toggle_goal_subtask', {
+    p_goal_id: goalId,
+    p_subtask_id: subtaskId,
+  });
+
+  if (!rpcErr && rpcData) {
+    goalRow = rpcData;
+  } else {
+    console.warn('toggle_goal_subtask RPC failed or unavailable, falling back:', rpcErr);
+    const { data: existingGoal, error: getErr } = await sb
+      .from('goals')
+      .select('*')
+      .eq('id', goalId)
+      .eq('user_id', userId)
+      .single();
+
+    if (getErr || !existingGoal) {
+      throw new Error(getErr?.message || 'Goal not found or access denied.');
+    }
+
+    const subtasks = Array.isArray(existingGoal.subtasks) ? existingGoal.subtasks : [];
+    const updatedSubtasks = subtasks.map((st: any) =>
+      st.id === subtaskId ? { ...st, completed: !st.completed } : st
+    );
+
+    const { data: fallbackUpdated, error: updateErr } = await sb
+      .from('goals')
+      .update({
+        subtasks: updatedSubtasks,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', goalId)
+      .eq('user_id', userId)
+      .select('*')
+      .single();
+
+    if (updateErr || !fallbackUpdated) {
+      throw new Error(updateErr?.message || 'Failed to toggle goal subtask.');
+    }
+    goalRow = fallbackUpdated;
+  }
+
+  const { data: milestoneRows } = await sb
+    .from('goal_milestones')
+    .select('*')
+    .eq('goal_id', goalId)
+    .eq('user_id', userId)
+    .order('created_at', { ascending: true });
+
+  const mapped = mapGoalRowToDetailedGoal(goalRow, milestoneRows || []);
+
+  if (
+    mapped.progress !== goalRow.progress ||
+    mapped.status !== goalRow.status ||
+    mapped.completedTasks !== goalRow.completed_tasks
+  ) {
+    await sb
+      .from('goals')
+      .update({
+        progress: mapped.progress,
+        completed_tasks: mapped.completedTasks,
+        total_tasks: mapped.totalTasks,
+        status: mapped.status,
+      })
+      .eq('id', goalId)
+      .eq('user_id', userId);
+  }
+
+  return mapped;
+}
+
+/**
+ * Toggles a Milestone for a goal in Supabase and updates the goal's metrics.
+ */
+export async function toggleGoalMilestoneInSupabase(
+  userId: string,
+  goalId: string,
+  milestoneId: string
+): Promise<DetailedGoal> {
+  const sb = getSupabase();
+  if (!sb || !userId) {
+    throw new Error('Supabase client not initialized or unauthenticated.');
+  }
+
+  const { data: mRow, error: mGetErr } = await sb
+    .from('goal_milestones')
+    .select('*')
+    .eq('id', milestoneId)
+    .eq('goal_id', goalId)
+    .eq('user_id', userId)
+    .single();
+
+  if (mGetErr || !mRow) {
+    throw new Error(mGetErr?.message || 'Milestone not found.');
+  }
+
+  const isNowCompleted = !mRow.completed;
+  const { error: mUpdateErr } = await sb
+    .from('goal_milestones')
+    .update({
+      completed: isNowCompleted,
+      completed_at: isNowCompleted ? new Date().toISOString() : null,
+    })
+    .eq('id', milestoneId)
+    .eq('user_id', userId);
+
+  if (mUpdateErr) {
+    throw new Error(mUpdateErr.message || 'Failed to toggle milestone.');
+  }
+
+  const { data: goalRow, error: goalErr } = await sb
+    .from('goals')
+    .select('*')
+    .eq('id', goalId)
+    .eq('user_id', userId)
+    .single();
+
+  if (goalErr || !goalRow) {
+    throw new Error(goalErr?.message || 'Goal not found.');
+  }
+
+  const { data: allMilestones } = await sb
+    .from('goal_milestones')
+    .select('*')
+    .eq('goal_id', goalId)
+    .eq('user_id', userId)
+    .order('created_at', { ascending: true });
+
+  const mapped = mapGoalRowToDetailedGoal(goalRow, allMilestones || []);
+
+  await sb
+    .from('goals')
+    .update({
+      progress: mapped.progress,
+      completed_tasks: mapped.completedTasks,
+      total_tasks: mapped.totalTasks,
+      status: mapped.status,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', goalId)
+    .eq('user_id', userId);
+
+  return mapped;
+}
+
+/**
+ * Maps a public.calendar_events row from Supabase to the frontend CalendarEvent interface.
+ */
+export function mapCalendarRowToCalendarEvent(row: any): CalendarEvent {
+  const isAllDay = Boolean(row.all_day);
+  const startTime = row.start_time_text || (row.start_time ? new Date(row.start_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : undefined);
+  const endTime = row.end_time_text || (row.end_time ? new Date(row.end_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : undefined);
+
+  let dateStr = row.event_date;
+  if (!dateStr && row.start_time) {
+    try {
+      dateStr = new Date(row.start_time).toISOString().split('T')[0];
+    } catch {}
+  }
+  if (!dateStr) {
+    dateStr = new Date().toISOString().split('T')[0];
+  }
+
+  return {
+    id: row.id,
+    title: row.title || 'Untitled Event',
+    date: dateStr,
+    startTime: isAllDay ? undefined : (startTime || undefined),
+    endTime: isAllDay ? undefined : (endTime || undefined),
+    allDay: isAllDay,
+    category: (row.category || 'other') as EventCategory,
+    color: row.color || '#6C63FF',
+    location: row.location || undefined,
+    description: row.description || '',
+    repeat: row.repeat_rule || undefined,
+    priority: (row.priority || 'medium') as 'high' | 'medium' | 'low',
+    subtasks: Array.isArray(row.subtasks) ? row.subtasks : [],
+    attachments: Array.isArray(row.attachments) ? row.attachments : [],
+    googleEventId: row.google_event_id || undefined,
+    taskId: row.task_id || undefined,
+    isAutoTask: Boolean(row.is_auto_task),
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
+/**
+ * Fetches all calendar events for an authenticated user from Supabase.
+ * Deterministically sorted by event_date, start_time_text, and created_at.
+ * Returns [] for zero rows (NEVER mock/demo data).
+ */
+export async function fetchUserCalendarEventsFromSupabase(userId: string): Promise<CalendarEvent[]> {
+  const sb = getSupabase();
+  if (!sb || !userId) return [];
+
+  const { data: rows, error } = await sb
+    .from('calendar_events')
+    .select('*')
+    .eq('user_id', userId)
+    .order('event_date', { ascending: true })
+    .order('start_time_text', { ascending: true, nullsFirst: true })
+    .order('created_at', { ascending: true });
+
+  if (error) {
+    console.error('Error fetching calendar events from Supabase:', error);
+    throw new Error(error.message || 'Failed to fetch calendar events from Supabase.');
+  }
+
+  if (!rows || rows.length === 0) {
+    return [];
+  }
+
+  return rows.map(mapCalendarRowToCalendarEvent);
+}
+
+/**
+ * Helper to construct optional timestamptz from date + time string
+ */
+function buildEventTimestamps(eventDate: string, startTimeText?: string, endTimeText?: string, allDay?: boolean) {
+  if (allDay || !eventDate) {
+    return { start_time: null, end_time: null };
+  }
+  let startTimeIso: string | null = null;
+  let endTimeIso: string | null = null;
+
+  try {
+    if (startTimeText) {
+      const match = startTimeText.match(/(\d+):(\d+)\s*(AM|PM)?/i);
+      if (match) {
+        let hours = parseInt(match[1], 10);
+        const minutes = match[2];
+        const ampm = match[3]?.toUpperCase();
+        if (ampm === 'PM' && hours < 12) hours += 12;
+        if (ampm === 'AM' && hours === 12) hours = 0;
+        const hStr = hours < 10 ? '0' + hours : hours.toString();
+        startTimeIso = new Date(`${eventDate}T${hStr}:${minutes}:00`).toISOString();
+      }
+    }
+  } catch {}
+
+  try {
+    if (endTimeText) {
+      const match = endTimeText.match(/(\d+):(\d+)\s*(AM|PM)?/i);
+      if (match) {
+        let hours = parseInt(match[1], 10);
+        const minutes = match[2];
+        const ampm = match[3]?.toUpperCase();
+        if (ampm === 'PM' && hours < 12) hours += 12;
+        if (ampm === 'AM' && hours === 12) hours = 0;
+        const hStr = hours < 10 ? '0' + hours : hours.toString();
+        endTimeIso = new Date(`${eventDate}T${hStr}:${minutes}:00`).toISOString();
+      }
+    }
+  } catch {}
+
+  return { start_time: startTimeIso, end_time: endTimeIso };
+}
+
+/**
+ * Creates a Calendar Event in Supabase.
+ * Authoritative UUID generated by Postgres default or preserved if provided UUID is valid.
+ */
+export async function createCalendarEventInSupabase(
+  userId: string,
+  eventData: Omit<CalendarEvent, 'id'> & { id?: string }
+): Promise<CalendarEvent> {
+  const sb = getSupabase();
+  if (!sb || !userId) {
+    throw new Error('Supabase client not initialized or unauthenticated.');
+  }
+
+  const isUUID = eventData.id && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(eventData.id);
+  const isTaskIdUUID = eventData.taskId && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(eventData.taskId);
+
+  const eventDate = eventData.date || new Date().toISOString().split('T')[0];
+  const { start_time, end_time } = buildEventTimestamps(eventDate, eventData.startTime, eventData.endTime, eventData.allDay);
+
+  const insertPayload: Record<string, any> = {
+    user_id: userId,
+    title: (eventData.title || 'Untitled Event').trim(),
+    description: eventData.description || '',
+    event_date: eventDate,
+    start_time_text: eventData.allDay ? null : (eventData.startTime || null),
+    end_time_text: eventData.allDay ? null : (eventData.endTime || null),
+    start_time,
+    end_time,
+    all_day: Boolean(eventData.allDay),
+    category: (eventData.category || 'other').toLowerCase(),
+    color: eventData.color || '#6C63FF',
+    location: eventData.location || null,
+    repeat_rule: eventData.repeat || null,
+    priority: eventData.priority || 'medium',
+    subtasks: Array.isArray(eventData.subtasks) ? eventData.subtasks : [],
+    attachments: Array.isArray(eventData.attachments) ? eventData.attachments : [],
+    google_event_id: eventData.googleEventId || null,
+    task_id: isTaskIdUUID ? eventData.taskId : null,
+    is_auto_task: Boolean(eventData.isAutoTask),
+  };
+
+  if (isUUID) {
+    insertPayload.id = eventData.id;
+  }
+
+  // Deduplication check for Google-linked events
+  if (eventData.googleEventId) {
+    const { data: existingGcal } = await sb
+      .from('calendar_events')
+      .select('*')
+      .eq('user_id', userId)
+      .eq('google_event_id', eventData.googleEventId)
+      .maybeSingle();
+
+    if (existingGcal) {
+      return mapCalendarRowToCalendarEvent(existingGcal);
+    }
+  }
+
+  const { data, error } = await sb
+    .from('calendar_events')
+    .insert(insertPayload)
+    .select('*')
+    .single();
+
+  if (error || !data) {
+    // If unique constraint violated on google_event_id, fetch existing
+    if (error?.code === '23505' && eventData.googleEventId) {
+      const { data: existing } = await sb
+        .from('calendar_events')
+        .select('*')
+        .eq('user_id', userId)
+        .eq('google_event_id', eventData.googleEventId)
+        .maybeSingle();
+      if (existing) return mapCalendarRowToCalendarEvent(existing);
+    }
+    console.error('Error creating calendar event in Supabase:', error);
+    throw new Error(error?.message || 'Failed to create calendar event in Supabase.');
+  }
+
+  return mapCalendarRowToCalendarEvent(data);
+}
+
+/**
+ * Updates an existing Calendar Event in Supabase.
+ */
+export async function updateCalendarEventInSupabase(
+  userId: string,
+  eventData: CalendarEvent
+): Promise<CalendarEvent> {
+  const sb = getSupabase();
+  if (!sb || !userId) {
+    throw new Error('Supabase client not initialized or unauthenticated.');
+  }
+
+  const eventDate = eventData.date || new Date().toISOString().split('T')[0];
+  const { start_time, end_time } = buildEventTimestamps(eventDate, eventData.startTime, eventData.endTime, eventData.allDay);
+  const isTaskIdUUID = eventData.taskId && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(eventData.taskId);
+
+  const updatePayload: Record<string, any> = {
+    title: (eventData.title || 'Untitled Event').trim(),
+    description: eventData.description || '',
+    event_date: eventDate,
+    start_time_text: eventData.allDay ? null : (eventData.startTime || null),
+    end_time_text: eventData.allDay ? null : (eventData.endTime || null),
+    start_time,
+    end_time,
+    all_day: Boolean(eventData.allDay),
+    category: (eventData.category || 'other').toLowerCase(),
+    color: eventData.color || '#6C63FF',
+    location: eventData.location || null,
+    repeat_rule: eventData.repeat || null,
+    priority: eventData.priority || 'medium',
+    subtasks: Array.isArray(eventData.subtasks) ? eventData.subtasks : [],
+    attachments: Array.isArray(eventData.attachments) ? eventData.attachments : [],
+    google_event_id: eventData.googleEventId || null,
+    task_id: isTaskIdUUID ? eventData.taskId : null,
+    is_auto_task: Boolean(eventData.isAutoTask),
+    updated_at: new Date().toISOString(),
+  };
+
+  const { data, error } = await sb
+    .from('calendar_events')
+    .update(updatePayload)
+    .eq('id', eventData.id)
+    .eq('user_id', userId)
+    .select('*')
+    .single();
+
+  if (error || !data) {
+    console.error('Error updating calendar event in Supabase:', error);
+    throw new Error(error?.message || 'Failed to update calendar event in Supabase.');
+  }
+
+  return mapCalendarRowToCalendarEvent(data);
+}
+
+/**
+ * Deletes a Calendar Event from Supabase.
+ */
+export async function deleteCalendarEventInSupabase(
+  userId: string,
+  eventId: string
+): Promise<void> {
+  const sb = getSupabase();
+  if (!sb || !userId) {
+    throw new Error('Supabase client not initialized or unauthenticated.');
+  }
+
+  const { error } = await sb
+    .from('calendar_events')
+    .delete()
+    .eq('id', eventId)
+    .eq('user_id', userId);
+
+  if (error) {
+    console.error('Error deleting calendar event in Supabase:', error);
+    throw new Error(error.message || 'Failed to delete calendar event from Supabase.');
+  }
+}
+
+
 

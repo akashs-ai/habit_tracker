@@ -32,7 +32,12 @@ export const RecentActivityCard: React.FC<RecentActivityCardProps> = ({
 
       {/* Activity Rows */}
       <div className="space-y-3 mt-3">
-        {activities.slice(0, 3).map((act) => (
+        {activities.length === 0 ? (
+          <div className="py-6 text-center text-xs text-[#687185]">
+            No recent friend activity. Connect with friends to see their achievements!
+          </div>
+        ) : (
+          activities.slice(0, 3).map((act) => (
           <div 
             key={act.id}
             className="flex items-center justify-between p-2 rounded-xl hover:bg-white/4 transition-colors text-xs"
@@ -57,7 +62,7 @@ export const RecentActivityCard: React.FC<RecentActivityCardProps> = ({
               +{act.xpReward} XP
             </span>
           </div>
-        ))}
+        )))}
       </div>
     </div>
   );

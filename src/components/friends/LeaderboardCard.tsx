@@ -156,7 +156,12 @@ export const LeaderboardCard: React.FC<LeaderboardCardProps> = ({
 
       {/* Table Body */}
       <div className="space-y-1.5">
-        {sortedFriends.map((friend, idx) => {
+        {sortedFriends.length === 0 ? (
+          <div className="py-8 text-center text-xs text-[#687185]">
+            No adventurers on the leaderboard yet. Add friends to compete!
+          </div>
+        ) : (
+          sortedFriends.map((friend, idx) => {
           const rank = idx + 1;
           const isCurrentUser = friend.isCurrentUser;
 
@@ -210,7 +215,7 @@ export const LeaderboardCard: React.FC<LeaderboardCardProps> = ({
               </div>
             </div>
           );
-        })}
+        }))}
       </div>
     </div>
   );
