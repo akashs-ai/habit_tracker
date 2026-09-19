@@ -14,17 +14,19 @@ import {
   Bookmark,
   Heart,
   ArrowRight,
-  Bot
+  Bot,
+  Trash2,
 } from 'lucide-react';
 import { QuickNote } from '../types';
 
 interface RightSidebarProps {
   notes: QuickNote[];
   onAddNote?: () => void;
+  onDeleteNote?: (id: string) => void;
   onNavigateTab?: (tab: string) => void;
 }
 
-export const RightSidebar: React.FC<RightSidebarProps> = ({ notes, onAddNote, onNavigateTab }) => {
+export const RightSidebar: React.FC<RightSidebarProps> = ({ notes, onAddNote, onDeleteNote, onNavigateTab }) => {
   // Focus Mode State
   const [focusDuration, setFocusDuration] = useState<number>(25);
   const [secondsRemaining, setSecondsRemaining] = useState<number>(25 * 60);
@@ -218,60 +220,78 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({ notes, onAddNote, on
         </div>
 
         <div className="flex flex-col gap-3">
-          {notes.map((note) => {
-            const isYellow = note.type === 'yellow';
-            const isPurple = note.type === 'purple';
-            const isPink = note.type === 'pink';
+          {notes.length === 0 ? (
+            <div className="p-4 rounded-xl border border-dashed border-[#E5E7EB] dark:border-[#27272A] text-center">
+              <p className="text-xs text-[#6B7280] dark:text-[#A1A1AA]">No quick notes yet. Jot down your first thought!</p>
+            </div>
+          ) : (
+            notes.map((note) => {
+              const isYellow = note.type === 'yellow';
+              const isPurple = note.type === 'purple';
+              const isPink = note.type === 'pink';
 
-            return (
-              <div
-                key={note.id}
-                className={`p-3.5 rounded-xl border flex items-start gap-3 transition-all ${
-                  isYellow
-                    ? 'bg-[#FEFCE8] dark:bg-[#232010] border-[#FEF08A] dark:border-[#383313]'
-                    : isPurple
-                    ? 'bg-[#F5F3FF] dark:bg-[#1A182E] border-[#DDD6FE] dark:border-[#2C274E]'
-                    : 'bg-[#FFF1F2] dark:bg-[#281318] border-[#FECDD3] dark:border-[#421E25]'
-                }`}
-              >
-                {/* Note Type Icon */}
+              return (
                 <div
-                  className={`w-7 h-7 rounded-lg shrink-0 flex items-center justify-center ${
+                  key={note.id}
+                  className={`group relative p-3.5 rounded-xl border flex items-start gap-3 transition-all ${
                     isYellow
-                      ? 'bg-[#FEF08A] text-[#854D0E]'
+                      ? 'bg-[#FEFCE8] dark:bg-[#232010] border-[#FEF08A] dark:border-[#383313]'
                       : isPurple
-                      ? 'bg-[#DDD6FE] text-[#5B21B6]'
-                      : 'bg-[#FECDD3] text-[#9F1239]'
+                      ? 'bg-[#F5F3FF] dark:bg-[#1A182E] border-[#DDD6FE] dark:border-[#2C274E]'
+                      : 'bg-[#FFF1F2] dark:bg-[#281318] border-[#FECDD3] dark:border-[#421E25]'
                   }`}
                 >
-                  {isYellow && <Bookmark className="w-3.5 h-3.5 fill-current" />}
-                  {isPurple && <Sparkles className="w-3.5 h-3.5 fill-current" />}
-                  {isPink && <Heart className="w-3.5 h-3.5 fill-current" />}
-                </div>
+                  {/* Note Type Icon */}
+                  <div
+                    className={`w-7 h-7 rounded-lg shrink-0 flex items-center justify-center ${
+                      isYellow
+                        ? 'bg-[#FEF08A] text-[#854D0E]'
+                        : isPurple
+                        ? 'bg-[#DDD6FE] text-[#5B21B6]'
+                        : 'bg-[#FECDD3] text-[#9F1239]'
+                    }`}
+                  >
+                    {isYellow && <Bookmark className="w-3.5 h-3.5 fill-current" />}
+                    {isPurple && <Sparkles className="w-3.5 h-3.5 fill-current" />}
+                    {isPink && <Heart className="w-3.5 h-3.5 fill-current" />}
+                  </div>
 
-                <div className="flex-1 min-w-0">
-                  <h4 className="font-semibold text-xs text-[#111827] dark:text-[#FAFAFA] mb-0.5">
-                    {note.title}
-                  </h4>
-                  {note.content && (
-                    <p className="text-xs text-[#4B5563] dark:text-[#A1A1AA]">
-                      {note.content}
-                    </p>
-                  )}
-                  {note.bullets && (
-                    <ul className="text-xs text-[#4B5563] dark:text-[#A1A1AA] flex flex-col gap-0.5 mt-0.5">
-                      {note.bullets.map((b, i) => (
-                        <li key={i} className="flex items-center gap-1.5">
-                          <span className="w-1 h-1 rounded-full bg-[#7C6CFF]" />
-                          <span>{b}</span>
-                        </li>
-                      ))}
-                    </ul>
+                  <div className="flex-1 min-w-0 pr-6">
+                    <h4 className="font-semibold text-xs text-[#111827] dark:text-[#FAFAFA] mb-0.5">
+                      {note.title}
+                    </h4>
+                    {note.content && (
+                      <p className="text-xs text-[#4B5563] dark:text-[#A1A1AA]">
+                        {note.content}
+                      </p>
+                    )}
+                    {note.bullets && (
+                      <ul className="text-xs text-[#4B5563] dark:text-[#A1A1AA] flex flex-col gap-0.5 mt-0.5">
+                        {note.bullets.map((b, i) => (
+                          <li key={i} className="flex items-center gap-1.5">
+                            <span className="w-1 h-1 rounded-full bg-[#7C6CFF]" />
+                            <span>{b}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
+
+                  {onDeleteNote && (
+                    <button
+                      type="button"
+                      onClick={() => onDeleteNote(note.id)}
+                      className="absolute top-2 right-2 p-1 rounded-md text-[#9CA3AF] hover:text-[#EF4444] opacity-0 group-hover:opacity-100 transition-opacity"
+                      title="Delete note"
+                      aria-label="Delete note"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
                   )}
                 </div>
-              </div>
-            );
-          })}
+              );
+            })
+          )}
         </div>
       </div>
 

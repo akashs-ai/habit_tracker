@@ -89,7 +89,12 @@ export function getStoredUserCache(userId: string): CachedUserData | null {
       }
       if (Array.isArray(parsed.calendarEvents)) {
         parsed.calendarEvents = parsed.calendarEvents.filter(
-          (e) => !e.id.startsWith('cal-') && !e.id.startsWith('evt-live-') && !e.id.startsWith('evt-demo-') && !e.id.startsWith('demo-')
+          (e) => !e.id.startsWith('cal-') && !e.id.startsWith('evt-live-') && !e.id.startsWith('evt-demo-') && !e.id.startsWith('demo-') && !e.id.startsWith('mock-')
+        );
+      }
+      if (Array.isArray(parsed.notes)) {
+        parsed.notes = parsed.notes.filter(
+          (n) => !n.id.startsWith('note-') && !n.id.startsWith('demo-') && !n.id.startsWith('mock-')
         );
       }
     }
@@ -130,9 +135,15 @@ export function setStoredUserCache(userId: string, state: Partial<CachedUserData
     const rawCalendarEvents = Array.isArray(state.calendarEvents) ? state.calendarEvents : (existing?.calendarEvents || []);
     const sanitizedCalendarEvents = isAuth
       ? rawCalendarEvents.filter(
-          (e) => !e.id.startsWith('cal-') && !e.id.startsWith('evt-live-') && !e.id.startsWith('evt-demo-') && !e.id.startsWith('demo-')
+          (e) => !e.id.startsWith('cal-') && !e.id.startsWith('evt-live-') && !e.id.startsWith('evt-demo-') && !e.id.startsWith('demo-') && !e.id.startsWith('mock-')
         )
       : rawCalendarEvents;
+    const rawNotes = Array.isArray(state.notes) ? state.notes : (existing?.notes || []);
+    const sanitizedNotes = isAuth
+      ? rawNotes.filter(
+          (n) => !n.id.startsWith('note-') && !n.id.startsWith('demo-') && !n.id.startsWith('mock-')
+        )
+      : rawNotes;
 
     const updated: CachedUserData = {
       userId,
@@ -149,7 +160,7 @@ export function setStoredUserCache(userId: string, state: Partial<CachedUserData
       collection: state.collection || existing?.collection || state.collectionItems || existing?.collectionItems || [],
       waysToEarn: state.waysToEarn || existing?.waysToEarn || [],
       claims: state.claims || existing?.claims || [],
-      notes: state.notes || existing?.notes || [],
+      notes: sanitizedNotes,
       attributes: state.attributes || existing?.attributes || [],
       weeklyData: state.weeklyData || existing?.weeklyData || [],
       aiAgents: state.aiAgents || existing?.aiAgents || [],

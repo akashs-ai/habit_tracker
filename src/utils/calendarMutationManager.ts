@@ -120,3 +120,60 @@ export function reconcileCalendarEvents(
 
   return reconciled;
 }
+
+/**
+ * Performs authoritative state synchronization for calendar events.
+ * Used during initial login, page refresh, and getMe/getState data hydrations.
+ *
+ * Rules:
+ * 1. Incoming backend events are the authoritative set of truth.
+ * 2. Purges any stale mock/demo events (e.g. evt-live-, cal-, evt-demo-, demo-).
+ * 3. Never resurrects deleted events.
+ * 4. Preserves any local in-flight unconfirmed optimistic events (e.g. temp IDs or pending mutations).
+ * 5. Replaces state completely with the authoritative list (so empty Supabase table -> empty array []).
+ */
+export function authoritativeReconcileCalendarEvents(
+  currentEvents: CalendarEvent[],
+  incomingEvents: CalendarEvent[],
+  isAuthUser: boolean
+): CalendarEvent[] {
+  const isMockId = (id: string) =>
+    id.startsWith('cal-') ||
+    id.startsWith('evt-live-') ||
+    id.startsWith('evt-demo-') ||
+    id.startsWith('demo-') ||
+    id.startsWith('mock-');
+
+  // Filter incoming: strip deleted events, and strip mock events if authenticated user
+  const validIncoming = (incomingEvents || []).filter(
+    (inc) => !deletedEventIds.has(inc.id) && (!isAuthUser || !isMockId(inc.id))
+  );
+  const incomingMap = new Map(validIncoming.map((e) => [e.id, e]));
+
+  const result: CalendarEvent[] = [];
+  const processedIncomingIds = new Set<string>();
+
+  // If there are local optimistic events currently undergoing pending mutations, keep them
+  for (const current of currentEvents) {
+    if (deletedEventIds.has(current.id)) continue;
+    if (isAuthUser && isMockId(current.id)) continue;
+
+    if (pendingMutationEventIds.has(current.id)) {
+      result.push(current);
+      if (incomingMap.has(current.id)) {
+        processedIncomingIds.add(current.id);
+      }
+    }
+  }
+
+  // Add all authoritative incoming events (unless already added due to pending mutation)
+  for (const inc of validIncoming) {
+    if (!processedIncomingIds.has(inc.id)) {
+      result.push(inc);
+      processedIncomingIds.add(inc.id);
+    }
+  }
+
+  return result;
+}
+

@@ -1,4 +1,4 @@
-import { TaskItem, TaskPriority, UserProfile, AuthUser, Quest, RewardItem, CollectionItem, FriendUser, FriendRequest, SuggestedFriend, DetailedGoal, GoalMilestone, GoalSubtask, GoalCategory, GoalStatus, CalendarEvent, EventCategory } from '../types';
+import { TaskItem, TaskPriority, UserProfile, AuthUser, Quest, RewardItem, CollectionItem, FriendUser, FriendRequest, SuggestedFriend, DetailedGoal, GoalMilestone, GoalSubtask, GoalCategory, GoalStatus, CalendarEvent, EventCategory, QuickNote } from '../types';
 import { getSupabase } from '../lib/supabase';
 import { initialUserProfile } from '../data/mockData';
 import { getLiveTodayISO, getStartOfWeek, formatDateISO, formatReadableDate } from '../utils/dateUtils';
@@ -2685,5 +2685,150 @@ export async function deleteCalendarEventInSupabase(
   }
 }
 
+/**
+ * Maps a public.quick_notes row from Supabase to frontend QuickNote.
+ * Handles both JSON-serialized content payloads and simple text content.
+ */
+export function mapQuickNoteRowToQuickNote(row: any): QuickNote {
+  let parsedTitle = '';
+  let parsedContent = '';
+  let parsedType: QuickNote['type'] = 'yellow';
+  let parsedBullets: string[] | undefined = undefined;
 
+  const rawContent = row.content || '';
 
+  if (rawContent.trim().startsWith('{') && rawContent.trim().endsWith('}')) {
+    try {
+      const parsed = JSON.parse(rawContent);
+      if (typeof parsed === 'object' && parsed !== null) {
+        parsedTitle = typeof parsed.title === 'string' ? parsed.title : '';
+        parsedContent = typeof parsed.content === 'string' ? parsed.content : '';
+        if (parsed.type === 'yellow' || parsed.type === 'purple' || parsed.type === 'pink') {
+          parsedType = parsed.type;
+        }
+        if (Array.isArray(parsed.bullets)) {
+          parsedBullets = parsed.bullets.map((b: any) => String(b));
+        }
+      }
+    } catch {
+      parsedTitle = rawContent.slice(0, 40);
+      parsedContent = rawContent;
+    }
+  } else {
+    parsedContent = rawContent;
+    parsedTitle = rawContent.split('\n')[0]?.slice(0, 40) || 'Note';
+  }
+
+  // Fallback to row.category for note type if not in json payload
+  if (!parsedType || (parsedType !== 'yellow' && parsedType !== 'purple' && parsedType !== 'pink')) {
+    if (row.category === 'yellow' || row.category === 'purple' || row.category === 'pink') {
+      parsedType = row.category;
+    } else {
+      parsedType = 'yellow';
+    }
+  }
+
+  return {
+    id: row.id,
+    type: parsedType,
+    title: parsedTitle || 'Note',
+    content: parsedContent,
+    bullets: parsedBullets,
+  };
+}
+
+/**
+ * Fetches all Quick Notes for an authenticated user from Supabase.
+ */
+export async function fetchUserNotesFromSupabase(userId: string): Promise<QuickNote[]> {
+  const sb = getSupabase();
+  if (!sb || !userId) {
+    return [];
+  }
+
+  const { data, error } = await sb
+    .from('quick_notes')
+    .select('*')
+    .eq('user_id', userId)
+    .order('created_at', { ascending: false });
+
+  if (error) {
+    console.error('Error fetching quick notes from Supabase:', error);
+    throw new Error(error.message || 'Failed to fetch quick notes from Supabase.');
+  }
+
+  if (!data || data.length === 0) {
+    return [];
+  }
+
+  return data.map(mapQuickNoteRowToQuickNote);
+}
+
+/**
+ * Creates a new Quick Note in Supabase.
+ */
+export async function createNoteInSupabase(
+  userId: string,
+  noteData: Omit<QuickNote, 'id'> & { id?: string }
+): Promise<QuickNote> {
+  const sb = getSupabase();
+  if (!sb || !userId) {
+    throw new Error('Supabase client not initialized or unauthenticated.');
+  }
+
+  // Lossless payload encoding: title, content, type, bullets preserved in content JSON
+  const payloadToStore = {
+    title: noteData.title || '',
+    content: noteData.content || '',
+    type: noteData.type || 'yellow',
+    bullets: noteData.bullets || [],
+  };
+
+  const insertPayload: any = {
+    user_id: userId,
+    content: JSON.stringify(payloadToStore),
+    category: noteData.type || 'yellow',
+  };
+
+  // Only pass UUID id if explicitly provided and valid UUID format
+  if (noteData.id && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(noteData.id)) {
+    insertPayload.id = noteData.id;
+  }
+
+  const { data, error } = await sb
+    .from('quick_notes')
+    .insert(insertPayload)
+    .select('*')
+    .single();
+
+  if (error || !data) {
+    console.error('Error creating quick note in Supabase:', error);
+    throw new Error(error?.message || 'Failed to create quick note in Supabase.');
+  }
+
+  return mapQuickNoteRowToQuickNote(data);
+}
+
+/**
+ * Deletes a Quick Note from Supabase by UUID.
+ */
+export async function deleteNoteInSupabase(
+  userId: string,
+  noteId: string
+): Promise<void> {
+  const sb = getSupabase();
+  if (!sb || !userId) {
+    throw new Error('Supabase client not initialized or unauthenticated.');
+  }
+
+  const { error } = await sb
+    .from('quick_notes')
+    .delete()
+    .eq('id', noteId)
+    .eq('user_id', userId);
+
+  if (error) {
+    console.error('Error deleting quick note from Supabase:', error);
+    throw new Error(error.message || 'Failed to delete quick note from Supabase.');
+  }
+}

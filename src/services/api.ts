@@ -61,6 +61,9 @@ import {
   updateCalendarEventInSupabase,
   deleteCalendarEventInSupabase,
   mapCalendarRowToCalendarEvent,
+  fetchUserNotesFromSupabase,
+  createNoteInSupabase,
+  deleteNoteInSupabase,
 } from './supabaseData';
 import {
   getStoredUserCache,
@@ -285,8 +288,8 @@ export function supabaseUserToAuthUser(sbUser: any, profile?: any): AuthUser {
   };
 }
 
-export function getDefaultAppState(user?: AuthUser): FullAppState {
-  const isGuest = !user || Boolean(user.isGuest);
+export function getDefaultAppState(user?: AuthUser | null): FullAppState {
+  const isGuest = Boolean(user && user.isGuest);
   const memberName = user?.fullName || user?.username || (isGuest ? 'Adventurer Guest' : 'Adventurer');
 
   if (isGuest) {
@@ -452,7 +455,7 @@ export const api = {
             const cached = getStoredUserCache(sbUser.id);
 
             // Single parallel data-fetching pipeline directly to Supabase - NO redundant waterfalls
-            const [profData, userTasks, userHabits, userRewards, userFriends, userGoals, userCalendar] = await Promise.all([
+            const [profData, userTasks, userHabits, userRewards, userFriends, userGoals, userCalendar, userNotes] = await Promise.all([
               fetchUserProfileFromSupabase(sbUser.id).catch(() => null),
               fetchUserTasksFromSupabase(sbUser.id).catch(() => []),
               fetchUserHabitsFromSupabase(sbUser.id).catch(() => []),
@@ -460,6 +463,7 @@ export const api = {
               fetchUserFriendsFromSupabase(sbUser.id).catch(() => []),
               fetchUserGoalsFromSupabase(sbUser.id).catch(() => []),
               fetchUserCalendarEventsFromSupabase(sbUser.id).catch(() => []),
+              fetchUserNotesFromSupabase(sbUser.id).catch(() => []),
             ]);
 
             const authUser = supabaseUserToAuthUser(sbUser, profData?.profile);
@@ -489,7 +493,7 @@ export const api = {
               claims: Array.isArray(userRewards?.claims)
                 ? userRewards.claims
                 : (Array.isArray(cached?.claims) ? cached.claims : []),
-              notes: cached?.notes || baseState.notes,
+              notes: userNotes,
               attributes: cached?.attributes || baseState.attributes,
               weeklyData: cached?.weeklyData || baseState.weeklyData,
               aiAgents: cached?.aiAgents || baseState.aiAgents,
@@ -1199,13 +1203,14 @@ export const api = {
             const userId = session.user.id;
             const cached = getStoredUserCache(userId);
 
-            const [profData, userTasks, userHabits, userRewards, userGoals, userCalendar] = await Promise.all([
+            const [profData, userTasks, userHabits, userRewards, userGoals, userCalendar, userNotes] = await Promise.all([
               fetchUserProfileFromSupabase(userId).catch(() => null),
               fetchUserTasksFromSupabase(userId).catch(() => []),
               fetchUserHabitsFromSupabase(userId).catch(() => []),
               fetchUserRewardsFromSupabase(userId).catch(() => ({ rewards: [], claims: [], collection: [] })),
               fetchUserGoalsFromSupabase(userId).catch(() => []),
               fetchUserCalendarEventsFromSupabase(userId).catch(() => []),
+              fetchUserNotesFromSupabase(userId).catch(() => []),
             ]);
 
             const authUser = supabaseUserToAuthUser(session.user, profData?.profile);
@@ -1233,7 +1238,7 @@ export const api = {
               claims: Array.isArray(userRewards?.claims)
                 ? userRewards.claims
                 : (Array.isArray(cached?.claims) ? cached.claims : []),
-              notes: cached?.notes || baseState.notes,
+              notes: userNotes,
               attributes: cached?.attributes || baseState.attributes,
               weeklyData: cached?.weeklyData || baseState.weeklyData,
               aiAgents: cached?.aiAgents || baseState.aiAgents,
@@ -1936,6 +1941,27 @@ export const api = {
 
   // 8. Notes
   async addNote(noteData: QuickNote): Promise<{ note: QuickNote; state: FullAppState }> {
+    if (isSupabaseConfigured()) {
+      const sb = getSupabase();
+      if (sb) {
+        try {
+          const { data: { session } } = await sb.auth.getSession();
+          if (session?.user?.id) {
+            const createdNote = await createNoteInSupabase(session.user.id, noteData);
+            const currentState = await this.getState();
+            // Ensure newly created note is in currentState notes array
+            const updatedNotes = [createdNote, ...(currentState.notes || []).filter((n) => n.id !== createdNote.id && n.id !== noteData.id)];
+            currentState.notes = updatedNotes;
+            setStoredUserCache(session.user.id, { ...currentState });
+            return { note: createdNote, state: currentState };
+          }
+        } catch (sbErr) {
+          console.error('Failed to create note in Supabase:', sbErr);
+          throw sbErr;
+        }
+      }
+    }
+
     const res = await authFetch('/api/notes', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -1947,6 +1973,25 @@ export const api = {
   },
 
   async deleteNote(noteId: string): Promise<{ state: FullAppState }> {
+    if (isSupabaseConfigured()) {
+      const sb = getSupabase();
+      if (sb) {
+        try {
+          const { data: { session } } = await sb.auth.getSession();
+          if (session?.user?.id) {
+            await deleteNoteInSupabase(session.user.id, noteId);
+            const currentState = await this.getState();
+            currentState.notes = (currentState.notes || []).filter((n) => n.id !== noteId);
+            setStoredUserCache(session.user.id, { ...currentState });
+            return { state: currentState };
+          }
+        } catch (sbErr) {
+          console.error('Failed to delete note from Supabase:', sbErr);
+          throw sbErr;
+        }
+      }
+    }
+
     const res = await authFetch(`/api/notes/${noteId}`, {
       method: 'DELETE',
     });

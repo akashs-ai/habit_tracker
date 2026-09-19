@@ -79,11 +79,14 @@ import {
   fetchSingleGoalFromSupabase,
   calculateGoalMetrics,
   mapCalendarRowToCalendarEvent,
+  mapQuickNoteRowToQuickNote,
 } from './services/supabaseData';
 import {
   markCalendarEventDeleted,
   isCalendarEventDeleted,
   reconcileCalendarEvents,
+  authoritativeReconcileCalendarEvents,
+  clearDeletedCalendarEventTracking,
   enqueueCalendarMutation,
 } from './utils/calendarMutationManager';
 import { calculateProgressionDelta } from './utils/progression';
@@ -134,6 +137,7 @@ export default function App() {
 
   // Core Synchronized Data States
   const isAuthUserCached = Boolean(initialCached?.authUser && !initialCached.authUser.isGuest);
+  const isGuestCached = Boolean(initialCached?.authUser?.isGuest);
 
   const [user, setUser] = useState(() => {
     if (initialCached?.user) return initialCached.user;
@@ -156,14 +160,17 @@ export default function App() {
     return initialCached?.tasks || initialTasks;
   });
   const [calendarEvents, setCalendarEvents] = useState<CalendarEvent[]>(() => {
+    if (isGuestCached) {
+      return initialCached?.calendarEvents || initialCalendarEvents;
+    }
     if (isAuthUserCached) {
       const cachedEvts = initialCached?.calendarEvents;
       return Array.isArray(cachedEvts)
-        ? cachedEvts.filter((e) => !e.id.startsWith('cal-') && !e.id.startsWith('evt-live-') && !e.id.startsWith('evt-demo-') && !e.id.startsWith('demo-'))
+        ? cachedEvts.filter((e) => !e.id.startsWith('cal-') && !e.id.startsWith('evt-live-') && !e.id.startsWith('evt-demo-') && !e.id.startsWith('demo-') && !e.id.startsWith('mock-'))
         : [];
     }
-    if (initialCached?.calendarEvents) return initialCached.calendarEvents;
-    return initialCalendarEvents;
+    // Authenticated or unknown session during resolution starts strictly with empty array
+    return [];
   });
   const [detailedGoals, setDetailedGoals] = useState<DetailedGoal[]>(() => {
     if (isAuthUserCached) {
@@ -192,6 +199,7 @@ export default function App() {
     if (initialCached?.notes) return initialCached.notes;
     return isAuthUserCached ? [] : initialNotes;
   });
+  const deletedNoteIdsRef = useRef<Set<string>>(new Set());
   const [rewards, setRewards] = useState<RewardItem[]>(() => initialCached?.rewards || initialFeaturedRewards);
   const [badges, setBadges] = useState<RewardBadge[]>(() => initialCached?.badges || initialBadges);
   const [collection, setCollection] = useState<CollectionItem[]>(() => {
@@ -236,12 +244,13 @@ export default function App() {
   const [xpToast, setXpToast] = useState<{ show: boolean; xp: number; attribute: string } | null>(null);
 
   // Reconcile complete authoritative backend state into React
-  const syncFromBackend = (data: BackendState, options?: { allowTaskSync?: boolean }) => {
+  const syncFromBackend = (data: BackendState, options?: { allowTaskSync?: boolean; user?: AuthUser | null }) => {
     if (!data) return;
     if (data.user) setUser(data.user);
     // For authenticated users, Supabase is the sole authoritative source for quests/habits and tasks.
     // Never allow unscoped Express state or mutation side-effects to overwrite authenticated habits/tasks.
-    const isAuthUser = Boolean(currentUser && !currentUser.isGuest);
+    const effectiveUser = options?.user !== undefined ? options.user : currentUser;
+    const isAuthUser = Boolean(effectiveUser && !effectiveUser.isGuest);
     const shouldSyncQuests = Array.isArray(data.quests) && (!isAuthUser || options?.allowTaskSync);
     if (shouldSyncQuests) {
       const finalQuests = isAuthUser ? data.quests.filter((q) => !q.id.startsWith('quest-')) : data.quests;
@@ -258,9 +267,9 @@ export default function App() {
     if (shouldSyncCalendar) {
       const rawEvents = data.calendarEvents;
       const filteredEvents = isAuthUser
-        ? rawEvents.filter((e) => !e.id.startsWith('cal-') && !e.id.startsWith('evt-live-') && !e.id.startsWith('evt-demo-') && !e.id.startsWith('demo-'))
+        ? rawEvents.filter((e) => !e.id.startsWith('cal-') && !e.id.startsWith('evt-live-') && !e.id.startsWith('evt-demo-') && !e.id.startsWith('demo-') && !e.id.startsWith('mock-'))
         : rawEvents;
-      setCalendarEvents((prev) => reconcileCalendarEvents(prev, filteredEvents));
+      setCalendarEvents((prev) => authoritativeReconcileCalendarEvents(prev, filteredEvents, isAuthUser));
     }
 
     const shouldSyncGoals =
@@ -277,7 +286,10 @@ export default function App() {
     if (data.badges) setBadges(data.badges);
     if (data.collection) setCollection(data.collection);
     else if (data.collectionItems) setCollection(data.collectionItems);
-    if (data.notes) setNotes(data.notes);
+    if (data.notes) {
+      const finalNotes = isAuthUser ? data.notes.filter((n) => !n.id.startsWith('note-') && !n.id.startsWith('demo-')) : data.notes;
+      setNotes(finalNotes);
+    }
     if (data.attributes) setAttributes(data.attributes);
     if (data.weeklyData) setWeeklyData(data.weeklyData);
     if (data.aiAgents && data.aiAgents.length > 0) setAiAgents(data.aiAgents);
@@ -358,7 +370,7 @@ export default function App() {
         ...cached,
         claims: cached.claims || [],
         collectionItems: cached.collectionItems || cached.collection || [],
-      } as BackendState, { allowTaskSync: true });
+      } as BackendState, { allowTaskSync: true, user: authUser });
     } else {
       // Clean slate for brand-new or uncached user
       const isAuth = !authUser.isGuest;
@@ -380,7 +392,7 @@ export default function App() {
     setShowLandingWelcome(false);
     try {
       const state = await api.getState();
-      syncFromBackend(state, { allowTaskSync: true });
+      syncFromBackend(state, { allowTaskSync: true, user: authUser });
     } catch (err) {
       console.warn('Sync state after auth:', err);
     } finally {
@@ -399,6 +411,7 @@ export default function App() {
     } else {
       clearUserCache();
     }
+    clearDeletedCalendarEventTracking();
     setCurrentUser(null);
     setUser(freshUserProfile);
     setTasks([]);
@@ -455,6 +468,7 @@ export default function App() {
               window.history.replaceState(null, '', window.location.pathname);
             }
           } else if (event === 'SIGNED_OUT') {
+            clearDeletedCalendarEventTracking();
             setCurrentUser(null);
             setStoredAuthToken(null);
             setUser(freshUserProfile);
@@ -488,7 +502,7 @@ export default function App() {
               setCurrentUser(meRes.user);
               setShowLandingWelcome(false);
               if (meRes.state) {
-                syncFromBackend(meRes.state, { allowTaskSync: true });
+                syncFromBackend(meRes.state, { allowTaskSync: true, user: meRes.user });
               }
             } else {
               setCurrentUser(null);
@@ -509,7 +523,7 @@ export default function App() {
               ...cached,
               claims: cached.claims || [],
               collectionItems: cached.collectionItems || cached.collection || [],
-            } as BackendState, { allowTaskSync: true });
+            } as BackendState, { allowTaskSync: true, user: cached.authUser });
           } else {
             // No session and no valid cache: show landing page
             setCurrentUser(null);
@@ -808,6 +822,29 @@ export default function App() {
           setCalendarEvents((prev) => prev.filter((e) => e.id !== payload.id));
         },
       }),
+      subscribeToUserTable(currentUser.id, {
+        table: 'quick_notes',
+        onInsert: (payload: any) => {
+          if (!payload?.id) return;
+          if (deletedNoteIdsRef.current.has(payload.id)) return;
+          const mappedNote = mapQuickNoteRowToQuickNote(payload);
+          setNotes((prev) => {
+            if (prev.some((n) => n.id === mappedNote.id)) return prev;
+            return [mappedNote, ...prev];
+          });
+        },
+        onUpdate: (payload: any) => {
+          if (!payload?.id) return;
+          if (deletedNoteIdsRef.current.has(payload.id)) return;
+          const mappedNote = mapQuickNoteRowToQuickNote(payload);
+          setNotes((prev) => prev.map((n) => (n.id === mappedNote.id ? mappedNote : n)));
+        },
+        onDelete: (payload: any) => {
+          if (!payload?.id) return;
+          deletedNoteIdsRef.current.add(payload.id);
+          setNotes((prev) => prev.filter((n) => n.id !== payload.id));
+        },
+      }),
     ];
 
     return () => {
@@ -1043,12 +1080,34 @@ export default function App() {
 
   // Add new note handler
   const handleAddNote = async (newNote: QuickNote) => {
-    setNotes((prev) => [newNote, ...prev]);
+    const previousNotes = notes;
+    setNotes((prev) => [newNote, ...prev.filter((n) => n.id !== newNote.id)]);
     try {
       const res = await api.addNote(newNote);
+      if (res.note) {
+        // Replace optimistic temp ID with database-persisted note
+        setNotes((prev) => prev.map((n) => (n.id === newNote.id ? res.note : n)));
+      }
       if (res.state) syncFromBackend(res.state);
     } catch (err) {
       console.error('Add note error:', err);
+      // Rollback optimistic addition
+      setNotes(previousNotes);
+    }
+  };
+
+  // Delete note handler
+  const handleDeleteNote = async (noteId: string) => {
+    deletedNoteIdsRef.current.add(noteId);
+    const previousNotes = notes;
+    setNotes((prev) => prev.filter((n) => n.id !== noteId));
+    try {
+      const res = await api.deleteNote(noteId);
+      if (res.state) syncFromBackend(res.state);
+    } catch (err) {
+      console.error('Delete note error:', err);
+      deletedNoteIdsRef.current.delete(noteId);
+      setNotes(previousNotes);
     }
   };
 
@@ -1914,6 +1973,7 @@ export default function App() {
                 <RightSidebar
                   notes={notes}
                   onAddNote={() => setIsAddNoteOpen(true)}
+                  onDeleteNote={handleDeleteNote}
                   onNavigateTab={handleNavigateTab}
                 />
               </div>

@@ -47,6 +47,32 @@ export class UnauthorizedDomainError extends Error {
   }
 }
 
+export class PopupBlockedError extends Error {
+  code: string;
+  isPopupBlocked: boolean;
+
+  constructor(message?: string) {
+    super(
+      message ||
+        'The Google authentication popup was blocked by your browser. Please allow popups for this site, open the app in a full browser tab, or connect with Demo Calendar.'
+    );
+    this.name = 'PopupBlockedError';
+    this.code = 'popup_failed_to_open';
+    this.isPopupBlocked = true;
+  }
+}
+
+export function isFirebaseAuthorizedDomain(): boolean {
+  if (typeof window === 'undefined') return false;
+  const host = window.location.hostname.toLowerCase();
+  return (
+    host === 'localhost' ||
+    host === '127.0.0.1' ||
+    host.endsWith('.firebaseapp.com') ||
+    host.endsWith('.web.app')
+  );
+}
+
 // Initialize Firebase App singleton
 const app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
 export const auth = getAuth(app);
@@ -160,15 +186,19 @@ export async function loadGsiClient(): Promise<void> {
   });
 }
 
-/**
- * Sign in directly via Google Identity Services Token Client.
- * Bypasses Firebase Auth authorized domain restrictions.
- */
-export const signInWithGoogleIdentityServices = async (
-  permission: CalendarPermissionLevel = 'read_edit'
-): Promise<{ user: GoogleCalendarUser; accessToken: string; permission: CalendarPermissionLevel } | null> => {
-  await loadGsiClient();
+// Pre-warm Google Identity Services script immediately in browser environments
+if (typeof window !== 'undefined') {
+  loadGsiClient().catch(() => {});
+}
 
+/**
+ * Execute GSI Token Request directly.
+ * Kept synchronous when the library is preloaded to preserve browser user activation
+ * and prevent popup blockers from killing the window.
+ */
+function executeGsiTokenRequest(
+  permission: CalendarPermissionLevel
+): Promise<{ user: GoogleCalendarUser; accessToken: string; permission: CalendarPermissionLevel } | null> {
   const google = typeof window !== 'undefined' ? (window as any).google : null;
   if (!google?.accounts?.oauth2) {
     throw new Error('Google Identity Services library is not loaded');
@@ -245,10 +275,21 @@ export const signInWithGoogleIdentityServices = async (
         error_callback: (err: any) => {
           if (completed) return;
           completed = true;
-          reject(err);
+          const isBlocked =
+            err?.type === 'popup_failed_to_open' ||
+            err?.type === 'popup_closed' ||
+            (typeof err?.message === 'string' &&
+              (err.message.includes('popup') || err.message.includes('blocked')));
+
+          if (isBlocked) {
+            reject(new PopupBlockedError(typeof err?.message === 'string' ? err.message : undefined));
+          } else {
+            reject(err || new Error('Google Identity Services authentication failed'));
+          }
         },
       });
 
+      // Synchronously trigger request to maintain browser user gesture validity
       client.requestAccessToken({ prompt: 'consent' });
     } catch (err) {
       if (!completed) {
@@ -257,6 +298,22 @@ export const signInWithGoogleIdentityServices = async (
       }
     }
   });
+}
+
+/**
+ * Sign in directly via Google Identity Services Token Client.
+ * Bypasses Firebase Auth authorized domain restrictions.
+ */
+export const signInWithGoogleIdentityServices = (
+  permission: CalendarPermissionLevel = 'read_edit'
+): Promise<{ user: GoogleCalendarUser; accessToken: string; permission: CalendarPermissionLevel } | null> => {
+  const google = typeof window !== 'undefined' ? (window as any).google : null;
+  if (!google?.accounts?.oauth2) {
+    // If not loaded yet, wait for client load and then execute
+    return loadGsiClient().then(() => executeGsiTokenRequest(permission));
+  }
+  // If already loaded, execute synchronously to preserve user click activation
+  return executeGsiTokenRequest(permission);
 };
 
 /**
@@ -288,7 +345,34 @@ export const googleSignIn = async (
     isSigningIn = true;
     cachedPermission = permission;
 
-    // 1. Attempt Firebase Auth popup first (works on authorized domains & localhost)
+    const isAuthorized = isFirebaseAuthorizedDomain();
+
+    // 1. In Cloud Run previews, AI Studio iframes, or non-whitelisted domains (*.run.app),
+    // calling signInWithPopup(auth, provider) is guaranteed to fail with auth/unauthorized-domain
+    // after an async network delay. That delay destroys browser user activation, causing subsequent
+    // popup windows to be blocked by the browser. So we call Google Identity Services directly!
+    if (!isAuthorized) {
+      try {
+        const gsiResult = await signInWithGoogleIdentityServices(permission);
+        if (gsiResult) return gsiResult;
+      } catch (gsiErr: any) {
+        console.warn('Google Identity Services attempt result:', gsiErr);
+        if (
+          gsiErr instanceof PopupBlockedError ||
+          gsiErr?.isPopupBlocked ||
+          gsiErr?.code === 'popup_failed_to_open' ||
+          (typeof gsiErr?.message === 'string' &&
+            (gsiErr.message.includes('popup') || gsiErr.message.includes('blocked')))
+        ) {
+          throw gsiErr instanceof PopupBlockedError ? gsiErr : new PopupBlockedError(gsiErr?.message);
+        }
+        const hostname = typeof window !== 'undefined' ? window.location.hostname : 'current domain';
+        throw new UnauthorizedDomainError(hostname, gsiErr?.message);
+      }
+      return null;
+    }
+
+    // 2. On Firebase-authorized domains (localhost, firebaseapp.com), try Firebase Auth popup
     try {
       const provider = createGoogleProvider(permission);
       const result = await signInWithPopup(auth, provider);
@@ -319,7 +403,7 @@ export const googleSignIn = async (
         return null;
       }
 
-      // If unauthorized-domain, seamlessly try Google Identity Services
+      // If unauthorized-domain, fallback to Google Identity Services
       if (code === 'auth/unauthorized-domain' || message.includes('auth/unauthorized-domain')) {
         console.warn('Firebase unauthorized-domain detected; falling back to Google Identity Services...');
         try {
@@ -327,8 +411,17 @@ export const googleSignIn = async (
           if (gsiResult) return gsiResult;
         } catch (gsiErr: any) {
           console.warn('Google Identity Services also failed:', gsiErr);
+          if (
+            gsiErr instanceof PopupBlockedError ||
+            gsiErr?.isPopupBlocked ||
+            gsiErr?.code === 'popup_failed_to_open' ||
+            (typeof gsiErr?.message === 'string' &&
+              (gsiErr.message.includes('popup') || gsiErr.message.includes('blocked')))
+          ) {
+            throw gsiErr instanceof PopupBlockedError ? gsiErr : new PopupBlockedError(gsiErr?.message);
+          }
           const hostname = typeof window !== 'undefined' ? window.location.hostname : 'current domain';
-          throw new UnauthorizedDomainError(hostname);
+          throw new UnauthorizedDomainError(hostname, gsiErr?.message);
         }
         return null;
       }

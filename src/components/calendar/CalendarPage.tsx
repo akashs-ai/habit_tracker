@@ -6,7 +6,9 @@ import {
   Bell, 
   Menu, 
   Plus,
-  Calendar
+  Calendar,
+  ExternalLink,
+  ShieldAlert
 } from 'lucide-react';
 import { CalendarEvent, CalendarViewType, AppNotification } from '../../types';
 import { NotificationDropdown } from '../NotificationDropdown';
@@ -44,6 +46,8 @@ import {
   googleSignOut, 
   fetchGoogleCalendarEvents,
   connectDemoCalendar,
+  loadGsiClient,
+  PopupBlockedError,
   GoogleCalendarUser,
 } from '../../services/googleCalendar';
 import { User } from 'firebase/auth';
@@ -119,9 +123,13 @@ export const CalendarPage: React.FC<CalendarPageProps> = ({
   const [isConnectingGoogle, setIsConnectingGoogle] = useState(false);
   const [isSyncingGoogle, setIsSyncingGoogle] = useState(false);
   const [showUnauthorizedDomainModal, setShowUnauthorizedDomainModal] = useState(false);
+  const [authModalType, setAuthModalType] = useState<'domain' | 'popup_blocked'>('popup_blocked');
   const [syncFeedback, setSyncFeedback] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
 
   React.useEffect(() => {
+    // Pre-warm Google Identity Services client script so it is ready instantly when user clicks
+    loadGsiClient().catch(() => {});
+
     const unsubscribe = initAuth(
       (user, token) => {
         setGoogleUser(user);
@@ -206,12 +214,28 @@ export const CalendarPage: React.FC<CalendarPageProps> = ({
         return;
       }
 
+      // Check specifically for popup blocked error
+      if (
+        err instanceof PopupBlockedError ||
+        err?.isPopupBlocked ||
+        code === 'popup_failed_to_open' ||
+        code === 'popup_closed' ||
+        message.includes('Failed to open popup window') ||
+        message.includes('blocked by the browser') ||
+        (typeof message === 'string' && message.toLowerCase().includes('popup'))
+      ) {
+        setAuthModalType('popup_blocked');
+        setShowUnauthorizedDomainModal(true);
+        return;
+      }
+
       // Check specifically for unauthorized-domain error
       if (
         code === 'auth/unauthorized-domain' ||
         message.includes('auth/unauthorized-domain') ||
         err?.name === 'UnauthorizedDomainError'
       ) {
+        setAuthModalType('domain');
         setShowUnauthorizedDomainModal(true);
         return;
       }
@@ -679,7 +703,7 @@ export const CalendarPage: React.FC<CalendarPageProps> = ({
         onGoToToday={handleGoToToday}
       />
 
-      {/* Unauthorized Domain Modal */}
+      {/* Unauthorized Domain / Popup Blocked Modal */}
       {showUnauthorizedDomainModal && (
         <div
           id="unauthorized-domain-modal"
@@ -688,11 +712,17 @@ export const CalendarPage: React.FC<CalendarPageProps> = ({
           <div className="bg-[#181920] border border-white/10 rounded-2xl max-w-lg w-full p-6 shadow-2xl space-y-5 text-[#F5F7FF]">
             <div className="flex items-start justify-between gap-3">
               <div className="w-10 h-10 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400 shrink-0">
-                <Calendar className="w-5 h-5" />
+                {authModalType === 'popup_blocked' ? <ShieldAlert className="w-5 h-5" /> : <Calendar className="w-5 h-5" />}
               </div>
               <div className="flex-1">
-                <h3 className="text-lg font-semibold text-white">Google Calendar Authorization</h3>
-                <p className="text-xs text-white/60 mt-1">Domain authorization requirement detected</p>
+                <h3 className="text-lg font-semibold text-white">
+                  {authModalType === 'popup_blocked' ? 'Google Sign-In Popup Blocked' : 'Google Calendar Authorization'}
+                </h3>
+                <p className="text-xs text-white/60 mt-1">
+                  {authModalType === 'popup_blocked'
+                    ? 'Browser prevented the authentication popup from opening'
+                    : 'Domain authorization requirement detected'}
+                </p>
               </div>
               <button
                 id="btn-close-domain-modal"
@@ -703,41 +733,92 @@ export const CalendarPage: React.FC<CalendarPageProps> = ({
               </button>
             </div>
 
-            <p className="text-sm text-white/80 leading-relaxed">
-              The preview domain (<code className="px-1.5 py-0.5 rounded bg-white/10 text-amber-300 font-mono text-xs">{typeof window !== 'undefined' ? window.location.hostname : 'run.app'}</code>) is not listed under Firebase Authentication&apos;s authorized domains.
-            </p>
+            {authModalType === 'popup_blocked' ? (
+              <>
+                <p className="text-sm text-white/80 leading-relaxed">
+                  Your browser or embedded iframe preview blocked the Google authentication popup window.
+                </p>
 
-            <div className="p-3.5 rounded-xl bg-white/5 border border-white/8 text-xs text-white/70 space-y-2">
-              <div className="font-medium text-white/90">Option A: Connect with Demo Calendar (Instant)</div>
-              <p className="text-white/60">
-                Populates your schedule with realistic demo events immediately so you can test all features without domain restrictions.
-              </p>
-            </div>
+                <div className="p-3.5 rounded-xl bg-white/5 border border-white/8 text-xs text-white/70 space-y-2">
+                  <div className="font-medium text-white/90">Option 1: Connect with Demo Calendar (Instant)</div>
+                  <p className="text-white/60">
+                    Populates your schedule with realistic demo events immediately so you can test all calendar views, task conversions, and time-blocking features.
+                  </p>
+                </div>
 
-            <div className="p-3.5 rounded-xl bg-white/5 border border-white/8 text-xs text-white/70 space-y-2">
-              <div className="font-medium text-white/90">Option B: Whitelist domain in Firebase Console</div>
-              <ol className="list-decimal list-inside space-y-1 text-white/60">
-                <li>Open Firebase Console &gt; Authentication &gt; Settings &gt; Authorized domains</li>
-                <li>Add <span className="font-mono text-white/90">{typeof window !== 'undefined' ? window.location.hostname : 'current domain'}</span></li>
-              </ol>
-            </div>
+                <div className="p-3.5 rounded-xl bg-white/5 border border-white/8 text-xs text-white/70 space-y-2">
+                  <div className="font-medium text-white/90">Option 2: Open in a Full Browser Tab</div>
+                  <p className="text-white/60">
+                    Open LifeRPG in a separate browser tab where iframe security restrictions will not block Google OAuth popups.
+                  </p>
+                </div>
 
-            <div className="flex items-center justify-end gap-3 pt-2">
-              <button
-                id="btn-domain-cancel"
-                onClick={() => setShowUnauthorizedDomainModal(false)}
-                className="px-4 py-2 rounded-xl text-sm font-medium text-white/60 hover:text-white hover:bg-white/5 transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                id="btn-connect-demo-calendar"
-                onClick={handleConnectDemo}
-                className="px-4 py-2 rounded-xl text-sm font-semibold bg-[#6C63FF] hover:bg-[#7B73FF] text-white shadow-md transition-all active:scale-95"
-              >
-                Connect Demo Calendar
-              </button>
-            </div>
+                <div className="flex flex-wrap items-center justify-end gap-2.5 pt-2">
+                  <button
+                    id="btn-domain-cancel"
+                    onClick={() => setShowUnauthorizedDomainModal(false)}
+                    className="px-3.5 py-2 rounded-xl text-sm font-medium text-white/60 hover:text-white hover:bg-white/5 transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <a
+                    id="btn-open-app-tab"
+                    href={typeof window !== 'undefined' ? window.location.href : '#'}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="px-3.5 py-2 rounded-xl text-sm font-medium bg-white/10 hover:bg-white/15 text-white border border-white/10 transition-colors inline-flex items-center gap-1.5"
+                  >
+                    <ExternalLink className="w-4 h-4" />
+                    <span>Open in Full Tab</span>
+                  </a>
+                  <button
+                    id="btn-connect-demo-calendar"
+                    onClick={handleConnectDemo}
+                    className="px-4 py-2 rounded-xl text-sm font-semibold bg-[#6C63FF] hover:bg-[#7B73FF] text-white shadow-md transition-all active:scale-95"
+                  >
+                    Connect Demo Calendar
+                  </button>
+                </div>
+              </>
+            ) : (
+              <>
+                <p className="text-sm text-white/80 leading-relaxed">
+                  The preview domain (<code className="px-1.5 py-0.5 rounded bg-white/10 text-amber-300 font-mono text-xs">{typeof window !== 'undefined' ? window.location.hostname : 'run.app'}</code>) is not listed under Firebase Authentication&apos;s authorized domains.
+                </p>
+
+                <div className="p-3.5 rounded-xl bg-white/5 border border-white/8 text-xs text-white/70 space-y-2">
+                  <div className="font-medium text-white/90">Option A: Connect with Demo Calendar (Instant)</div>
+                  <p className="text-white/60">
+                    Populates your schedule with realistic demo events immediately so you can test all features without domain restrictions.
+                  </p>
+                </div>
+
+                <div className="p-3.5 rounded-xl bg-white/5 border border-white/8 text-xs text-white/70 space-y-2">
+                  <div className="font-medium text-white/90">Option B: Whitelist domain in Firebase Console</div>
+                  <ol className="list-decimal list-inside space-y-1 text-white/60">
+                    <li>Open Firebase Console &gt; Authentication &gt; Settings &gt; Authorized domains</li>
+                    <li>Add <span className="font-mono text-white/90">{typeof window !== 'undefined' ? window.location.hostname : 'current domain'}</span></li>
+                  </ol>
+                </div>
+
+                <div className="flex items-center justify-end gap-3 pt-2">
+                  <button
+                    id="btn-domain-cancel"
+                    onClick={() => setShowUnauthorizedDomainModal(false)}
+                    className="px-4 py-2 rounded-xl text-sm font-medium text-white/60 hover:text-white hover:bg-white/5 transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    id="btn-connect-demo-calendar"
+                    onClick={handleConnectDemo}
+                    className="px-4 py-2 rounded-xl text-sm font-semibold bg-[#6C63FF] hover:bg-[#7B73FF] text-white shadow-md transition-all active:scale-95"
+                  >
+                    Connect Demo Calendar
+                  </button>
+                </div>
+              </>
+            )}
           </div>
         </div>
       )}

@@ -1,6 +1,6 @@
 import React from 'react';
 import { CalendarEvent } from '../../types';
-import { Clock, MapPin } from 'lucide-react';
+import { Clock, MapPin, Calendar } from 'lucide-react';
 import { formatFullDayHeader, getRelativeDayLabel, isToday, isPast, isFuture } from '../../utils/dateUtils';
 
 interface CalendarAgendaViewProps {
@@ -12,6 +12,25 @@ export const CalendarAgendaView: React.FC<CalendarAgendaViewProps> = ({
   events,
   onSelectEvent,
 }) => {
+  if (!events || events.length === 0) {
+    return (
+      <div 
+        id="calendar-agenda-empty"
+        className="w-full bg-white dark:bg-[#0F1217] border border-slate-200 dark:border-white/8 rounded-xl p-8 sm:p-12 shadow-sm flex flex-col items-center justify-center text-center transition-colors"
+      >
+        <div className="w-12 h-12 rounded-full bg-slate-100 dark:bg-white/5 flex items-center justify-center text-slate-400 dark:text-[#6F7789] mb-3">
+          <Calendar className="w-6 h-6" />
+        </div>
+        <h4 className="text-sm font-semibold text-slate-900 dark:text-[#F5F7FF] mb-1">
+          No Scheduled Events
+        </h4>
+        <p className="text-xs text-slate-500 dark:text-[#A6AEC0] max-w-sm">
+          Your schedule is clear. Click any day or the Add Event button to plan your schedule.
+        </p>
+      </div>
+    );
+  }
+
   // Sort events by date and time
   const sortedEvents = [...events].sort((a, b) => a.date.localeCompare(b.date));
 
