@@ -5,6 +5,7 @@ import { db } from './server/db';
 import { REWARD_TERMS_POLICY } from './server/terms';
 import { generateAIChatResponse } from './server/ai';
 import { verifySupabaseToken, getServerSupabase } from './server/supabase';
+import { fetchInstagramProfile } from './server/instagram';
 
 async function startServer() {
   const app = express();
@@ -369,6 +370,28 @@ async function startServer() {
   // Health Check
   app.get('/api/health', (req: Request, res: Response) => {
     res.json({ status: 'ok', time: new Date().toISOString() });
+  });
+
+  // Team Expo Instagram Profile Sync (Server-Side SerpApi proxy with caching & deduplication)
+  app.get('/api/team/instagram-profile', async (req: Request, res: Response) => {
+    try {
+      const rawUsername = (req.query.username || req.query.profile_id) as string;
+      if (!rawUsername) {
+        return res.status(400).json({
+          success: false,
+          error: 'Missing required query parameter "username"',
+        });
+      }
+
+      const result = await fetchInstagramProfile(rawUsername);
+      return res.json(result);
+    } catch (err: any) {
+      console.warn('[InstagramSync] Route error:', err);
+      return res.status(500).json({
+        success: false,
+        error: 'Internal server error while retrieving Instagram profile',
+      });
+    }
   });
 
   // 1. Full State Snapshot (Single Source of Truth)

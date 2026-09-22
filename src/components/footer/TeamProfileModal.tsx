@@ -16,13 +16,16 @@ import {
 } from 'lucide-react';
 import { TeamMember, TEAM_INFO } from './teamData';
 import { fetchGitHubDeveloperStats, GitHubDeveloperStats } from './githubService';
+import { fetchInstagramAvatar } from './instagramService';
 
 interface TeamProfileModalProps {
   member: TeamMember | null;
   isOpen: boolean;
   onClose: () => void;
   initialGitHubStats?: GitHubDeveloperStats | null;
+  initialInstagramAvatar?: string | null;
   onStatsUpdated?: (memberId: string, stats: GitHubDeveloperStats) => void;
+  onInstagramAvatarUpdated?: (memberId: string, avatarUrl: string) => void;
 }
 
 export const TeamProfileModal: React.FC<TeamProfileModalProps> = ({
@@ -30,10 +33,16 @@ export const TeamProfileModal: React.FC<TeamProfileModalProps> = ({
   isOpen,
   onClose,
   initialGitHubStats = null,
-  onStatsUpdated
+  initialInstagramAvatar = null,
+  onStatsUpdated,
+  onInstagramAvatarUpdated
 }) => {
   const [imgError, setImgError] = useState(false);
   const [bannerError, setBannerError] = useState(false);
+
+  // Instagram Avatar Auto-Sync state
+  const [instagramAvatar, setInstagramAvatar] = useState<string | null>(initialInstagramAvatar || null);
+  const [instagramImgError, setInstagramImgError] = useState(false);
 
   // GitHub Auto-Sync state
   const [isLoadingGitHub, setIsLoadingGitHub] = useState(false);
@@ -45,6 +54,13 @@ export const TeamProfileModal: React.FC<TeamProfileModalProps> = ({
     setImgError(false);
     setBannerError(false);
     setGitHubError(null);
+    setInstagramImgError(false);
+
+    if (initialInstagramAvatar) {
+      setInstagramAvatar(initialInstagramAvatar);
+    } else {
+      setInstagramAvatar(null);
+    }
 
     if (initialGitHubStats) {
       setGitHubStats(initialGitHubStats);
@@ -52,39 +68,54 @@ export const TeamProfileModal: React.FC<TeamProfileModalProps> = ({
       setGitHubStats(null);
     }
 
-    if (!isOpen || !member?.github) return;
+    if (!isOpen || !member) return;
 
-    // Automatically fetch GitHub stats if not already supplied
     let isMounted = true;
-    const autoSync = async () => {
-      if (!initialGitHubStats) {
-        setIsLoadingGitHub(true);
-      }
-      try {
-        const stats = await fetchGitHubDeveloperStats(member.github);
-        if (isMounted) {
-          setGitHubStats(stats);
-          if (onStatsUpdated && member.id) {
-            onStatsUpdated(member.id, stats);
+
+    // 1. Fetch Instagram avatar if available and not supplied
+    if (member.instagram && !initialInstagramAvatar) {
+      fetchInstagramAvatar(member.instagram).then((avatar) => {
+        if (isMounted && avatar) {
+          setInstagramAvatar(avatar);
+          if (onInstagramAvatarUpdated && member.id) {
+            onInstagramAvatarUpdated(member.id, avatar);
           }
         }
-      } catch (err: any) {
-        if (isMounted && !initialGitHubStats) {
-          setGitHubError(err.message || 'GitHub stats currently unavailable');
-        }
-      } finally {
-        if (isMounted) {
-          setIsLoadingGitHub(false);
-        }
-      }
-    };
+      });
+    }
 
-    autoSync();
+    // 2. Automatically fetch GitHub stats if not already supplied
+    if (member.github) {
+      const autoSync = async () => {
+        if (!initialGitHubStats) {
+          setIsLoadingGitHub(true);
+        }
+        try {
+          const stats = await fetchGitHubDeveloperStats(member.github);
+          if (isMounted) {
+            setGitHubStats(stats);
+            if (onStatsUpdated && member.id) {
+              onStatsUpdated(member.id, stats);
+            }
+          }
+        } catch (err: any) {
+          if (isMounted && !initialGitHubStats) {
+            setGitHubError(err.message || 'GitHub stats currently unavailable');
+          }
+        } finally {
+          if (isMounted) {
+            setIsLoadingGitHub(false);
+          }
+        }
+      };
+
+      autoSync();
+    }
 
     return () => {
       isMounted = false;
     };
-  }, [member?.id, isOpen]);
+  }, [member?.id, isOpen, initialInstagramAvatar, initialGitHubStats]);
 
   // Handle ESC key press to close modal
   useEffect(() => {
@@ -101,8 +132,11 @@ export const TeamProfileModal: React.FC<TeamProfileModalProps> = ({
   if (!isOpen || !member) return null;
 
   const hasBanner = Boolean(member.bannerImage && !bannerError);
-  // If GitHub has synced an avatar and member has no explicit profile image, automatically use GitHub avatar!
-  const effectiveProfileImage = member.profileImage || gitHubStats?.avatarUrl;
+  // Priority: 1. Synced Instagram Avatar -> 2. Member profileImage -> 3. GitHub Avatar -> 4. Initials fallback
+  const hasInstagramAvatar = Boolean(instagramAvatar && !instagramImgError);
+  const effectiveProfileImage = hasInstagramAvatar
+    ? instagramAvatar
+    : (member.profileImage || gitHubStats?.avatarUrl);
   const hasProfileImage = Boolean(effectiveProfileImage && !imgError);
 
   return (
@@ -157,7 +191,13 @@ export const TeamProfileModal: React.FC<TeamProfileModalProps> = ({
                     src={effectiveProfileImage}
                     alt={member.name}
                     className="w-full h-full object-cover object-center rounded-full"
-                    onError={() => setImgError(true)}
+                    onError={() => {
+                      if (hasInstagramAvatar) {
+                        setInstagramImgError(true);
+                      } else {
+                        setImgError(true);
+                      }
+                    }}
                   />
                 ) : (
                   <div className="w-full h-full flex items-center justify-center text-white font-bold text-xl tracking-wider select-none">

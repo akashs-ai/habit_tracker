@@ -3,6 +3,7 @@ import { Sparkles, Calendar, Code2, Users, Github } from 'lucide-react';
 import { TEAM_MEMBERS, TEAM_INFO, TeamMember } from './teamData';
 import { TeamProfileModal } from './TeamProfileModal';
 import { fetchGitHubDeveloperStats, GitHubDeveloperStats } from './githubService';
+import { fetchInstagramAvatar } from './instagramService';
 
 interface FooterProps {
   className?: string;
@@ -15,11 +16,15 @@ export const Footer: React.FC<FooterProps> = ({ className = '' }) => {
   // Cached developer stats by member ID - auto synced in background
   const [memberStatsMap, setMemberStatsMap] = useState<Record<string, GitHubDeveloperStats>>({});
 
-  // Automatically fetch/sync GitHub stats for all developers on mount (non-blocking, parallel)
+  // Cached Instagram avatars by member ID - auto synced in background
+  const [memberInstagramMap, setMemberInstagramMap] = useState<Record<string, string>>({});
+
+  // Automatically fetch/sync GitHub stats and Instagram avatars for all developers on mount (non-blocking, parallel)
   useEffect(() => {
     let isMounted = true;
 
     TEAM_MEMBERS.forEach(async (member) => {
+      // 1. Sync GitHub stats
       try {
         const stats = await fetchGitHubDeveloperStats(member.github);
         if (isMounted) {
@@ -27,6 +32,18 @@ export const Footer: React.FC<FooterProps> = ({ className = '' }) => {
         }
       } catch {
         // Silent catch: unauthenticated rate limits or offline network will safely fall back to static member info
+      }
+
+      // 2. Sync Instagram avatar
+      if (member.instagram) {
+        try {
+          const avatar = await fetchInstagramAvatar(member.instagram);
+          if (isMounted && avatar) {
+            setMemberInstagramMap((prev) => ({ ...prev, [member.id]: avatar }));
+          }
+        } catch {
+          // Silent catch: network/api unavailability gracefully falls back
+        }
       }
     });
 
@@ -47,6 +64,10 @@ export const Footer: React.FC<FooterProps> = ({ className = '' }) => {
 
   const handleUpdateMemberStats = (memberId: string, stats: GitHubDeveloperStats) => {
     setMemberStatsMap((prev) => ({ ...prev, [memberId]: stats }));
+  };
+
+  const handleUpdateInstagramAvatar = (memberId: string, avatarUrl: string) => {
+    setMemberInstagramMap((prev) => ({ ...prev, [memberId]: avatarUrl }));
   };
 
   return (
@@ -127,7 +148,9 @@ export const Footer: React.FC<FooterProps> = ({ className = '' }) => {
         isOpen={isModalOpen}
         onClose={handleCloseModal}
         initialGitHubStats={selectedMember ? memberStatsMap[selectedMember.id] : null}
+        initialInstagramAvatar={selectedMember ? memberInstagramMap[selectedMember.id] : null}
         onStatsUpdated={handleUpdateMemberStats}
+        onInstagramAvatarUpdated={handleUpdateInstagramAvatar}
       />
     </>
   );
