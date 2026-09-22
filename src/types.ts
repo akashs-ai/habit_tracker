@@ -401,6 +401,32 @@ export interface CoachPromptOption {
   prompt: string;
 }
 
+export type GeminiModelOptionId = 'gemini-3.5-flash' | 'gemini-3.1-flash-lite' | 'gemini-3.1-pro-preview';
+
+export interface GeminiModelOption {
+  id: GeminiModelOptionId;
+  name: string;
+  tagline: string;
+  taskType: 'general' | 'fast' | 'complex';
+  speedBadge: string;
+  recommendedFor: string;
+  isDefault?: boolean;
+}
+
+export type CoachRoleOptionId =
+  | 'general_coach'
+  | 'strict_drill_sergeant'
+  | 'calendar_strategist'
+  | 'habit_architect';
+
+export interface CoachRoleOption {
+  id: CoachRoleOptionId;
+  name: string;
+  tagline: string;
+  emoji: string;
+  description: string;
+}
+
 export interface CoachChatMessage {
   id: string;
   sender: 'coach' | 'user';
@@ -408,6 +434,8 @@ export interface CoachChatMessage {
   timestamp: string;
   agentId?: 'chatgpt' | 'claude' | 'gemini' | string;
   agentName?: string;
+  geminiModel?: GeminiModelOptionId | string;
+  role?: CoachRoleOptionId | string;
   suggestions?: string[];
   actionRecommendation?: {
     title: string;
@@ -468,6 +496,8 @@ export interface AIIntegrationModel {
   authMethod?: 'google' | 'phone' | 'email' | 'apikey';
   authProviderName?: string;
   sessionToken?: string;
+  selectedGeminiModel?: GeminiModelOptionId;
+  selectedRole?: CoachRoleOptionId;
 }
 
 export interface AIAgentVerifyPayload {

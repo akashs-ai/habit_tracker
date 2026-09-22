@@ -1,6 +1,6 @@
 import { GoogleGenAI, FunctionDeclaration, Type } from '@google/genai';
 import { db } from './db';
-import { CoachChatMessage, CalendarPermissionLevel, CalendarEvent } from '../src/types';
+import { CoachChatMessage, CalendarPermissionLevel, CalendarEvent, GeminiModelOptionId } from '../src/types';
 
 let geminiClient: GoogleGenAI | null = null;
 
@@ -20,6 +20,8 @@ function getGemini(): GoogleGenAI | null {
 
 export interface AIChatRequest {
   modelId: string; // 'gemini' | 'chatgpt' | 'claude'
+  geminiModel?: 'gemini-3.5-flash' | 'gemini-3.1-flash-lite' | 'gemini-3.1-pro-preview';
+  role?: 'general_coach' | 'strict_drill_sergeant' | 'calendar_strategist' | 'habit_architect';
   message: string;
   history?: Array<{ role: 'user' | 'model'; text: string }>;
   calendarPermission?: CalendarPermissionLevel;
@@ -155,8 +157,26 @@ export async function generateAIChatResponse(req: AIChatRequest): Promise<CoachC
     return heuristicResult;
   }
 
-  // 1. GEMINI AGENT (uses real @google/genai with 'gemini-3.8-flash')
+  // 1. GEMINI AGENT (Multi-Turn Chatbot with Model Options & Role System Instructions)
   if (modelId === 'gemini') {
+    const requestedModel = req.geminiModel || agent.selectedGeminiModel || 'gemini-3.5-flash';
+    const requestedRole = req.role || agent.selectedRole || 'general_coach';
+
+    const modelDisplayNames: Record<string, string> = {
+      'gemini-3.5-flash': 'Gemini 3.5 Flash',
+      'gemini-3.1-flash-lite': 'Gemini 3.1 Flash Lite',
+      'gemini-3.1-pro-preview': 'Gemini 3.1 Pro Preview',
+    };
+    const activeModelName = modelDisplayNames[requestedModel] || 'Gemini 3.5 Flash';
+
+    const roleGuidanceMap: Record<string, string> = {
+      strict_drill_sergeant: 'Role: Strict Accountability Drill Sergeant. Direct, assertive, no-nonsense tone. Call out procrastination, demand immediate action, remind user of their streak, and push through mental resistance.',
+      calendar_strategist: 'Role: Schedule & Calendar Strategist. Expert at time-blocking, locating schedule openings, eliminating gaps, and syncing Google Calendar commitments with daily habit goals.',
+      habit_architect: 'Role: Habit & Streak Architect. Grounded in behavioral science and atomic habit stacking. Focus on friction reduction, habit cue design, and identity-based daily wins.',
+      general_coach: 'Role: General Productivity Coach. Balanced, motivating, highly actionable guidance focused on daily progress, habit completion, and XP progression.',
+    };
+    const activeRoleGuidance = roleGuidanceMap[requestedRole] || roleGuidanceMap.general_coach;
+
     const gemini = getGemini();
     if (gemini) {
       try {
@@ -167,17 +187,17 @@ export async function generateAIChatResponse(req: AIChatRequest): Promise<CoachC
             ? 'Calendar Permission: "Read only" IS ACTIVE. You can read events (readCalendarEvents), but you CANNOT create, reschedule, or delete events. If the user asks to modify or schedule an event, you must explain that permission is set to "Read only" and suggest switching to "Read & edit" in AI Integration settings.'
             : 'Calendar Permission: "No access" IS ACTIVE. You do not have access to the user\'s calendar.';
 
-        const systemPrompt = `You are the Gemini 3.8 Flash AI Coach inside LifeRPG.
+        const systemInstruction = `You are the ${activeModelName} AI Coach inside LifeRPG.
 User Info: Level ${level}, ${streak}-day streak.
-Remaining habits today: ${questsRemaining.slice(0, 3).join(', ') || 'All habits completed!'}
-Pending tasks: ${tasksRemaining.slice(0, 3).join(', ') || 'No urgent tasks!'}
+Remaining habits today: ${questsRemaining.slice(0, 4).join(', ') || 'All habits completed!'}
+Pending tasks: ${tasksRemaining.slice(0, 4).join(', ') || 'No urgent tasks!'}
+${activeRoleGuidance}
 ${permissionGuidance}
-Personality: Ultra fast, multimodal-ready, Google Calendar and schedule alignment expert. Give concise, highly actionable, encouraging coaching (max 3 short paragraphs).`;
+Personality: High craft, intelligent, concise, and highly actionable (max 2-3 structured paragraphs or bullet points). Maintain conversational continuity across multi-turn exchanges.`;
 
         // Configure tools strictly according to permission level
         const tools: any[] = [];
         if (activePermission === 'read_edit') {
-          // Both read and mutation tools are enabled
           tools.push({
             functionDeclarations: [
               createCalendarEventDeclaration,
@@ -187,22 +207,79 @@ Personality: Ultra fast, multimodal-ready, Google Calendar and schedule alignmen
             ],
           });
         } else if (activePermission === 'read_only') {
-          // Strictly read-only tool, mutation tools are excluded
           tools.push({
             functionDeclarations: [readCalendarEventsDeclaration],
           });
         }
 
-        const requestConfig: any = {};
+        const requestConfig: any = {
+          systemInstruction,
+        };
         if (tools.length > 0) {
           requestConfig.tools = tools;
         }
 
-        const response = await gemini.models.generateContent({
-          model: 'gemini-3.8-flash',
-          contents: `${systemPrompt}\n\nUser Question: ${message}`,
-          config: requestConfig,
+        // Build multi-turn conversation thread for Gemini API
+        const contents: any[] = [];
+        if (Array.isArray(req.history) && req.history.length > 0) {
+          // Keep up to last 16 turns for focused context
+          const recentHistory = req.history.slice(-16);
+          for (const item of recentHistory) {
+            if (item.text && item.text.trim()) {
+              contents.push({
+                role: item.role === 'user' ? 'user' : 'model',
+                parts: [{ text: item.text.trim() }],
+              });
+            }
+          }
+        }
+        // Current user message
+        contents.push({
+          role: 'user',
+          parts: [{ text: message.trim() }],
         });
+
+        let response: any = null;
+        let actualModelUsed = requestedModel;
+        let noticeNote = '';
+
+        try {
+          response = await gemini.models.generateContent({
+            model: requestedModel,
+            contents,
+            config: requestConfig,
+          });
+        } catch (initialModelErr: any) {
+          console.warn(`Gemini generation with ${requestedModel} failed:`, initialModelErr?.message);
+          // Resilient failover: If requested model is under high demand (503) or hits quota (429), failover to gemini-3.1-flash-lite or gemini-3.5-flash
+          const fallbackModel: GeminiModelOptionId = requestedModel === 'gemini-3.1-flash-lite' ? 'gemini-3.5-flash' : 'gemini-3.1-flash-lite';
+          try {
+            response = await gemini.models.generateContent({
+              model: fallbackModel,
+              contents,
+              config: requestConfig,
+            });
+            actualModelUsed = fallbackModel;
+            if (requestedModel === 'gemini-3.1-pro-preview') {
+              noticeNote = '\n\n*(Served via Gemini 3.1 Flash Lite while Pro Preview free-tier quota is cooling down)*';
+            } else if (requestedModel === 'gemini-3.5-flash') {
+              noticeNote = '\n\n*(Served via Gemini 3.1 Flash Lite during a temporary 3.5 Flash demand spike)*';
+            }
+          } catch (fallbackErr: any) {
+            // If tools caused schema issue on fallback, retry without tools
+            if (requestConfig.tools) {
+              const strippedConfig = { systemInstruction };
+              response = await gemini.models.generateContent({
+                model: 'gemini-3.1-flash-lite',
+                contents,
+                config: strippedConfig,
+              });
+              actualModelUsed = 'gemini-3.1-flash-lite';
+            } else {
+              throw fallbackErr;
+            }
+          }
+        }
 
         // Handle tool calls if returned by Gemini
         const functionCalls = response.functionCalls;
@@ -217,7 +294,9 @@ Personality: Ultra fast, multimodal-ready, Google Calendar and schedule alignmen
                 text: '⚠️ **Permission Denied**: Google Calendar access is set to **Read only**. To allow me to schedule and create calendar events, please switch permission to **Read & edit** in the **AI Integration** settings.',
                 timestamp: timeStr,
                 agentId: 'gemini',
-                agentName: agent.modelTier || 'Gemini 3.8 Flash',
+                agentName: activeModelName,
+                geminiModel: actualModelUsed,
+                role: requestedRole,
                 calendarAction: {
                   action: 'permission_denied',
                   details: 'Calendar permission is Read only.',
@@ -232,7 +311,7 @@ Personality: Ultra fast, multimodal-ready, Google Calendar and schedule alignmen
               startTime: args.startTime || '09:00 AM',
               endTime: args.endTime || '10:00 AM',
               category: args.category || 'workout',
-              description: args.description || 'Scheduled by AI Coach',
+              description: args.description || `Scheduled by ${activeModelName}`,
               priority: args.priority || 'medium',
               color: args.category === 'study' ? '#3B82F6' : args.category === 'project' ? '#10B981' : '#F43F5E',
             });
@@ -243,7 +322,9 @@ Personality: Ultra fast, multimodal-ready, Google Calendar and schedule alignmen
               text: `📅 **Event Created**: I added **${newEvt.title}** to your calendar on **${newEvt.date}** at **${newEvt.startTime}**.\n\nYour schedule has been aligned with your habits and productivity targets!`,
               timestamp: timeStr,
               agentId: 'gemini',
-              agentName: agent.modelTier || 'Gemini 3.8 Flash',
+              agentName: activeModelName,
+              geminiModel: actualModelUsed,
+              role: requestedRole,
               calendarAction: {
                 action: 'created',
                 eventTitle: newEvt.title,
@@ -267,7 +348,9 @@ Personality: Ultra fast, multimodal-ready, Google Calendar and schedule alignmen
                 text: '⚠️ **Permission Denied**: Google Calendar access is currently set to **Read only**. Please enable **Read & edit** in **AI Integration** settings to reschedule events.',
                 timestamp: timeStr,
                 agentId: 'gemini',
-                agentName: agent.modelTier || 'Gemini 3.8 Flash',
+                agentName: activeModelName,
+                geminiModel: actualModelUsed,
+                role: requestedRole,
                 calendarAction: {
                   action: 'permission_denied',
                   details: 'Calendar permission is Read only.',
@@ -292,7 +375,9 @@ Personality: Ultra fast, multimodal-ready, Google Calendar and schedule alignmen
                 text: `🕒 **Event Rescheduled**: I moved **${target.title}** to **${updated?.date}** at **${updated?.startTime}**.`,
                 timestamp: timeStr,
                 agentId: 'gemini',
-                agentName: agent.modelTier || 'Gemini 3.8 Flash',
+                agentName: activeModelName,
+                geminiModel: actualModelUsed,
+                role: requestedRole,
                 calendarAction: {
                   action: 'rescheduled',
                   eventTitle: target.title,
@@ -311,7 +396,9 @@ Personality: Ultra fast, multimodal-ready, Google Calendar and schedule alignmen
                 text: '⚠️ **Permission Denied**: Google Calendar access is currently set to **Read only**. Please enable **Read & edit** in **AI Integration** settings to delete events.',
                 timestamp: timeStr,
                 agentId: 'gemini',
-                agentName: agent.modelTier || 'Gemini 3.8 Flash',
+                agentName: activeModelName,
+                geminiModel: actualModelUsed,
+                role: requestedRole,
                 calendarAction: {
                   action: 'permission_denied',
                   details: 'Calendar permission is Read only.',
@@ -331,7 +418,9 @@ Personality: Ultra fast, multimodal-ready, Google Calendar and schedule alignmen
                 text: `🗑️ **Event Removed**: I deleted **${target.title}** from your calendar schedule.`,
                 timestamp: timeStr,
                 agentId: 'gemini',
-                agentName: agent.modelTier || 'Gemini 3.8 Flash',
+                agentName: activeModelName,
+                geminiModel: actualModelUsed,
+                role: requestedRole,
                 calendarAction: {
                   action: 'deleted',
                   eventTitle: target.title,
@@ -341,7 +430,7 @@ Personality: Ultra fast, multimodal-ready, Google Calendar and schedule alignmen
           }
         }
 
-        const replyText = response.text || 'I analyzed your schedule and habits. Keep maintaining your momentum!';
+        const replyText = (response.text || 'I analyzed your schedule and habits. Keep maintaining your momentum!') + noticeNote;
 
         return {
           id: `gemini-msg-${Date.now()}`,
@@ -349,7 +438,9 @@ Personality: Ultra fast, multimodal-ready, Google Calendar and schedule alignmen
           text: replyText,
           timestamp: timeStr,
           agentId: 'gemini',
-          agentName: agent.modelTier || 'Gemini 3.8 Flash',
+          agentName: activeModelName,
+          geminiModel: actualModelUsed,
+          role: requestedRole,
           suggestions: [
             'How can I optimize my calendar today?',
             'What should I tackle next for max XP?',
@@ -366,8 +457,17 @@ Personality: Ultra fast, multimodal-ready, Google Calendar and schedule alignmen
       }
     }
 
-    // Built-in Gemini 3.8 Flash Persona Response
-    return generateGeminiFallback(message, streak, questsRemaining, timeStr, agent.modelTier || 'Gemini 3.8 Flash', activePermission);
+    // Built-in Gemini Persona Response with model & role awareness
+    return generateGeminiFallback(
+      message, 
+      streak, 
+      questsRemaining, 
+      timeStr, 
+      activeModelName, 
+      activePermission,
+      requestedModel,
+      requestedRole
+    );
   }
 
   // 2. CHATGPT AGENT (OpenAI GPT-4o Persona)
@@ -604,9 +704,19 @@ function generateGeminiFallback(
   quests: string[],
   timestamp: string,
   modelTier: string,
-  permission: CalendarPermissionLevel
+  permission: CalendarPermissionLevel,
+  geminiModel?: string,
+  role?: string
 ): CoachChatMessage {
   const lower = userText.toLowerCase();
+
+  const roleTag = role === 'strict_drill_sergeant' 
+    ? '⚡ Drill Sergeant Accountability'
+    : role === 'calendar_strategist'
+    ? '📅 Calendar Strategist Brief'
+    : role === 'habit_architect'
+    ? '🧠 Habit Architecture Protocol'
+    : '🎯 Productivity Coach Guidance';
 
   if (lower.includes('schedule') || lower.includes('calendar') || lower.includes('time') || lower.includes('plan')) {
     const permNote = permission === 'read_edit' 
@@ -616,10 +726,12 @@ function generateGeminiFallback(
     return {
       id: `gemini-${Date.now()}`,
       sender: 'coach',
-      text: `⚡ **${modelTier} Calendar Optimization**: I synced your schedule and current habit queue. You have a ${streak}-day streak active. Based on your energy levels, protect the 2:00 PM to 4:30 PM window for deep focus.\n\n*${permNote}*`,
+      text: `⚡ **${modelTier} • ${roleTag}**:\n\nI synced your schedule and current habit queue. You have a ${streak}-day streak active. Based on your energy levels, protect the 2:00 PM to 4:30 PM window for deep focus.\n\n*${permNote}*`,
       timestamp,
       agentId: 'gemini',
       agentName: modelTier,
+      geminiModel: geminiModel || 'gemini-3.5-flash',
+      role: role || 'general_coach',
       suggestions: ['Schedule a workout tomorrow at 7am', 'Check calendar conflicts', 'Set 45-min focus block'],
       actionRecommendation: {
         title: 'Deep Focus Sprint (45m)',
@@ -632,10 +744,12 @@ function generateGeminiFallback(
   return {
     id: `gemini-${Date.now()}`,
     sender: 'coach',
-    text: `⚡ **${modelTier} Analysis**: I evaluated your daily progression. You have ${quests.length} pending habits today (${quests.slice(0, 2).join(', ') || 'great progress!'}). Doing the smallest habit first will trigger dopamine momentum to finish the rest effortlessly.`,
+    text: `⚡ **${modelTier} • ${roleTag}**:\n\nI evaluated your daily progression. You have ${quests.length} pending habits today (${quests.slice(0, 2).join(', ') || 'great progress!'}). Doing the smallest habit first will trigger dopamine momentum to finish the rest effortlessly.`,
     timestamp,
     agentId: 'gemini',
     agentName: modelTier,
+    geminiModel: geminiModel || 'gemini-3.5-flash',
+    role: role || 'general_coach',
     suggestions: ['Break down my next task', 'Optimize my evening routine', 'Show streak statistics'],
     actionRecommendation: {
       title: 'Review Today\'s Habit Queue',

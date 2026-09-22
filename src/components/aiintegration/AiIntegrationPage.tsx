@@ -33,6 +33,7 @@ interface AiIntegrationPageProps {
   onConnectSubmit?: (agentId: string, details: any) => Promise<void>;
   onDisconnectModel?: (agentId: string) => Promise<void>;
   onSyncModels?: () => void;
+  onUpdateGeminiConfig?: (params: { modelOption?: string; role?: string }) => void;
   isSyncing?: boolean;
   lastSyncedTime?: string | null;
   userEmail?: string;
@@ -47,6 +48,7 @@ export const AiIntegrationPage: React.FC<AiIntegrationPageProps> = ({
   onConnectSubmit: propOnConnectSubmit,
   onDisconnectModel: propOnDisconnectModel,
   onSyncModels: propOnSyncModels,
+  onUpdateGeminiConfig: propOnUpdateGeminiConfig,
   isSyncing = false,
   lastSyncedTime,
   userEmail = 'iitangaming18@gmail.com',
@@ -189,6 +191,19 @@ export const AiIntegrationPage: React.FC<AiIntegrationPageProps> = ({
     }
   };
 
+  const handleUpdateGeminiConfig = async (params: { modelOption?: string; role?: string }) => {
+    if (propOnUpdateGeminiConfig) {
+      propOnUpdateGeminiConfig(params);
+      return;
+    }
+    try {
+      const updated = await api.updateGeminiConfig(params);
+      setLocalModels(updated);
+    } catch (err) {
+      console.error('Failed to update Gemini config in integration page:', err);
+    }
+  };
+
   const handlePermissionChange = async (perm: CalendarPermissionLevel) => {
     setCalendarState((prev) => ({
       ...prev,
@@ -317,6 +332,7 @@ export const AiIntegrationPage: React.FC<AiIntegrationPageProps> = ({
           onManageModel={handleManageModel}
           onOpenCompare={() => setIsCompareOpen(true)}
           onSyncModels={propOnSyncModels}
+          onUpdateGeminiConfig={handleUpdateGeminiConfig}
           isSyncing={isSyncing}
           lastSyncedTime={lastSyncedTime}
         />

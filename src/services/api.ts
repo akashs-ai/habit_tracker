@@ -2209,6 +2209,8 @@ export const api = {
 
   async sendAIChat(params: {
     modelId: string;
+    geminiModel?: string;
+    role?: string;
     message: string;
     history?: any[];
     calendarPermission?: CalendarPermissionLevel;
@@ -2221,6 +2223,20 @@ export const api = {
     });
     const json = await safeResponseJson(res, 'Failed to send message to AI agent');
     if (!res.ok || !json.success) throw new Error(json.error || 'Failed to send message to AI agent');
+    return json.data;
+  },
+
+  async updateGeminiConfig(params: {
+    modelOption?: string;
+    role?: string;
+  }): Promise<AIIntegrationModel[]> {
+    const res = await authFetch('/api/ai/gemini-config', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(params),
+    });
+    const json = await safeResponseJson(res, 'Failed to update Gemini settings');
+    if (!res.ok || !json.success) throw new Error(json.error || 'Failed to update Gemini settings');
     return json.data;
   },
 

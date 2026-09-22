@@ -58,13 +58,23 @@ export const AiCoachPage: React.FC<AiCoachPageProps> = ({
   const [localAgents, setLocalAgents] = useState<AIIntegrationModel[]>(initialAIModels);
   const agents = propAgents && propAgents.length > 0 ? propAgents : localAgents;
 
-  const [selectedModelId, setSelectedModelId] = useState<string>('chatgpt');
+  // Gemini is the default chatbot as requested
+  const [selectedModelId, setSelectedModelId] = useState<string>('gemini');
+  const [selectedGeminiModel, setSelectedGeminiModel] = useState<string>('gemini-3.5-flash');
+  const [selectedRole, setSelectedRole] = useState<string>('general_coach');
   const [connectingAgent, setConnectingAgent] = useState<AIIntegrationModel | null>(null);
   const [isGenerating, setIsGenerating] = useState<boolean>(false);
 
   useEffect(() => {
     if (propAgents && propAgents.length > 0) {
-      const active = propAgents.find((a) => a.selected) || propAgents.find((a) => a.status === 'connected') || propAgents[0];
+      const geminiAgent = propAgents.find((a) => a.id === 'gemini');
+      if (geminiAgent?.selectedGeminiModel) {
+        setSelectedGeminiModel(geminiAgent.selectedGeminiModel);
+      }
+      if (geminiAgent?.selectedRole) {
+        setSelectedRole(geminiAgent.selectedRole);
+      }
+      const active = propAgents.find((a) => a.selected) || geminiAgent || propAgents.find((a) => a.status === 'connected') || propAgents[0];
       if (active) {
         setSelectedModelId(active.id);
       }
@@ -76,7 +86,14 @@ export const AiCoachPage: React.FC<AiCoachPageProps> = ({
       .then((loaded) => {
         if (!isMounted) return;
         setLocalAgents(loaded);
-        const active = loaded.find((a) => a.selected) || loaded.find((a) => a.status === 'connected') || loaded[0];
+        const geminiAgent = loaded.find((a) => a.id === 'gemini');
+        if (geminiAgent?.selectedGeminiModel) {
+          setSelectedGeminiModel(geminiAgent.selectedGeminiModel);
+        }
+        if (geminiAgent?.selectedRole) {
+          setSelectedRole(geminiAgent.selectedRole);
+        }
+        const active = loaded.find((a) => a.selected) || geminiAgent || loaded.find((a) => a.status === 'connected') || loaded[0];
         if (active) {
           setSelectedModelId(active.id);
         }
@@ -100,6 +117,32 @@ export const AiCoachPage: React.FC<AiCoachPageProps> = ({
       setLocalAgents(updated);
     } catch (err) {
       console.error('Failed to select AI agent:', err);
+    }
+  };
+
+  const handleChangeGeminiModel = async (modelKey: string) => {
+    setSelectedGeminiModel(modelKey);
+    try {
+      const updated = await api.updateGeminiConfig({ modelOption: modelKey });
+      setLocalAgents(updated);
+      if (propOnSyncModels) {
+        propOnSyncModels();
+      }
+    } catch (err) {
+      console.error('Failed to update Gemini model in coach:', err);
+    }
+  };
+
+  const handleChangeRole = async (roleKey: string) => {
+    setSelectedRole(roleKey);
+    try {
+      const updated = await api.updateGeminiConfig({ role: roleKey });
+      setLocalAgents(updated);
+      if (propOnSyncModels) {
+        propOnSyncModels();
+      }
+    } catch (err) {
+      console.error('Failed to update Gemini role in coach:', err);
     }
   };
 
@@ -133,9 +176,18 @@ export const AiCoachPage: React.FC<AiCoachPageProps> = ({
     setIsGenerating(true);
 
     try {
+      // Build multi-turn conversational history for Gemini
+      const conversationHistory = messages.slice(-12).map((m) => ({
+        role: (m.sender === 'user' ? 'user' : 'model') as 'user' | 'model',
+        text: m.text,
+      }));
+
       const reply = await api.sendAIChat({
         modelId: selectedModelId,
+        geminiModel: selectedGeminiModel,
+        role: selectedRole,
         message: userText,
+        history: conversationHistory,
       });
       setMessages((prev) => [...prev, reply]);
     } catch (err: any) {
@@ -298,6 +350,10 @@ export const AiCoachPage: React.FC<AiCoachPageProps> = ({
                 isSyncingModels={isSyncingModels}
                 lastSyncedTime={lastSyncedTime}
                 userEmail={userEmail}
+                selectedGeminiModel={selectedGeminiModel}
+                onChangeGeminiModel={handleChangeGeminiModel}
+                selectedRole={selectedRole}
+                onChangeRole={handleChangeRole}
               />
             </div>
           </div>
@@ -326,6 +382,10 @@ export const AiCoachPage: React.FC<AiCoachPageProps> = ({
               isSyncingModels={isSyncingModels}
               lastSyncedTime={lastSyncedTime}
               userEmail={userEmail}
+              selectedGeminiModel={selectedGeminiModel}
+              onChangeGeminiModel={handleChangeGeminiModel}
+              selectedRole={selectedRole}
+              onChangeRole={handleChangeRole}
             />
           </div>
         </div>

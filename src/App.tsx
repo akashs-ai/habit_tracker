@@ -351,6 +351,15 @@ export default function App() {
     }
   };
 
+  const handleUpdateGeminiConfig = async (params: { modelOption?: string; role?: string }) => {
+    try {
+      const updated = await api.updateGeminiConfig(params);
+      setAiAgents(updated);
+    } catch (err) {
+      console.error('Failed to update Gemini configuration in App:', err);
+    }
+  };
+
   // Auth Action Handlers
   const handleOpenAuth = (screen: AuthScreenType = 'login') => {
     setAuthModalScreen(screen);
@@ -1810,6 +1819,7 @@ export default function App() {
           onConnectSubmit={handleConnectAISubmit}
           onDisconnectModel={handleDisconnectAI}
           onSyncModels={handleSyncAIModels}
+          onUpdateGeminiConfig={handleUpdateGeminiConfig}
           isSyncing={isSyncingAI}
           lastSyncedTime={aiLastSyncedTime}
           userEmail={currentUser?.email || user.email || ''}

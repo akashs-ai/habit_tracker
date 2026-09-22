@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
-import { Bot, Check, ArrowRight, Loader2, RefreshCw, Zap, ShieldCheck, CheckCircle2, AlertCircle } from 'lucide-react';
-import { AIIntegrationModel } from '../../types';
+import { Bot, Check, ArrowRight, Loader2, RefreshCw, Zap, ShieldCheck, CheckCircle2, AlertCircle, Sparkles, Cpu, Sliders } from 'lucide-react';
+import { AIIntegrationModel, GeminiModelOption, CoachRoleOption } from '../../types';
 import { ChatGPTLogo, ClaudeLogo, GeminiLogo } from './ModelLogos';
 import { initialAIModels } from '../../data/aiIntegrationMockData';
+import { api } from '../../services/api';
 
 interface AIModelsSectionProps {
   models: AIIntegrationModel[];
@@ -11,6 +12,7 @@ interface AIModelsSectionProps {
   onManageModel: (id: string) => void;
   onOpenCompare: () => void;
   onSyncModels?: () => void;
+  onUpdateGeminiConfig?: (params: { modelOption?: string; role?: string }) => void;
   isSyncing?: boolean;
   lastSyncedTime?: string | null;
 }
@@ -22,12 +24,65 @@ export const AIModelsSection: React.FC<AIModelsSectionProps> = ({
   onManageModel,
   onOpenCompare,
   onSyncModels,
+  onUpdateGeminiConfig,
   isSyncing = false,
   lastSyncedTime,
 }) => {
   const [connectingId, setConnectingId] = useState<string | null>(null);
   const [localChecking, setLocalChecking] = useState(false);
   const [connectionCheckBanner, setConnectionCheckBanner] = useState<string | null>(null);
+  const [activeGeminiModel, setActiveGeminiModel] = useState<string>('gemini-3.5-flash');
+  const [activeGeminiRole, setActiveGeminiRole] = useState<string>('general_coach');
+  const [isUpdatingModel, setIsUpdatingModel] = useState<boolean>(false);
+  const [modelUpdateFeedback, setModelUpdateFeedback] = useState<string | null>(null);
+
+  // Sync state if models contain selectedGeminiModel
+  React.useEffect(() => {
+    const gemini = models?.find((m) => m.id === 'gemini');
+    if (gemini?.selectedGeminiModel) {
+      setActiveGeminiModel(gemini.selectedGeminiModel);
+    }
+    if (gemini?.selectedRole) {
+      setActiveGeminiRole(gemini.selectedRole);
+    }
+  }, [models]);
+
+  const handleToggleGeminiModel = async (e: React.MouseEvent, modelKey: string) => {
+    e.stopPropagation();
+    setActiveGeminiModel(modelKey);
+    setIsUpdatingModel(true);
+    try {
+      if (onUpdateGeminiConfig) {
+        await onUpdateGeminiConfig({ modelOption: modelKey });
+      } else {
+        await api.updateGeminiConfig({ modelOption: modelKey });
+      }
+      const label = modelKey === 'gemini-3.1-pro-preview' ? 'Gemini 3.1 Pro Preview' : modelKey === 'gemini-3.1-flash-lite' ? 'Gemini 3.1 Flash Lite' : 'Gemini 3.5 Flash';
+      setModelUpdateFeedback(`Active Model: ${label}`);
+      setTimeout(() => setModelUpdateFeedback(null), 3000);
+    } catch (err) {
+      console.error('Failed to update Gemini model option:', err);
+    } finally {
+      setIsUpdatingModel(false);
+    }
+  };
+
+  const handleToggleGeminiRole = async (e: React.MouseEvent, roleKey: string) => {
+    e.stopPropagation();
+    setActiveGeminiRole(roleKey);
+    try {
+      if (onUpdateGeminiConfig) {
+        await onUpdateGeminiConfig({ role: roleKey });
+      } else {
+        await api.updateGeminiConfig({ role: roleKey });
+      }
+      const roleName = roleKey === 'strict_drill_sergeant' ? 'Drill Sergeant' : roleKey === 'calendar_strategist' ? 'Calendar Strategist' : roleKey === 'habit_architect' ? 'Habit Architect' : 'General Coach';
+      setModelUpdateFeedback(`Persona: ${roleName}`);
+      setTimeout(() => setModelUpdateFeedback(null), 3000);
+    } catch (err) {
+      console.error('Failed to update Gemini role option:', err);
+    }
+  };
 
   // GUARANTEE: The 3 model cards (ChatGPT, Claude, Gemini) will be there for all time
   const displayModels: AIIntegrationModel[] = initialAIModels.map((baseModel) => {
@@ -186,13 +241,21 @@ export const AIModelsSection: React.FC<AIModelsSectionProps> = ({
                   : 'bg-[#101722] border border-white/[0.08] hover:border-white/20 hover:-translate-y-0.5 hover:shadow-md'
               }`}
             >
-              {/* Selected Checkmark Badge */}
-              {isSelected && (
-                <div className="absolute top-4 right-4 flex items-center gap-1 px-2 py-0.5 rounded-full bg-[#5B5CE2] text-white text-[10px] font-bold shadow-sm ring-2 ring-[#101722]">
-                  <Check className="w-3 h-3 stroke-[3]" />
-                  <span>ACTIVE COACH</span>
-                </div>
-              )}
+              {/* Selected / Default Checkmark Badge */}
+              <div className="absolute top-4 right-4 flex items-center gap-1.5 flex-wrap justify-end">
+                {model.id === 'gemini' && (
+                  <div className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-[#818CF8]/20 text-[#A5B4FC] border border-[#818CF8]/30 text-[10px] font-bold shadow-sm">
+                    <Sparkles className="w-3 h-3 text-[#F59E0B]" />
+                    <span>DEFAULT CHATBOT</span>
+                  </div>
+                )}
+                {isSelected && (
+                  <div className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-[#5B5CE2] text-white text-[10px] font-bold shadow-sm ring-2 ring-[#101722]">
+                    <Check className="w-3 h-3 stroke-[3]" />
+                    <span>ACTIVE COACH</span>
+                  </div>
+                )}
+              </div>
 
               <div>
                 {/* Top Row: Icon + Name + Status */}
@@ -203,11 +266,15 @@ export const AIModelsSection: React.FC<AIModelsSectionProps> = ({
                       <h3 className="text-base font-bold text-[#F5F7FB] truncate">
                         {model.name}
                       </h3>
-                      {model.modelTier && (
+                      {model.id === 'gemini' ? (
+                        <span className="text-[10px] px-2 py-0.5 rounded-full bg-[#6366F1]/20 text-[#A5B4FC] border border-[#6366F1]/30 font-semibold">
+                          {activeGeminiModel === 'gemini-3.1-pro-preview' ? '3.1 Pro' : activeGeminiModel === 'gemini-3.1-flash-lite' ? '3.1 Lite' : '3.5 Flash'}
+                        </span>
+                      ) : model.modelTier ? (
                         <span className="text-[10px] px-1.5 py-0.2 rounded bg-white/[0.06] text-[#94A3B8] border border-white/[0.05]">
                           {model.modelTier.split(' ')[0]}
                         </span>
-                      )}
+                      ) : null}
                     </div>
                     <div className="flex items-center gap-2 mt-0.5">
                       <div className="flex items-center gap-1.5">
@@ -256,7 +323,7 @@ export const AIModelsSection: React.FC<AIModelsSectionProps> = ({
                 </p>
 
                 {/* Capability Chips */}
-                <div className="flex flex-wrap gap-2 mb-5">
+                <div className="flex flex-wrap gap-2 mb-4">
                   {model.tags.map((tag) => (
                     <span
                       key={tag}
@@ -266,6 +333,106 @@ export const AIModelsSection: React.FC<AIModelsSectionProps> = ({
                     </span>
                   ))}
                 </div>
+
+                {/* SPECIAL: Gemini Dynamic Model Toggle Section */}
+                {model.id === 'gemini' && (
+                  <div className="mb-5 p-3 rounded-xl bg-[#141D2A]/90 border border-[#6366F1]/30 flex flex-col gap-2.5 shadow-inner" onClick={(e) => e.stopPropagation()}>
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-1.5 text-xs font-bold text-[#F5F7FB]">
+                        <Cpu className="w-3.5 h-3.5 text-[#818CF8]" />
+                        <span>Toggle Gemini Model</span>
+                      </div>
+                      {modelUpdateFeedback ? (
+                        <span className="text-[10px] text-[#34D399] font-semibold animate-pulse">
+                          {modelUpdateFeedback}
+                        </span>
+                      ) : (
+                        <span className="text-[10px] text-[#94A3B8]">
+                          {activeGeminiModel === 'gemini-3.5-flash' ? 'General Tasks' : activeGeminiModel === 'gemini-3.1-flash-lite' ? 'Fast Check-ins' : 'Complex Tasks'}
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Model Option Buttons */}
+                    <div className="grid grid-cols-3 gap-1.5">
+                      <button
+                        type="button"
+                        onClick={(e) => handleToggleGeminiModel(e, 'gemini-3.5-flash')}
+                        className={`p-1.5 rounded-lg text-[11px] font-semibold flex flex-col items-center justify-center text-center transition-all cursor-pointer ${
+                          activeGeminiModel === 'gemini-3.5-flash'
+                            ? 'bg-[#6366F1] text-white shadow-sm ring-1 ring-[#818CF8]'
+                            : 'bg-white/[0.04] text-[#94A3B8] hover:text-white hover:bg-white/[0.08] border border-white/[0.06]'
+                        }`}
+                        title="gemini-3.5-flash: Balanced multimodal model for general tasks (Default)"
+                      >
+                        <span className="truncate w-full">3.5 Flash</span>
+                        <span className="text-[9px] opacity-75 truncate w-full">Default</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={(e) => handleToggleGeminiModel(e, 'gemini-3.1-flash-lite')}
+                        className={`p-1.5 rounded-lg text-[11px] font-semibold flex flex-col items-center justify-center text-center transition-all cursor-pointer ${
+                          activeGeminiModel === 'gemini-3.1-flash-lite'
+                            ? 'bg-[#6366F1] text-white shadow-sm ring-1 ring-[#818CF8]'
+                            : 'bg-white/[0.04] text-[#94A3B8] hover:text-white hover:bg-white/[0.08] border border-white/[0.06]'
+                        }`}
+                        title="gemini-3.1-flash-lite: Fast, lightweight tasks and quick responses"
+                      >
+                        <span className="truncate w-full">3.1 Lite</span>
+                        <span className="text-[9px] opacity-75 truncate w-full">Fast Tasks</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={(e) => handleToggleGeminiModel(e, 'gemini-3.1-pro-preview')}
+                        className={`p-1.5 rounded-lg text-[11px] font-semibold flex flex-col items-center justify-center text-center transition-all cursor-pointer ${
+                          activeGeminiModel === 'gemini-3.1-pro-preview'
+                            ? 'bg-[#6366F1] text-white shadow-sm ring-1 ring-[#818CF8]'
+                            : 'bg-white/[0.04] text-[#94A3B8] hover:text-white hover:bg-white/[0.08] border border-white/[0.06]'
+                        }`}
+                        title="gemini-3.1-pro-preview: Deep reasoning and complex tasks"
+                      >
+                        <span className="truncate w-full">3.1 Pro</span>
+                        <span className="text-[9px] opacity-75 truncate w-full">Complex</span>
+                      </button>
+                    </div>
+
+                    {/* Persona Toggle Row */}
+                    <div className="pt-1.5 border-t border-white/[0.06]">
+                      <div className="flex items-center justify-between mb-1.5">
+                        <span className="text-[10px] font-medium text-[#94A3B8] flex items-center gap-1">
+                          <Sliders className="w-3 h-3 text-[#818CF8]" />
+                          Coaching Persona:
+                        </span>
+                        <span className="text-[10px] text-[#CBD5E1] font-semibold">
+                          {activeGeminiRole === 'strict_drill_sergeant' ? 'Drill Sergeant' : activeGeminiRole === 'calendar_strategist' ? 'Calendar Strategist' : activeGeminiRole === 'habit_architect' ? 'Habit Architect' : 'General Coach'}
+                        </span>
+                      </div>
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-1">
+                        {[
+                          { id: 'general_coach', label: 'General' },
+                          { id: 'strict_drill_sergeant', label: 'Drill Sgt' },
+                          { id: 'calendar_strategist', label: 'Schedule' },
+                          { id: 'habit_architect', label: 'Habit Arc' }
+                        ].map((roleItem) => (
+                          <button
+                            key={roleItem.id}
+                            type="button"
+                            onClick={(e) => handleToggleGeminiRole(e, roleItem.id)}
+                            className={`px-1.5 py-1 rounded text-[10px] font-medium transition-colors truncate ${
+                              activeGeminiRole === roleItem.id
+                                ? 'bg-[#818CF8]/25 text-[#A5B4FC] border border-[#818CF8]/40'
+                                : 'bg-white/[0.03] text-[#64748B] hover:text-[#CBD5E1]'
+                            }`}
+                          >
+                            {roleItem.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* Bottom Action Button */}

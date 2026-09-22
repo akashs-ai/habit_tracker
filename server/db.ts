@@ -259,10 +259,27 @@ export interface AppStoreData {
 
 export const defaultAIAgents: AIIntegrationModel[] = [
   {
+    id: 'gemini',
+    name: 'Gemini',
+    status: 'connected',
+    selected: true,
+    description: 'Official Google Gemini Chatbot with multi-turn memory, model toggling, and calendar sync.',
+    tags: ['Default Coach', 'Multi-turn Chat', 'Model Toggling', 'Google Sync'],
+    iconType: 'gemini',
+    accountEmail: 'user@google.ai',
+    connectedAt: new Date().toISOString(),
+    modelTier: 'Gemini 3.5 Flash',
+    selectedGeminiModel: 'gemini-3.5-flash',
+    selectedRole: 'general_coach',
+    verified: true,
+    latencyMs: 110,
+    isEnvironmentKeyConfigured: true,
+  },
+  {
     id: 'chatgpt',
     name: 'ChatGPT',
     status: 'connected',
-    selected: true,
+    selected: false,
     description: 'Great for general productivity, explanations and daily task breakdown.',
     tags: ['Fast', 'Versatile', 'Popular'],
     iconType: 'chatgpt',
@@ -270,6 +287,7 @@ export const defaultAIAgents: AIIntegrationModel[] = [
     connectedAt: new Date().toISOString(),
     modelTier: 'GPT-4o (Omni)',
     verified: true,
+    latencyMs: 195,
   },
   {
     id: 'claude',
@@ -280,16 +298,7 @@ export const defaultAIAgents: AIIntegrationModel[] = [
     tags: ['Thoughtful', 'Detailed', 'Safe'],
     iconType: 'claude',
     modelTier: 'Claude 3.5 Sonnet',
-  },
-  {
-    id: 'gemini',
-    name: 'Gemini',
-    status: 'not_connected',
-    selected: false,
-    description: 'Best with Google ecosystem, real-time schedule alignment, and rapid planning.',
-    tags: ['Real-time', 'Integrated', 'Multimodal'],
-    iconType: 'gemini',
-    modelTier: 'Gemini 3.8 Flash',
+    latencyMs: 280,
   },
 ];
 
@@ -1710,13 +1719,31 @@ class LifeRpgDatabase {
             };
           });
 
+          // Ensure Gemini is connected, verified, and configured with default model and role
+          const geminiAgent = parsed.aiAgents.find((a: any) => a.id === 'gemini');
+          if (geminiAgent) {
+            geminiAgent.status = 'connected';
+            geminiAgent.verified = true;
+            geminiAgent.modelTier = geminiAgent.modelTier || 'Gemini 3.5 Flash';
+            geminiAgent.selectedGeminiModel = geminiAgent.selectedGeminiModel || 'gemini-3.5-flash';
+            geminiAgent.selectedRole = geminiAgent.selectedRole || 'general_coach';
+            geminiAgent.isEnvironmentKeyConfigured = Boolean(process.env.GEMINI_API_KEY);
+            // If chatgpt was previously selected by old default, switch default to gemini
+            const currentSelected = parsed.aiAgents.find((a: any) => a.selected);
+            if (!currentSelected || currentSelected.id === 'chatgpt') {
+              parsed.aiAgents.forEach((a: any) => {
+                a.selected = a.id === 'gemini';
+              });
+            }
+          }
+
           const anyConnected = parsed.aiAgents.some((a: any) => a.status === 'connected' && a.verified);
           if (!anyConnected && parsed.aiAgents.length > 0) {
             parsed.aiAgents[0].status = 'connected';
             parsed.aiAgents[0].verified = true;
             parsed.aiAgents[0].selected = true;
-            parsed.aiAgents[0].accountEmail = parsed.aiAgents[0].accountEmail || 'alex.das@openai.user';
-            parsed.aiAgents[0].modelTier = parsed.aiAgents[0].modelTier || 'GPT-4o (Omni)';
+            parsed.aiAgents[0].accountEmail = parsed.aiAgents[0].accountEmail || 'user@google.ai';
+            parsed.aiAgents[0].modelTier = parsed.aiAgents[0].modelTier || 'Gemini 3.5 Flash';
           }
         }
 
@@ -2694,6 +2721,27 @@ class LifeRpgDatabase {
     return agents;
   }
 
+  updateGeminiConfig(updates: { modelOption?: string; role?: string }): AIIntegrationModel[] {
+    const agents = this.getAIAgents();
+    const gemini = agents.find((a) => a.id === 'gemini');
+    if (gemini) {
+      if (updates.modelOption) {
+        gemini.selectedGeminiModel = updates.modelOption as any;
+        const tierName = updates.modelOption === 'gemini-3.1-flash-lite'
+          ? 'Gemini 3.1 Flash Lite'
+          : updates.modelOption === 'gemini-3.1-pro-preview'
+          ? 'Gemini 3.1 Pro Preview'
+          : 'Gemini 3.5 Flash';
+        gemini.modelTier = tierName;
+      }
+      if (updates.role) {
+        gemini.selectedRole = updates.role as any;
+      }
+      this.persist();
+    }
+    return agents;
+  }
+
   syncAIAgents(): {
     agents: AIIntegrationModel[];
     syncedAt: string;
@@ -2723,7 +2771,9 @@ class LifeRpgDatabase {
           agent.status = 'connected';
           agent.accountEmail = agent.accountEmail || 'cloud-verified@google.internal';
           agent.connectedAt = agent.connectedAt || now;
-          agent.modelTier = agent.modelTier || 'Gemini 3.8 Flash';
+          agent.modelTier = agent.modelTier || 'Gemini 3.5 Flash';
+          agent.selectedGeminiModel = agent.selectedGeminiModel || 'gemini-3.5-flash';
+          agent.selectedRole = agent.selectedRole || 'general_coach';
         }
       }
 

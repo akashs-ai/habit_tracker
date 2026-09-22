@@ -1189,18 +1189,30 @@ async function startServer() {
 
   app.post('/api/ai/chat', async (req: Request, res: Response) => {
     try {
-      const { modelId, message, history, calendarPermission, googleAccessToken } = req.body;
+      const { modelId, geminiModel, role, message, history, calendarPermission, googleAccessToken } = req.body;
       if (!modelId || !message) {
         return res.status(400).json({ success: false, error: 'modelId and message are required.' });
       }
       const reply = await generateAIChatResponse({ 
         modelId, 
+        geminiModel,
+        role,
         message, 
         history,
         calendarPermission,
         googleAccessToken
       });
       res.json({ success: true, data: reply });
+    } catch (err: any) {
+      res.status(400).json({ success: false, error: err.message });
+    }
+  });
+
+  app.post('/api/ai/gemini-config', (req: Request, res: Response) => {
+    try {
+      const { modelOption, role } = req.body;
+      const updatedAgents = db.updateGeminiConfig({ modelOption, role });
+      res.json({ success: true, data: updatedAgents });
     } catch (err: any) {
       res.status(400).json({ success: false, error: err.message });
     }
