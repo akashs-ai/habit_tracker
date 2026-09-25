@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Search, Bell, Menu, LogIn, LogOut, User, Sparkles, ChevronDown, Compass, Settings, Volume2, VolumeX, Flame, CheckCircle2, AlertCircle } from 'lucide-react';
-import { AuthUser, AppNotification } from '../types';
+import { AuthUser, AppNotification, MotivationalQuote } from '../types';
 import { soundFx } from '../utils/audioFx';
 import { NotificationDropdown } from './NotificationDropdown';
 import { verifyCurrentAuthUserStreak } from '../services/supabaseData';
@@ -18,6 +18,8 @@ interface HeaderProps {
   onMarkAllNotificationsAsRead?: () => void;
   onClearAllNotifications?: () => void;
   onNavigateTab?: (tab: string) => void;
+  activeQuote?: MotivationalQuote;
+  onOpenQuotesModal?: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -33,6 +35,8 @@ export const Header: React.FC<HeaderProps> = ({
   onMarkAllNotificationsAsRead,
   onClearAllNotifications,
   onNavigateTab,
+  activeQuote,
+  onOpenQuotesModal,
 }) => {
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   const [isNotificationOpen, setIsNotificationOpen] = useState(false);
@@ -142,9 +146,25 @@ export const Header: React.FC<HeaderProps> = ({
         )}
 
         {/* Motivational Daily Quote (visible on lg+) */}
-        <div id="header-quote" className="hidden lg:block max-w-[240px] text-right">
-          <p className="text-xs text-[#52525B] dark:text-[#A1A1AA] font-normal italic leading-tight">
-            &ldquo;Small steps, bigger tomorrow.&rdquo;
+        <div 
+          id="header-quote" 
+          onClick={onOpenQuotesModal}
+          className="hidden lg:block max-w-[240px] text-right cursor-pointer group select-none"
+          title="Daily Wisdom — Click to change or inscribe quote"
+          role="button"
+          tabIndex={0}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault();
+              onOpenQuotesModal?.();
+            }
+          }}
+        >
+          <p className="text-xs text-[#52525B] dark:text-[#A1A1AA] group-hover:text-[#7C6CFF] dark:group-hover:text-amber-300 font-normal italic leading-tight truncate transition-colors">
+            &ldquo;{activeQuote?.text || 'Small steps, bigger tomorrow.'}&rdquo;
+          </p>
+          <p className="text-[10px] text-slate-400 dark:text-slate-400 group-hover:text-slate-600 dark:group-hover:text-slate-200 transition-colors">
+            — {activeQuote?.author || 'Daily Stoic'} ✎
           </p>
         </div>
 

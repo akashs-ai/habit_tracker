@@ -8,7 +8,10 @@ import {
   AnalyticsGoalItem,
   AnalyticsInsight,
   AnalyticsAchievement,
-  AnalyticsTimeRange
+  AnalyticsTimeRange,
+  TaskItem,
+  Quest,
+  UserProfile
 } from '../types';
 
 export const initialAnalyticsKpi: AnalyticsKpiData = {
@@ -251,3 +254,306 @@ export const getTimeRangeKpi = (range: AnalyticsTimeRange): AnalyticsKpiData => 
       };
   }
 };
+
+// ==========================================
+// DYNAMIC REAL-TIME SYNCHRONIZED ANALYTICS
+// ==========================================
+
+export const generateDynamicTrendPoints = (tasks: TaskItem[] = [], quests: Quest[] = []): ConsistencyTrendPoint[] => {
+  const points: ConsistencyTrendPoint[] = [];
+  const now = new Date();
+
+  for (let i = 6; i >= 0; i--) {
+    const d = new Date(now);
+    d.setDate(d.getDate() - i);
+    const isoDate = d.toISOString().split('T')[0];
+    const monthName = d.toLocaleDateString('en-US', { month: 'short' });
+    const dayNum = d.getDate();
+    const dayLabel = `${monthName} ${dayNum}`;
+
+    // Filter tasks scheduled or completed for this day
+    const dayTasks = tasks.filter((t) => t.dueDate === isoDate || t.clientDate === isoDate);
+    const isToday = i === 0;
+
+    let tasksCompleted = dayTasks.filter((t) => t.completed).length;
+    let totalTasks = dayTasks.length;
+
+    // Today also incorporates daily quests
+    if (isToday && quests.length > 0) {
+      tasksCompleted += quests.filter((q) => q.completed).length;
+      totalTasks += quests.length;
+    }
+
+    const completionRate = totalTasks > 0 ? Math.round((tasksCompleted / totalTasks) * 100) : 0;
+
+    points.push({
+      date: isoDate,
+      dayLabel,
+      completionRate,
+      tasksCompleted,
+      totalTasks,
+    });
+  }
+
+  return points;
+};
+
+export const generateDynamicHabitBreakdown = (tasks: TaskItem[] = [], quests: Quest[] = []): HabitBreakdownCategory[] => {
+  const categoryCounts: Record<string, number> = {};
+
+  // Count from tasks
+  tasks.forEach((t) => {
+    const cat = t.labels && t.labels.length > 0 ? t.labels[0] : (t.priority === 'high' ? 'Priority' : 'General');
+    categoryCounts[cat] = (categoryCounts[cat] || 0) + 1;
+  });
+
+  // Count from quests
+  quests.forEach((q) => {
+    const cat = q.category ? q.category.charAt(0).toUpperCase() + q.category.slice(1) : 'General';
+    categoryCounts[cat] = (categoryCounts[cat] || 0) + 1;
+  });
+
+  const total = Object.values(categoryCounts).reduce((acc, c) => acc + c, 0);
+  if (total === 0) return [];
+
+  const colorPalette = ['#38BDF8', '#34D399', '#06B6D4', '#FB7185', '#F59E0B', '#818CF8', '#A855F7'];
+
+  return Object.entries(categoryCounts).map(([name, count], idx) => ({
+    name,
+    count,
+    percentage: Math.round((count / total) * 100),
+    color: colorPalette[idx % colorPalette.length],
+  }));
+};
+
+export const generateDynamicConsistentHabits = (quests: Quest[] = [], tasks: TaskItem[] = []): ConsistentHabitItem[] => {
+  const items: ConsistentHabitItem[] = [];
+
+  quests.forEach((q, idx) => {
+    const colors = ['#38BDF8', '#EC4899', '#818CF8', '#06B6D4', '#F59E0B'];
+    let iconType: ConsistentHabitItem['icon'] = 'reading';
+    const lower = (q.title + ' ' + (q.subtitle || '')).toLowerCase();
+    if (lower.includes('workout') || lower.includes('walk') || lower.includes('gym')) iconType = 'workout';
+    else if (lower.includes('sleep') || lower.includes('bed')) iconType = 'sleep';
+    else if (lower.includes('code') || lower.includes('dsa')) iconType = 'coding';
+    else if (lower.includes('meditat') || lower.includes('breathe')) iconType = 'meditation';
+
+    items.push({
+      id: `hab-dyn-${q.id || idx}`,
+      name: q.title,
+      percentage: q.completed ? 100 : 0,
+      icon: iconType,
+      color: colors[idx % colors.length],
+    });
+  });
+
+  // Also include recurring or priority tasks
+  tasks.slice(0, 5 - items.length).forEach((t, idx) => {
+    if (items.some((i) => i.name === t.title)) return;
+    items.push({
+      id: `hab-task-${t.id || idx}`,
+      name: t.title,
+      percentage: t.completed ? 100 : 0,
+      icon: t.priority === 'high' ? 'workout' : 'coding',
+      color: t.priority === 'high' ? '#EF4444' : '#6366F1',
+    });
+  });
+
+  return items;
+};
+
+export const generateDynamicHeatmapData = (tasks: TaskItem[] = [], quests: Quest[] = []): HeatmapDay[] => {
+  const days: HeatmapDay[] = [];
+  const now = new Date();
+  
+  // Find date 14 weeks ago aligned to Monday
+  const currentDayOfWeek = (now.getDay() + 6) % 7; // Mon=0, Sun=6
+  const totalDays = 14 * 7;
+  const startDate = new Date(now);
+  startDate.setDate(now.getDate() - currentDayOfWeek - (13 * 7));
+
+  // Count completions per date
+  const completionsPerDate: Record<string, number> = {};
+  tasks.forEach((t) => {
+    if (t.completed && (t.dueDate || t.clientDate)) {
+      const dStr = t.dueDate || t.clientDate!;
+      completionsPerDate[dStr] = (completionsPerDate[dStr] || 0) + 1;
+    }
+  });
+
+  // If quests completed today, add them to today's count
+  const todayStr = now.toISOString().split('T')[0];
+  const questsDone = quests.filter((q) => q.completed).length;
+  if (questsDone > 0) {
+    completionsPerDate[todayStr] = (completionsPerDate[todayStr] || 0) + questsDone;
+  }
+
+  for (let i = 0; i < totalDays; i++) {
+    const cur = new Date(startDate);
+    cur.setDate(startDate.getDate() + i);
+    const dateStr = cur.toISOString().split('T')[0];
+    const dayOfWeek = (cur.getDay() + 6) % 7;
+    const weekIndex = Math.floor(i / 7);
+
+    const count = completionsPerDate[dateStr] || 0;
+    let level: 0 | 1 | 2 | 3 | 4 = 0;
+    if (count >= 4) level = 4;
+    else if (count === 3) level = 3;
+    else if (count === 2) level = 2;
+    else if (count === 1) level = 1;
+
+    days.push({
+      date: dateStr,
+      dayOfWeek,
+      weekIndex,
+      count,
+      consistencyRate: count > 0 ? Math.min(100, count * 25) : 0,
+      level,
+    });
+  }
+
+  return days;
+};
+
+export const generateDynamicTimeDistribution = (
+  tasks: TaskItem[] = [],
+  quests: Quest[] = []
+): { habitItems: TimeDistributionItem[]; taskItems: TimeDistributionItem[] } => {
+  const habitMap: Record<string, number> = {};
+  const taskMap: Record<string, number> = {};
+
+  quests.forEach((q) => {
+    const cat = q.category ? q.category.charAt(0).toUpperCase() + q.category.slice(1) : 'Habits';
+    const hours = (q.durationMinutes || 15) / 60;
+    habitMap[cat] = (habitMap[cat] || 0) + hours;
+  });
+
+  tasks.forEach((t) => {
+    const cat = t.labels && t.labels.length > 0 ? t.labels[0] : 'Tasks';
+    taskMap[cat] = (taskMap[cat] || 0) + 0.5; // default 30m per task
+  });
+
+  const colors = ['#38BDF8', '#34D399', '#818CF8', '#FB7185', '#F59E0B'];
+
+  const habitTotal = Object.values(habitMap).reduce((a, b) => a + b, 0);
+  const taskTotal = Object.values(taskMap).reduce((a, b) => a + b, 0);
+
+  const habitItems: TimeDistributionItem[] = Object.entries(habitMap).map(([category, hours], idx) => ({
+    category,
+    hours: parseFloat(hours.toFixed(1)),
+    percentage: habitTotal > 0 ? Math.round((hours / habitTotal) * 100) : 0,
+    color: colors[idx % colors.length],
+  }));
+
+  const taskItems: TimeDistributionItem[] = Object.entries(taskMap).map(([category, hours], idx) => ({
+    category,
+    hours: parseFloat(hours.toFixed(1)),
+    percentage: taskTotal > 0 ? Math.round((hours / taskTotal) * 100) : 0,
+    color: colors[(idx + 2) % colors.length],
+  }));
+
+  return { habitItems, taskItems };
+};
+
+export const generateDynamicInsights = (
+  tasks: TaskItem[] = [],
+  quests: Quest[] = [],
+  user?: UserProfile
+): AnalyticsInsight[] => {
+  const completedTasks = tasks.filter((t) => t.completed).length;
+  const streak = user?.streakDays ?? user?.streak ?? 0;
+  const consistency = tasks.length > 0 ? Math.round((completedTasks / tasks.length) * 100) : 0;
+
+  const insights: AnalyticsInsight[] = [];
+
+  if (completedTasks > 0) {
+    insights.push({
+      id: 'ins-1',
+      headline: 'Active Task Momentum',
+      subtext: `You have completed ${completedTasks} of ${tasks.length} task${tasks.length === 1 ? '' : 's'} with a ${consistency}% completion rate.`,
+      icon: 'trending-up',
+      type: 'productivity',
+      color: '#34D399',
+    });
+  } else {
+    insights.push({
+      id: 'ins-1',
+      headline: 'Begin Your Streak',
+      subtext: 'Check off your first task or complete a quest today to kickstart your momentum and habit tracking analytics.',
+      icon: 'clock',
+      type: 'consistency',
+      color: '#6366F1',
+    });
+  }
+
+  if (streak > 0) {
+    insights.push({
+      id: 'ins-2',
+      headline: `${streak}-Day Streak Active`,
+      subtext: 'Keep showing up daily to protect your consistency streak and earn bonus momentum points.',
+      icon: 'trending-up',
+      type: 'consistency',
+      color: '#F59E0B',
+    });
+  } else {
+    insights.push({
+      id: 'ins-2',
+      headline: 'Daily Consistency',
+      subtext: 'Completing at least one task or quest daily establishes your habit streak score.',
+      icon: 'clock',
+      type: 'productivity',
+      color: '#818CF8',
+    });
+  }
+
+  return insights;
+};
+
+export const generateDynamicAchievements = (
+  tasks: TaskItem[] = [],
+  user?: UserProfile
+): AnalyticsAchievement[] => {
+  const completedTasks = tasks.filter((t) => t.completed).length;
+  const level = user?.level ?? 1;
+  const streak = user?.streakDays ?? user?.streak ?? 0;
+
+  return [
+    {
+      id: 'ach-1',
+      title: 'First Step',
+      description: 'Complete your first habit or task in LifeRPG.',
+      icon: 'streak',
+      color: '#F59E0B',
+      isUnlocked: completedTasks >= 1,
+      earnedDate: completedTasks >= 1 ? 'Recent' : undefined,
+    },
+    {
+      id: 'ach-2',
+      title: 'Level 2 Explorer',
+      description: 'Gain sufficient XP to advance to Level 2.',
+      icon: 'crusher',
+      color: '#6366F1',
+      isUnlocked: level >= 2,
+      earnedDate: level >= 2 ? 'Recent' : undefined,
+    },
+    {
+      id: 'ach-3',
+      title: 'Streak Novice',
+      description: 'Maintain a 3-day consecutive consistency streak.',
+      icon: 'consistency',
+      color: '#34D399',
+      isUnlocked: streak >= 3,
+      earnedDate: streak >= 3 ? 'Recent' : undefined,
+    },
+    {
+      id: 'ach-4',
+      title: 'Task Finisher',
+      description: 'Complete 5 tasks or daily quests.',
+      icon: 'crusher',
+      color: '#A855F7',
+      isUnlocked: completedTasks >= 5,
+      earnedDate: completedTasks >= 5 ? 'Recent' : undefined,
+    },
+  ];
+};
+

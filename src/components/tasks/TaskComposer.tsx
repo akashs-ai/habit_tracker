@@ -55,6 +55,7 @@ export const TaskComposer: React.FC<TaskComposerProps> = ({
   const [showPriorityMenu, setShowPriorityMenu] = useState(false);
   const [showLabelMenu, setShowLabelMenu] = useState(false);
   const [showDateMenu, setShowDateMenu] = useState(false);
+  const [hasEmptyError, setHasEmptyError] = useState(false);
 
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -124,7 +125,13 @@ export const TaskComposer: React.FC<TaskComposerProps> = ({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!title.trim()) return;
+    if (!title.trim()) {
+      setHasEmptyError(true);
+      setTimeout(() => setHasEmptyError(false), 2400);
+      inputRef.current?.focus();
+      return;
+    }
+    setHasEmptyError(false);
 
     const localToday = getTodayISO();
     let computedCategory = defaultCategory;
@@ -200,8 +207,15 @@ export const TaskComposer: React.FC<TaskComposerProps> = ({
         <form
           id="active-task-composer-form"
           onSubmit={handleSubmit}
-          className="bg-white dark:bg-[#121214] border-2 border-[#6366F1]/60 dark:border-[#6366F1]/50 rounded-2xl p-4 shadow-md transition-all animate-in fade-in zoom-in-98 duration-150 relative"
+          className={`bg-white dark:bg-[#121214] border-2 ${
+            hasEmptyError ? 'border-rose-500 shadow-rose-500/20' : 'border-[#6366F1]/60 dark:border-[#6366F1]/50'
+          } rounded-2xl p-4 shadow-md transition-all animate-in fade-in zoom-in-98 duration-150 relative`}
         >
+          {hasEmptyError && (
+            <div className="mb-2 p-2 rounded-xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800 text-xs font-semibold text-rose-600 dark:text-rose-400 animate-in fade-in">
+              Please enter a task title first.
+            </div>
+          )}
           {/* Main Title Input */}
           <div className="relative">
             <input

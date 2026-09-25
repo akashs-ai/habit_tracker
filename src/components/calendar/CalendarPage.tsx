@@ -65,6 +65,7 @@ interface CalendarPageProps {
   onMarkAllNotificationsAsRead?: () => void;
   onClearAllNotifications?: () => void;
   onNavigateTab?: (tab: string) => void;
+  onToggleTaskComplete?: (taskId: string) => void;
 }
 
 export const CalendarPage: React.FC<CalendarPageProps> = ({
@@ -80,6 +81,7 @@ export const CalendarPage: React.FC<CalendarPageProps> = ({
   onMarkAllNotificationsAsRead,
   onClearAllNotifications,
   onNavigateTab,
+  onToggleTaskComplete,
 }) => {
   const todayISO = useMemo(() => getTodayISO(), []);
   const [currentView, setCurrentView] = useState<CalendarViewType>('month');
@@ -583,6 +585,7 @@ export const CalendarPage: React.FC<CalendarPageProps> = ({
                 events={selectedDayEvents}
                 onSelectEvent={setSelectedEventForDetail}
                 onAddEvent={() => setIsAddEventOpen(true)}
+                onToggleTaskComplete={onToggleTaskComplete}
               />
             </div>
 
@@ -641,6 +644,7 @@ export const CalendarPage: React.FC<CalendarPageProps> = ({
               events={selectedDayEvents}
               onSelectEvent={setSelectedEventForDetail}
               onAddEvent={() => setIsAddEventOpen(true)}
+              onToggleTaskComplete={onToggleTaskComplete}
             />
           </div>
         </div>
@@ -691,6 +695,7 @@ export const CalendarPage: React.FC<CalendarPageProps> = ({
         onClose={() => setSelectedEventForDetail(null)}
         onUpdateEvent={onUpdateEvent}
         onDeleteEvent={onDeleteEvent}
+        onToggleTaskComplete={onToggleTaskComplete}
       />
 
       {/* View Options & Shortcuts Popover */}

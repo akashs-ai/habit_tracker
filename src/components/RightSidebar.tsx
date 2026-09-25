@@ -17,16 +17,25 @@ import {
   Bot,
   Trash2,
 } from 'lucide-react';
-import { QuickNote } from '../types';
+import { QuickNote, MotivationalQuote } from '../types';
 
 interface RightSidebarProps {
   notes: QuickNote[];
   onAddNote?: () => void;
   onDeleteNote?: (id: string) => void;
   onNavigateTab?: (tab: string) => void;
+  activeQuote?: MotivationalQuote;
+  onOpenQuotesModal?: () => void;
 }
 
-export const RightSidebar: React.FC<RightSidebarProps> = ({ notes, onAddNote, onDeleteNote, onNavigateTab }) => {
+export const RightSidebar: React.FC<RightSidebarProps> = ({ 
+  notes, 
+  onAddNote, 
+  onDeleteNote, 
+  onNavigateTab,
+  activeQuote,
+  onOpenQuotesModal
+}) => {
   // Focus Mode State
   const [focusDuration, setFocusDuration] = useState<number>(25);
   const [secondsRemaining, setSecondsRemaining] = useState<number>(25 * 60);
@@ -454,12 +463,29 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({ notes, onAddNote, on
         </div>
 
         {/* Script Motivational Quote */}
-        <div className="flex-1 pl-3 text-right">
-          <p className="font-handwriting text-xl sm:text-2xl text-[#3E3833] dark:text-[#D5CDC5] leading-snug font-semibold select-none">
-            Discipline <br />
-            today, <br />
-            a brighter <br />
-            tomorrow.
+        <div 
+          onClick={onOpenQuotesModal}
+          className="flex-1 pl-3 text-right cursor-pointer group select-none"
+          title="Daily Wisdom Inscription — Click to change or inscribe"
+          role="button"
+          tabIndex={0}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault();
+              onOpenQuotesModal?.();
+            }
+          }}
+        >
+          <div className="flex items-center justify-end gap-1 mb-1">
+            <span className="text-[10px] uppercase font-bold text-amber-600 dark:text-amber-400 group-hover:underline">
+              Daily Wisdom ✎
+            </span>
+          </div>
+          <p className="font-handwriting text-xl sm:text-2xl text-[#3E3833] dark:text-[#D5CDC5] group-hover:text-amber-600 dark:group-hover:text-amber-300 transition-colors leading-snug font-semibold">
+            {activeQuote?.text || 'Discipline today, a brighter tomorrow.'}
+          </p>
+          <p className="text-[10px] text-slate-500 dark:text-slate-400 mt-1 italic">
+            — {activeQuote?.author || 'Ancient Wisdom'}
           </p>
         </div>
       </div>

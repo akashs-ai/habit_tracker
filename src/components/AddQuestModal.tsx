@@ -18,12 +18,17 @@ export const AddQuestModal: React.FC<AddQuestModalProps> = ({
   const [category, setCategory] = useState<Quest['category']>('focus');
   const [durationMinutes, setDurationMinutes] = useState(25);
   const [attribute, setAttribute] = useState<Quest['attribute']>('Intellect');
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   if (!isOpen) return null;
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!title.trim()) return;
+    if (!title.trim()) {
+      setErrorMessage('Please enter a quest title.');
+      return;
+    }
+    setErrorMessage(null);
 
     const xpReward = durationMinutes >= 30 ? 50 : durationMinutes >= 20 ? 30 : 20;
 
@@ -38,6 +43,7 @@ export const AddQuestModal: React.FC<AddQuestModalProps> = ({
 
     setTitle('');
     setSubtitle('');
+    setErrorMessage(null);
     onClose();
   };
 
@@ -65,6 +71,11 @@ export const AddQuestModal: React.FC<AddQuestModalProps> = ({
         </div>
 
         <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+          {errorMessage && (
+            <div className="p-2.5 rounded-xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800 text-xs font-semibold text-rose-600 dark:text-rose-400">
+              {errorMessage}
+            </div>
+          )}
           <div>
             <label className="block text-xs font-semibold text-[#4B5563] dark:text-[#A1A1AA] mb-1">
               Quest Title

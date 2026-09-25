@@ -48,39 +48,45 @@ export const GoalProgressCard: React.FC<GoalProgressCardProps> = ({ goals, onSee
 
       {/* Goal rows */}
       <div className="flex flex-col gap-2.5 pt-3">
-        {goals.map((goal) => (
-          <div key={goal.id} className="flex items-center justify-between gap-3 group">
-            <div className="flex items-center gap-2.5 min-w-0 flex-1">
-              {/* Icon */}
-              <div className="w-7 h-7 rounded-lg bg-slate-100 dark:bg-white/5 border border-slate-200/80 dark:border-white/8 flex items-center justify-center shrink-0">
-                {getGoalIcon(goal.icon)}
-              </div>
-
-              {/* Title & Bar */}
-              <div className="min-w-0 flex-1">
-                <div className="flex items-center justify-between gap-2 mb-1.5">
-                  <span className="text-xs font-medium text-slate-800 dark:text-white/90 truncate group-hover:text-slate-900 dark:group-hover:text-white transition-colors">
-                    {goal.title}
-                  </span>
-                  <span className="text-xs font-semibold text-slate-900 dark:text-white tabular-nums">
-                    {goal.percentage}%
-                  </span>
+        {goals.length === 0 ? (
+          <div className="py-8 text-center text-xs text-slate-500 dark:text-[#94A3B8]">
+            No active goals yet. Add goals in the Goals tab to track progress!
+          </div>
+        ) : (
+          goals.map((goal) => (
+            <div key={goal.id} className="flex items-center justify-between gap-3 group">
+              <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                {/* Icon */}
+                <div className="w-7 h-7 rounded-lg bg-slate-100 dark:bg-white/5 border border-slate-200/80 dark:border-white/8 flex items-center justify-center shrink-0">
+                  {getGoalIcon(goal.icon)}
                 </div>
 
-                {/* Progress bar */}
-                <div className="w-full h-1.5 bg-slate-100 dark:bg-white/7 rounded-full overflow-hidden">
-                  <div
-                    className="h-full rounded-full transition-all duration-500"
-                    style={{
-                      width: `${goal.percentage}%`,
-                      backgroundColor: goal.color,
-                    }}
-                  />
+                {/* Title & Bar */}
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center justify-between gap-2 mb-1.5">
+                    <span className="text-xs font-medium text-slate-800 dark:text-white/90 truncate group-hover:text-slate-900 dark:group-hover:text-white transition-colors">
+                      {goal.title}
+                    </span>
+                    <span className="text-xs font-semibold text-slate-900 dark:text-white tabular-nums">
+                      {goal.percentage}%
+                    </span>
+                  </div>
+
+                  {/* Progress bar */}
+                  <div className="w-full h-1.5 bg-slate-100 dark:bg-white/7 rounded-full overflow-hidden">
+                    <div
+                      className="h-full rounded-full transition-all duration-500"
+                      style={{
+                        width: `${goal.percentage}%`,
+                        backgroundColor: goal.color,
+                      }}
+                    />
+                  </div>
                 </div>
               </div>
             </div>
-          </div>
-        ))}
+          ))
+        )}
       </div>
     </div>
   );

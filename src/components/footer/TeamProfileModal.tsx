@@ -40,8 +40,10 @@ export const TeamProfileModal: React.FC<TeamProfileModalProps> = ({
   const [imgError, setImgError] = useState(false);
   const [bannerError, setBannerError] = useState(false);
 
-  // Instagram Avatar Auto-Sync state
-  const [instagramAvatar, setInstagramAvatar] = useState<string | null>(initialInstagramAvatar || null);
+  // Instagram Avatar Auto-Sync state (initialized with initial avatar or member's verified image)
+  const [instagramAvatar, setInstagramAvatar] = useState<string | null>(
+    initialInstagramAvatar || member?.profileImage || null
+  );
   const [instagramImgError, setInstagramImgError] = useState(false);
 
   // GitHub Auto-Sync state
@@ -58,6 +60,8 @@ export const TeamProfileModal: React.FC<TeamProfileModalProps> = ({
 
     if (initialInstagramAvatar) {
       setInstagramAvatar(initialInstagramAvatar);
+    } else if (member?.profileImage) {
+      setInstagramAvatar(member.profileImage);
     } else {
       setInstagramAvatar(null);
     }
@@ -136,7 +140,7 @@ export const TeamProfileModal: React.FC<TeamProfileModalProps> = ({
   const hasInstagramAvatar = Boolean(instagramAvatar && !instagramImgError);
   const effectiveProfileImage = hasInstagramAvatar
     ? instagramAvatar
-    : (member.profileImage || gitHubStats?.avatarUrl);
+    : (member.profileImage || (!imgError && gitHubStats?.avatarUrl ? gitHubStats.avatarUrl : null));
   const hasProfileImage = Boolean(effectiveProfileImage && !imgError);
 
   return (
@@ -158,6 +162,7 @@ export const TeamProfileModal: React.FC<TeamProfileModalProps> = ({
             <img
               src={member.bannerImage}
               alt={`${member.name} banner`}
+              referrerPolicy="no-referrer"
               className="absolute inset-0 w-full h-full object-cover object-center"
               onError={() => setBannerError(true)}
             />
@@ -190,6 +195,7 @@ export const TeamProfileModal: React.FC<TeamProfileModalProps> = ({
                   <img
                     src={effectiveProfileImage}
                     alt={member.name}
+                    referrerPolicy="no-referrer"
                     className="w-full h-full object-cover object-center rounded-full"
                     onError={() => {
                       if (hasInstagramAvatar) {
@@ -205,6 +211,16 @@ export const TeamProfileModal: React.FC<TeamProfileModalProps> = ({
                   </div>
                 )}
               </div>
+
+              {/* Instagram sync badge on avatar */}
+              {hasInstagramAvatar && (
+                <div 
+                  title="Instagram Profile Picture Synced"
+                  className="absolute -bottom-1 -right-1 z-20 w-6 h-6 rounded-full bg-gradient-to-tr from-[#F58529] via-[#DD2A7B] to-[#8134AF] p-0.5 shadow-md flex items-center justify-center text-white ring-2 ring-white dark:ring-[#0F172A]"
+                >
+                  <Instagram className="w-3.5 h-3.5" />
+                </div>
+              )}
             </div>
 
             <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-indigo-50 dark:bg-[#6366F1]/15 border border-indigo-200 dark:border-[#6366F1]/30 text-indigo-700 dark:text-[#A5B4FC] text-xs font-semibold">

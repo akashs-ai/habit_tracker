@@ -1,5 +1,5 @@
 import React from 'react';
-import { Plus, Laptop, Utensils, Gamepad2, Dumbbell, BookOpen, Clock, Calendar as CalIcon } from 'lucide-react';
+import { Plus, Laptop, Utensils, Gamepad2, Dumbbell, BookOpen, Clock, Calendar as CalIcon, Check } from 'lucide-react';
 import { CalendarEvent } from '../../types';
 import { formatReadableDate, getRelativeDayLabel, isToday } from '../../utils/dateUtils';
 
@@ -8,6 +8,7 @@ interface SelectedDayPanelProps {
   events: CalendarEvent[];
   onSelectEvent: (event: CalendarEvent) => void;
   onAddEvent: () => void;
+  onToggleTaskComplete?: (taskId: string) => void;
 }
 
 export const SelectedDayPanel: React.FC<SelectedDayPanelProps> = ({
@@ -15,6 +16,7 @@ export const SelectedDayPanel: React.FC<SelectedDayPanelProps> = ({
   events,
   onSelectEvent,
   onAddEvent,
+  onToggleTaskComplete,
 }) => {
   // Format selectedDate e.g. "Tue, 11 Mar 2026"
   const formattedDate = React.useMemo(() => {
@@ -75,8 +77,33 @@ export const SelectedDayPanel: React.FC<SelectedDayPanelProps> = ({
                 />
 
                 <div className="flex items-center gap-3 pl-1.5 min-w-0 flex-1">
+                  {(evt.isAutoTask || evt.taskId || evt.completed !== undefined) && (
+                    <button
+                      type="button"
+                      title={evt.completed ? "Mark as Incomplete" : "Mark as Complete"}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        const taskId = evt.taskId || evt.id.replace('task-evt-', '');
+                        if (onToggleTaskComplete) {
+                          onToggleTaskComplete(taskId);
+                        }
+                      }}
+                      className={`w-4 h-4 rounded-md border flex items-center justify-center shrink-0 transition-all cursor-pointer ${
+                        evt.completed
+                          ? 'bg-[#10B981] border-[#10B981] text-white shadow-xs'
+                          : 'border-slate-400 dark:border-white/30 hover:border-[#6C63FF] bg-white/5'
+                      }`}
+                    >
+                      {evt.completed && <Check className="w-2.5 h-2.5 stroke-[3]" />}
+                    </button>
+                  )}
+
                   <div className="flex flex-col min-w-0">
-                    <span className="text-xs font-semibold text-slate-900 dark:text-[#F5F7FF] truncate group-hover:text-slate-950 dark:group-hover:text-white transition-colors">
+                    <span className={`text-xs font-semibold truncate transition-colors group-hover:text-slate-950 dark:group-hover:text-white ${
+                      evt.completed 
+                        ? 'line-through text-slate-400 dark:text-[#6F7789]' 
+                        : 'text-slate-900 dark:text-[#F5F7FF]'
+                    }`}>
                       {evt.title}
                     </span>
                     <span className="text-[11px] text-slate-500 dark:text-[#A6AEC0] flex items-center gap-1 mt-0.5">
@@ -84,6 +111,11 @@ export const SelectedDayPanel: React.FC<SelectedDayPanelProps> = ({
                       <span>
                         {evt.allDay ? 'All day' : `${evt.startTime || ''} – ${evt.endTime || ''}`}
                       </span>
+                      {evt.completed && (
+                        <span className="ml-1.5 px-1.5 py-0.2 rounded text-[9px] font-bold bg-[#10B981]/15 text-[#10B981]">
+                          Completed
+                        </span>
+                      )}
                     </span>
                   </div>
                 </div>

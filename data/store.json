@@ -2,18 +2,30 @@
   "user": {
     "name": "Alex Das",
     "level": 12,
-    "currentXp": 840,
+    "currentXp": 860,
     "nextLevelXp": 1200,
     "streakDays": 12,
-    "totalPoints": 902,
+    "totalPoints": 922,
     "questsDoneThisWeek": 7,
-    "momentumPoints": 3570,
+    "momentumPoints": 3590,
     "pointsThisWeek": 765,
     "weeklyConsistency": 92,
     "avatarUrl": "https://utebwqwnpadkbgxgbbcf.supabase.co/storage/v1/object/public/avatars/28aedc97-d79b-4331-bcbe-d8ec2ea40b17/avatar-1789402903800.png"
   },
   "quests": [],
-  "tasks": [],
+  "tasks": [
+    {
+      "id": "task-1790327595599",
+      "completed": false,
+      "priority": "medium",
+      "labels": [
+        "General"
+      ],
+      "subtasks": [],
+      "xpReward": 15,
+      "title": "Master Algorithms and LeetCode"
+    }
+  ],
   "calendarEvents": [],
   "goals": [
     {
@@ -740,7 +752,7 @@
       "dayShort": "Mon",
       "xp": 180,
       "heightPercent": 45,
-      "isToday": true
+      "isToday": false
     },
     {
       "day": "Tuesday",
@@ -768,7 +780,7 @@
       "dayShort": "Fri",
       "xp": 190,
       "heightPercent": 48,
-      "isToday": false
+      "isToday": true
     },
     {
       "day": "Saturday",
@@ -996,13 +1008,13 @@
       }
     ]
   },
-  "lastUpdated": "2026-09-14T16:21:44.347Z",
+  "lastUpdated": "2026-09-25T09:13:23.287Z",
   "aiAgents": [
     {
       "id": "chatgpt",
       "name": "ChatGPT",
       "status": "connected",
-      "selected": true,
+      "selected": false,
       "description": "Great for general productivity, explanations and daily task breakdown.",
       "tags": [
         "Fast",
@@ -1014,8 +1026,8 @@
       "connectedAt": "2026-09-13T01:04:27.877Z",
       "modelTier": "GPT-4o (Omni)",
       "verified": true,
-      "syncStatus": "ready",
       "latencyMs": 185,
+      "syncStatus": "ready",
       "lastSyncedAt": "2026-09-12T23:06:03.027Z",
       "isEnvironmentKeyConfigured": false
     },
@@ -1032,17 +1044,17 @@
       ],
       "iconType": "claude",
       "modelTier": "Claude 3.5 Sonnet",
+      "latencyMs": 162,
       "verified": false,
       "syncStatus": "ready",
-      "latencyMs": 162,
       "lastSyncedAt": "2026-09-12T23:06:03.027Z",
       "isEnvironmentKeyConfigured": false
     },
     {
       "id": "gemini",
       "name": "Gemini",
-      "status": "not_connected",
-      "selected": false,
+      "status": "connected",
+      "selected": true,
       "description": "Best with Google ecosystem, real-time schedule alignment, and rapid planning.",
       "tags": [
         "Real-time",
@@ -1050,12 +1062,16 @@
         "Multimodal"
       ],
       "iconType": "gemini",
+      "accountEmail": "user@google.ai",
+      "connectedAt": "2026-09-25T07:56:20.053Z",
       "modelTier": "Gemini 3.8 Flash",
-      "verified": false,
-      "syncStatus": "ready",
+      "selectedGeminiModel": "gemini-3.5-flash",
+      "selectedRole": "general_coach",
+      "verified": true,
       "latencyMs": 98,
-      "lastSyncedAt": "2026-09-12T23:06:03.027Z",
-      "isEnvironmentKeyConfigured": true
+      "isEnvironmentKeyConfigured": true,
+      "syncStatus": "ready",
+      "lastSyncedAt": "2026-09-12T23:06:03.027Z"
     }
   ],
   "calendarIntegration": {
@@ -1064,5 +1080,109 @@
     "account": "alex.das@gmail.com",
     "permission": "read_edit",
     "useInCoach": true
+  },
+  "quotes": [
+    {
+      "id": "quote-1790327603287",
+      "text": "Stay hungry, stay foolish.",
+      "author": "Steve Jobs",
+      "category": "growth",
+      "isActive": true,
+      "isCustom": true,
+      "createdAt": "2026-09-25T09:13:23.287Z",
+      "likesCount": 1
+    },
+    {
+      "id": "quote-1790324207615",
+      "text": "Every master was once a beginner.",
+      "author": "Robin Sharma",
+      "category": "growth",
+      "isActive": false,
+      "isCustom": true,
+      "createdAt": "2026-09-25T08:16:47.615Z",
+      "likesCount": 1
+    },
+    {
+      "id": "quote-1",
+      "text": "Progress, not perfection.",
+      "author": "Alex Rivera",
+      "category": "mindset",
+      "isActive": false,
+      "isCustom": false,
+      "createdAt": "2026-09-25T08:16:41.157Z"
+    },
+    {
+      "id": "quote-2",
+      "text": "Discipline today, a brighter tomorrow.",
+      "author": "Ancient Wisdom",
+      "category": "discipline",
+      "isActive": false,
+      "isCustom": false,
+      "createdAt": "2026-09-25T08:16:41.157Z"
+    },
+    {
+      "id": "quote-3",
+      "text": "Small steps, bigger tomorrow.",
+      "author": "Daily Stoic",
+      "category": "growth",
+      "isActive": false,
+      "isCustom": false,
+      "createdAt": "2026-09-25T08:16:41.157Z"
+    },
+    {
+      "id": "quote-4",
+      "text": "We suffer more often in imagination than in reality.",
+      "author": "Seneca",
+      "category": "mindset",
+      "isActive": false,
+      "isCustom": false,
+      "createdAt": "2026-09-25T08:16:41.157Z"
+    },
+    {
+      "id": "quote-5",
+      "text": "You do not rise to the level of your goals. You fall to the level of your systems.",
+      "author": "James Clear",
+      "category": "discipline",
+      "isActive": false,
+      "isCustom": false,
+      "createdAt": "2026-09-25T08:16:41.157Z"
+    },
+    {
+      "id": "quote-6",
+      "text": "The obstacle is the way.",
+      "author": "Marcus Aurelius",
+      "category": "courage",
+      "isActive": false,
+      "isCustom": false,
+      "createdAt": "2026-09-25T08:16:41.157Z"
+    },
+    {
+      "id": "quote-7",
+      "text": "Focus on being productive instead of busy.",
+      "author": "Tim Ferriss",
+      "category": "focus",
+      "isActive": false,
+      "isCustom": false,
+      "createdAt": "2026-09-25T08:16:41.157Z"
+    },
+    {
+      "id": "quote-8",
+      "text": "Small daily victories compound into legendary achievements.",
+      "author": "LifeRPG Philosophy",
+      "category": "growth",
+      "isActive": false,
+      "isCustom": false,
+      "createdAt": "2026-09-25T08:16:41.157Z"
+    }
+  ],
+  "activeQuote": {
+    "id": "quote-1790327603287",
+    "text": "Stay hungry, stay foolish.",
+    "author": "Steve Jobs",
+    "category": "growth",
+    "isActive": true,
+    "isCustom": true,
+    "createdAt": "2026-09-25T09:13:23.287Z",
+    "likesCount": 1
   }
 }

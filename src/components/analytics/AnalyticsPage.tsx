@@ -21,17 +21,14 @@ import { GoalProgressCard } from './GoalProgressCard';
 import { InsightsCard } from './InsightsCard';
 import { AchievementsCard } from './AchievementsCard';
 import {
-  initialAnalyticsKpi,
-  initialTrendPoints,
-  initialHabitBreakdown,
-  initialConsistentHabits,
-  initialHeatmapDays,
-  initialTimeDistributionHabits,
-  initialTimeDistributionTasks,
-  initialAnalyticsGoals,
-  initialAnalyticsInsights,
-  initialAnalyticsAchievements,
   getTimeRangeKpi,
+  generateDynamicTrendPoints,
+  generateDynamicHabitBreakdown,
+  generateDynamicConsistentHabits,
+  generateDynamicHeatmapData,
+  generateDynamicTimeDistribution,
+  generateDynamicInsights,
+  generateDynamicAchievements,
 } from '../../data/analyticsMockData';
 import { AnalyticsTimeRange, UserProfile, TaskItem, Quest, DetailedGoal, AnalyticsGoalItem } from '../../types';
 
@@ -50,34 +47,32 @@ export const AnalyticsPage: React.FC<AnalyticsPageProps> = ({
   setIsDark,
   onToggleMobileMenu,
   liveUser,
-  liveTasks,
-  liveQuests,
-  liveGoals,
+  liveTasks = [],
+  liveQuests = [],
+  liveGoals = [],
 }) => {
   const [timeRange, setTimeRange] = useState<AnalyticsTimeRange>('7d');
-  const [dateRangeText, setDateRangeText] = useState('Sep 5, 2025 – Sep 11, 2025');
+  const [dateRangeText, setDateRangeText] = useState('Last 7 Days');
   const [searchQuery, setSearchQuery] = useState('');
   const [bottomTab, setBottomTab] = useState<'insights' | 'milestones'>('insights');
   const [activeDetailModal, setActiveDetailModal] = useState<string | null>(null);
 
-  // Dynamic KPI synchronized with live backend state
+  // Dynamic KPI synchronized with live user data
   const dynamicKpi = React.useMemo(() => {
     const baseKpi = getTimeRangeKpi(timeRange);
-    if (!liveUser && !liveTasks && !liveQuests) return baseKpi;
-    const completedTasks = liveTasks ? liveTasks.filter((t) => t.completed).length : baseKpi.tasksCompleted;
-    const totalTasks = liveTasks ? liveTasks.length : baseKpi.tasksTotal;
-    const streak = liveUser ? (liveUser.streakDays ?? liveUser.streak ?? 0) : baseKpi.currentStreakDays;
-    const mp = liveUser ? (liveUser.momentumPoints ?? liveUser.totalPoints ?? 0) : baseKpi.momentumPoints;
-    const completedQuests = liveQuests ? liveQuests.filter((q) => q.completed).length : 0;
-    const totalQuests = liveQuests ? liveQuests.length : 4;
-    const ratio = Math.round(((completedTasks + completedQuests) / Math.max(1, totalTasks + totalQuests)) * 100);
-    const consistency = (timeRange === '7d' && liveUser?.weeklyConsistency !== undefined)
-      ? liveUser.weeklyConsistency
-      : (ratio > 0 ? ratio : baseKpi.overallConsistency);
+    const completedTasks = liveTasks.filter((t) => t.completed).length;
+    const totalTasks = liveTasks.length;
+    const streak = liveUser ? (liveUser.streakDays ?? liveUser.streak ?? 0) : 0;
+    const mp = liveUser ? (liveUser.momentumPoints ?? liveUser.totalPoints ?? 0) : 0;
+    const completedQuests = liveQuests.filter((q) => q.completed).length;
+    const totalQuests = liveQuests.length;
+    const totalItems = totalTasks + totalQuests;
+    const completedItems = completedTasks + completedQuests;
+    const ratio = totalItems > 0 ? Math.round((completedItems / totalItems) * 100) : 0;
 
     return {
       ...baseKpi,
-      overallConsistency: consistency,
+      overallConsistency: totalItems > 0 ? ratio : 0,
       currentStreakDays: streak,
       tasksCompleted: completedTasks,
       tasksTotal: totalTasks,
@@ -85,9 +80,9 @@ export const AnalyticsPage: React.FC<AnalyticsPageProps> = ({
     };
   }, [timeRange, liveUser, liveTasks, liveQuests]);
 
-  // Synchronized goals from Goals page & Backend
+  // Synchronized goals from live state
   const dynamicGoals: AnalyticsGoalItem[] = React.useMemo(() => {
-    if (!liveGoals || liveGoals.length === 0) return initialAnalyticsGoals;
+    if (!liveGoals || liveGoals.length === 0) return [];
     return liveGoals.map((g) => ({
       id: g.id,
       title: g.title,
@@ -97,6 +92,35 @@ export const AnalyticsPage: React.FC<AnalyticsPageProps> = ({
       color: g.color || '#6366F1',
     }));
   }, [liveGoals]);
+
+  const dynamicTrendPoints = React.useMemo(() => {
+    return generateDynamicTrendPoints(liveTasks, liveQuests);
+  }, [liveTasks, liveQuests]);
+
+  const dynamicHabitBreakdown = React.useMemo(() => {
+    return generateDynamicHabitBreakdown(liveTasks, liveQuests);
+  }, [liveTasks, liveQuests]);
+
+  const dynamicConsistentHabits = React.useMemo(() => {
+    return generateDynamicConsistentHabits(liveQuests, liveTasks);
+  }, [liveQuests, liveTasks]);
+
+  const dynamicHeatmapDays = React.useMemo(() => {
+    return generateDynamicHeatmapData(liveTasks, liveQuests);
+  }, [liveTasks, liveQuests]);
+
+  const { dynamicTimeHabits, dynamicTimeTasks } = React.useMemo(() => {
+    const res = generateDynamicTimeDistribution(liveTasks, liveQuests);
+    return { dynamicTimeHabits: res.habitItems, dynamicTimeTasks: res.taskItems };
+  }, [liveTasks, liveQuests]);
+
+  const dynamicInsights = React.useMemo(() => {
+    return generateDynamicInsights(liveTasks, liveQuests, liveUser);
+  }, [liveTasks, liveQuests, liveUser]);
+
+  const dynamicAchievements = React.useMemo(() => {
+    return generateDynamicAchievements(liveTasks, liveUser);
+  }, [liveTasks, liveUser]);
 
   const handleTimeRangeChange = (range: AnalyticsTimeRange) => {
     setTimeRange(range);
@@ -225,10 +249,10 @@ export const AnalyticsPage: React.FC<AnalyticsPageProps> = ({
         {/* Primary Charts Row: Consistency Trend (66%) + Habit Breakdown (33%) */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-3 sm:gap-4 items-stretch">
           <div className="lg:col-span-8 flex flex-col">
-            <ConsistencyTrendCard data={initialTrendPoints} />
+            <ConsistencyTrendCard data={dynamicTrendPoints} />
           </div>
           <div className="lg:col-span-4 flex flex-col">
-            <HabitBreakdownCard categories={initialHabitBreakdown} />
+            <HabitBreakdownCard categories={dynamicHabitBreakdown} />
           </div>
         </div>
 
@@ -236,17 +260,17 @@ export const AnalyticsPage: React.FC<AnalyticsPageProps> = ({
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 items-stretch">
           <div className="flex flex-col">
             <MostConsistentHabitsCard
-              habits={initialConsistentHabits}
+              habits={dynamicConsistentHabits}
               onSeeAll={() => setActiveDetailModal('habits')}
             />
           </div>
           <div className="flex flex-col">
-            <ActivityHeatmapCard days={initialHeatmapDays} />
+            <ActivityHeatmapCard days={dynamicHeatmapDays} />
           </div>
           <div className="flex flex-col md:col-span-2 lg:col-span-1">
             <TimeDistributionCard
-              habitItems={initialTimeDistributionHabits}
-              taskItems={initialTimeDistributionTasks}
+              habitItems={dynamicTimeHabits}
+              taskItems={dynamicTimeTasks}
             />
           </div>
         </div>
@@ -266,14 +290,14 @@ export const AnalyticsPage: React.FC<AnalyticsPageProps> = ({
             {bottomTab === 'insights' ? (
               <div className="relative">
                 <InsightsCard
-                  insights={initialAnalyticsInsights}
+                  insights={dynamicInsights}
                   onSeeAll={() => setBottomTab('milestones')}
                 />
               </div>
             ) : (
               <div className="relative">
                 <AchievementsCard
-                  achievements={initialAnalyticsAchievements}
+                  achievements={dynamicAchievements}
                   onSeeAll={() => setBottomTab('insights')}
                 />
               </div>
@@ -366,12 +390,16 @@ export const AnalyticsPage: React.FC<AnalyticsPageProps> = ({
                 <div className="space-y-2">
                   <p className="text-slate-900 dark:text-white font-medium">All Monitored Habits (Sorted by Consistency):</p>
                   <div className="space-y-2 max-h-60 overflow-y-auto pr-1">
-                    {initialConsistentHabits.map(h => (
-                      <div key={h.id} className="flex justify-between items-center p-2 rounded-lg bg-slate-50 dark:bg-white/4 border border-slate-200/60 dark:border-transparent text-xs">
-                        <span className="text-slate-800 dark:text-white font-medium">{h.name}</span>
-                        <span className="font-bold text-[#6366F1] dark:text-[#818CF8]">{h.percentage}%</span>
-                      </div>
-                    ))}
+                    {dynamicConsistentHabits.length === 0 ? (
+                      <p className="text-xs text-slate-500 py-4 text-center">No monitored habits yet.</p>
+                    ) : (
+                      dynamicConsistentHabits.map(h => (
+                        <div key={h.id} className="flex justify-between items-center p-2 rounded-lg bg-slate-50 dark:bg-white/4 border border-slate-200/60 dark:border-transparent text-xs">
+                          <span className="text-slate-800 dark:text-white font-medium">{h.name}</span>
+                          <span className="font-bold text-[#6366F1] dark:text-[#818CF8]">{h.percentage}%</span>
+                        </div>
+                      ))
+                    )}
                   </div>
                 </div>
               )}
@@ -380,15 +408,19 @@ export const AnalyticsPage: React.FC<AnalyticsPageProps> = ({
                 <div className="space-y-2">
                   <p className="text-slate-900 dark:text-white font-medium">Quarterly Active Goals:</p>
                   <div className="space-y-2 max-h-60 overflow-y-auto pr-1">
-                    {initialAnalyticsGoals.map(g => (
-                      <div key={g.id} className="flex justify-between items-center p-2 rounded-lg bg-slate-50 dark:bg-white/4 border border-slate-200/60 dark:border-transparent text-xs">
-                        <div>
-                          <p className="text-slate-800 dark:text-white font-medium">{g.title}</p>
-                          <p className="text-[10px] text-slate-500 dark:text-[#64748B]">{g.category}</p>
+                    {dynamicGoals.length === 0 ? (
+                      <p className="text-xs text-slate-500 py-4 text-center">No active goals yet.</p>
+                    ) : (
+                      dynamicGoals.map(g => (
+                        <div key={g.id} className="flex justify-between items-center p-2 rounded-lg bg-slate-50 dark:bg-white/4 border border-slate-200/60 dark:border-transparent text-xs">
+                          <div>
+                            <p className="text-slate-800 dark:text-white font-medium">{g.title}</p>
+                            <p className="text-[10px] text-slate-500 dark:text-[#64748B]">{g.category}</p>
+                          </div>
+                          <span className="font-bold text-emerald-600 dark:text-[#34D399]">{g.percentage}%</span>
                         </div>
-                        <span className="font-bold text-emerald-600 dark:text-[#34D399]">{g.percentage}%</span>
-                      </div>
-                    ))}
+                      ))
+                    )}
                   </div>
                 </div>
               )}

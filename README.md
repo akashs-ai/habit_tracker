@@ -196,7 +196,13 @@ npm run build
 npm start
 ```
 
-### Option B: Docker
+### Option B: Vercel Deployment
+The repository includes dedicated Vercel Serverless API handlers (`api/index.ts`, `api/[...all].ts`) and rewrites (`vercel.json`) to serve all REST API routes without 405 Method Not Allowed errors.
+1. Connect your repository to Vercel.
+2. Set Environment Variables in Project Settings (`GEMINI_API_KEY`, `VITE_SUPABASE_URL`, etc.).
+3. Deploy!
+
+### Option C: Docker
 ```dockerfile
 FROM node:20-alpine
 WORKDIR /app
@@ -207,6 +213,42 @@ RUN npm run build
 EXPOSE 3000
 CMD ["npm", "start"]
 ```
+
+---
+
+## 📐 RPG Progression Engine Math
+
+LifeRPG implements an authoritative non-linear leveling curve where every subsequent level requires increasingly more XP to master:
+
+$$\text{XP Required for Level } L = 500 + (L - 1) \times 200$$
+
+- **Level 1**: 500 XP
+- **Level 2**: 700 XP (+200 XP delta)
+- **Level 3**: 900 XP (+200 XP delta)
+- **Level 4**: 1,100 XP (+200 XP delta)
+- **Level $N$**: Non-linear compounded curve ensuring long-term engagement.
+
+### Attributes System
+Tasks and quests boost specific character RPG attributes:
+- **Coding / Architecture** $\rightarrow$ **Intellect**
+- **Workout / Gym / Physical activity** $\rightarrow$ **Strength**
+- **Reading / Strategy / Research** $\rightarrow$ **Knowledge / Wisdom**
+- **Consistency / Mindfulness / Routine** $\rightarrow$ **Discipline**
+
+---
+
+## 📜 Daily Wisdom & Inscription Engine
+- Inscribe personalized motivational quotes with custom authors and category tags (Discipline, Mindset, Courage, Focus, Growth, Wisdom).
+- Earn **+10 XP** and tactile celebrations upon inscribing wisdom.
+- Instantly syncs across the Hero Banner, Header, and Sidebar.
+- Shuffle mode allows instantaneous cycling through curated and user-inscribed quotes.
+
+---
+
+## ♿ Accessibility & Tactile Micro-Interactions
+- **Zero-Latency Audio Synthesizer**: Pure Web Audio API synthesizes wooden checkmark pops, heroic major pentatonic fanfares, coin chimes, and crystal unlocks in-memory without external asset latency.
+- **Keyboard Navigation**: 100% navigable via keyboard (<kbd>Tab</kbd>, <kbd>Enter</kbd>, <kbd>Space</kbd>, <kbd>Esc</kbd>) with explicit `aria-label`, dialog roles, and visible focus rings.
+- **Resilient Offline Architecture**: Optimistic task and quest addition preserves your input during network hiccups or offline mode without ever deleting your work.
 
 ---
 

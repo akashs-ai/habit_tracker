@@ -19,6 +19,7 @@ interface EventDetailModalProps {
   onClose: () => void;
   onUpdateEvent: (updated: CalendarEvent) => void;
   onDeleteEvent: (id: string) => void;
+  onToggleTaskComplete?: (taskId: string) => void;
 }
 
 export const EventDetailModal: React.FC<EventDetailModalProps> = ({
@@ -27,6 +28,7 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({
   onClose,
   onUpdateEvent,
   onDeleteEvent,
+  onToggleTaskComplete,
 }) => {
   const [newSubtask, setNewSubtask] = useState('');
   const [isAddingSubtask, setIsAddingSubtask] = useState(false);
@@ -134,8 +136,8 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({
           </div>
         )}
 
-        {/* Badges: Category & Priority */}
-        <div className="flex items-center gap-2 mt-3.5">
+        {/* Badges: Category & Priority & Task Status */}
+        <div className="flex items-center gap-2 mt-3.5 flex-wrap">
           <span 
             className="px-2.5 py-0.5 rounded-md text-[11px] font-semibold uppercase tracking-wider"
             style={{ 
@@ -151,6 +153,27 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({
               <Flag className="w-3 h-3 fill-current" />
               <span>High</span>
             </span>
+          )}
+
+          {(event.isAutoTask || event.taskId || event.completed !== undefined) && (
+            <button
+              type="button"
+              onClick={() => {
+                const taskId = event.taskId || event.id.replace('task-evt-', '');
+                if (onToggleTaskComplete) {
+                  onToggleTaskComplete(taskId);
+                }
+                onUpdateEvent({ ...event, completed: !event.completed });
+              }}
+              className={`flex items-center gap-1.5 px-2.5 py-0.5 rounded-md text-[11px] font-semibold transition-all cursor-pointer ${
+                event.completed
+                  ? 'bg-[#10B981]/20 text-[#10B981] border border-[#10B981]/30 hover:bg-[#10B981]/30'
+                  : 'bg-white/10 text-white/80 border border-white/15 hover:bg-white/20'
+              }`}
+            >
+              <Check className="w-3 h-3 stroke-[2.5]" />
+              <span>{event.completed ? 'Task Completed' : 'Mark as Complete'}</span>
+            </button>
           )}
         </div>
 

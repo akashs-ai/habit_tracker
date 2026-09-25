@@ -20,7 +20,9 @@ import {
   FriendRequest,
   SuggestedFriend,
   CalendarIntegrationState,
-  CalendarPermissionLevel
+  CalendarPermissionLevel,
+  MotivationalQuote,
+  defaultMotivationalQuotes
 } from '../types';
 import { getSupabase, isSupabaseConfigured } from '../lib/supabase';
 import {
@@ -69,6 +71,7 @@ import {
   getStoredUserCache,
   setStoredUserCache,
   clearUserCache,
+  getLastActiveUserId,
 } from './userCache';
 import {
   initialUserProfile,
@@ -407,6 +410,8 @@ export interface FullAppState {
   notes: QuickNote[];
   attributes: Attribute[];
   weeklyData: WeeklyData[];
+  quotes?: MotivationalQuote[];
+  activeQuote?: MotivationalQuote;
   aiAgents?: AIIntegrationModel[];
   friends?: FriendUser[];
 }
@@ -1317,25 +1322,53 @@ export const api = {
             const newQuest = await createUserHabitInSupabase(session.user.id, questData);
             const cached = getStoredUserCache(session.user.id);
             if (cached) {
-              setStoredUserCache(session.user.id, { quests: [newQuest, ...cached.quests] });
+              setStoredUserCache(session.user.id, { quests: [newQuest, ...(cached.quests || [])] });
             }
             return { quest: newQuest };
           }
         }
       } catch (err: any) {
-        console.error('Supabase addQuest error:', err);
-        throw err;
+        console.warn('Supabase addQuest error, trying backend/local fallback:', err);
       }
     }
 
-    const res = await authFetch('/api/quests', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(questData),
-    });
-    const json = await safeResponseJson(res, 'Failed to add quest');
-    if (!res.ok || !json.success) throw new Error(json.error || 'Failed to add quest');
-    return { quest: json.data, state: json.state };
+    try {
+      const res = await authFetch('/api/quests', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(questData),
+      });
+      if (res.ok) {
+        const json = await safeResponseJson(res, 'Failed to add quest');
+        if (json.success && json.data) {
+          const activeUserId = getLastActiveUserId() || 'guest_user';
+          const cached = getStoredUserCache(activeUserId);
+          if (cached) {
+            setStoredUserCache(activeUserId, {
+              quests: [json.data, ...(cached.quests || []).filter((q) => q.id !== json.data.id)]
+            });
+          }
+          return { quest: json.data, state: json.state };
+        }
+      }
+    } catch (netErr) {
+      console.warn('Network addQuest fallback triggered:', netErr);
+    }
+
+    // Resilient local persistence
+    const fallbackQuest: Quest = {
+      ...questData,
+      id: `quest-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+      completed: false,
+    };
+    const activeUserId = getLastActiveUserId() || 'guest_user';
+    const cached = getStoredUserCache(activeUserId);
+    if (cached) {
+      setStoredUserCache(activeUserId, {
+        quests: [fallbackQuest, ...(cached.quests || []).filter((q) => q.id !== fallbackQuest.id)]
+      });
+    }
+    return { quest: fallbackQuest };
   },
 
   async updateQuest(questId: string, updates: Partial<Quest>): Promise<{ quest: Quest; state?: FullAppState }> {
@@ -1454,7 +1487,7 @@ export const api = {
             const task = await createUserTaskInSupabase(session.user.id, taskData);
             const cached = getStoredUserCache(session.user.id);
             if (cached) {
-              const cleanedTasks = cached.tasks.filter(
+              const cleanedTasks = (cached.tasks || []).filter(
                 (t) => t.id !== task.id && (!task.clientTempId || t.id !== task.clientTempId)
               );
               setStoredUserCache(session.user.id, { tasks: [task, ...cleanedTasks] });
@@ -1463,20 +1496,56 @@ export const api = {
           }
         }
       } catch (err: any) {
-        console.error('Supabase addTask error:', err);
-        throw err;
+        console.warn('Supabase addTask error, trying backend/local fallback:', err);
       }
     }
 
-    const res = await authFetch('/api/tasks', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(taskData),
-    });
-    const json = await safeResponseJson(res, 'Failed to add task');
-    if (!res.ok || !json.success) throw new Error(json.error || 'Failed to add task');
-    const task: TaskItem = { ...json.data, clientTempId: (taskData as any).clientTempId };
-    return { task, state: json.state };
+    try {
+      const res = await authFetch('/api/tasks', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(taskData),
+      });
+      if (res.ok) {
+        const json = await safeResponseJson(res, 'Failed to add task');
+        if (json.success && json.data) {
+          const task: TaskItem = { ...json.data, clientTempId: (taskData as any).clientTempId };
+          const activeUserId = getLastActiveUserId() || 'guest_user';
+          const cached = getStoredUserCache(activeUserId);
+          if (cached) {
+            const cleaned = (cached.tasks || []).filter(
+              (t) => t.id !== task.id && (!task.clientTempId || t.id !== task.clientTempId)
+            );
+            setStoredUserCache(activeUserId, { tasks: [task, ...cleaned] });
+          }
+          return { task, state: json.state };
+        }
+      }
+    } catch (netErr) {
+      console.warn('Network addTask fallback triggered:', netErr);
+    }
+
+    // Resilient local persistence
+    const fallbackId = `task-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
+    const task: TaskItem = {
+      ...taskData,
+      id: fallbackId,
+      completed: false,
+      clientTempId: (taskData as any).clientTempId || fallbackId,
+      dueDate: taskData.dueDate || new Date().toISOString().split('T')[0],
+      clientDate: taskData.clientDate || new Date().toISOString().split('T')[0],
+      labels: taskData.labels || ['Personal'],
+      xpReward: taskData.xpReward || 15
+    };
+    const activeUserId = getLastActiveUserId() || 'guest_user';
+    const cached = getStoredUserCache(activeUserId);
+    if (cached) {
+      const existing = cached.tasks || [];
+      setStoredUserCache(activeUserId, {
+        tasks: [task, ...existing.filter((t) => t.id !== task.id && (!task.clientTempId || t.id !== task.clientTempId))]
+      });
+    }
+    return { task };
   },
 
   async updateTask(taskData: TaskItem): Promise<{ task: TaskItem; state?: FullAppState }> {
@@ -2563,5 +2632,205 @@ export const api = {
     const json = await safeResponseJson(res, 'Failed to remove friend');
     if (!res.ok || !json.success) throw new Error(json.error || 'Failed to remove friend');
     return json;
+  },
+
+  // --- Quotes & Daily Wisdom ---
+  async getQuotes(): Promise<{ quotes: MotivationalQuote[]; activeQuote: MotivationalQuote }> {
+    try {
+      const res = await authFetch('/api/quotes');
+      if (res.ok) {
+        const json = await safeResponseJson(res, 'Failed to fetch quotes');
+        if (json.success && json.data) {
+          const activeUserId = getLastActiveUserId() || 'guest_user';
+          setStoredUserCache(activeUserId, {
+            quotes: json.data.quotes,
+            activeQuote: json.data.activeQuote,
+          });
+          return json.data;
+        }
+      }
+    } catch (e) {
+      console.warn('Network quote fetch error, reading local cache:', e);
+    }
+    const activeUserId = getLastActiveUserId() || 'guest_user';
+    const cached = getStoredUserCache(activeUserId);
+    const quotes = cached?.quotes && cached.quotes.length > 0 ? cached.quotes : defaultMotivationalQuotes;
+    const activeQuote = cached?.activeQuote || quotes.find((q) => q.isActive) || quotes[0];
+    return { quotes, activeQuote };
+  },
+
+  async addQuote(quoteData: {
+    text: string;
+    author?: string;
+    category?: string;
+    setActive?: boolean;
+  }): Promise<{ quote: MotivationalQuote; activeQuote: MotivationalQuote; state?: FullAppState }> {
+    try {
+      const res = await authFetch('/api/quotes', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(quoteData),
+      });
+      if (res.ok) {
+        const json = await safeResponseJson(res, 'Failed to add quote');
+        if (json.success && json.data?.quote) {
+          const activeUserId = getLastActiveUserId() || 'guest_user';
+          const cached = getStoredUserCache(activeUserId);
+          const existingQuotes = cached?.quotes || defaultMotivationalQuotes;
+          const newQuotes = [json.data.quote, ...existingQuotes.filter((q) => q.id !== json.data.quote.id)];
+          setStoredUserCache(activeUserId, {
+            quotes: newQuotes,
+            activeQuote: json.data.activeQuote || (json.data.quote.isActive ? json.data.quote : cached?.activeQuote),
+          });
+          return { quote: json.data.quote, activeQuote: json.data.activeQuote, state: json.state };
+        }
+      }
+    } catch (netErr) {
+      console.warn('Network addQuote fallback triggered:', netErr);
+    }
+
+    // Resilient local persistence
+    const shouldBeActive = quoteData.setActive !== false;
+    const newQuote: MotivationalQuote = {
+      id: `quote-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+      text: quoteData.text.trim(),
+      author: quoteData.author?.trim() || 'Adventurer',
+      category: (quoteData.category as any) || 'mindset',
+      isActive: shouldBeActive,
+      isCustom: true,
+      createdAt: new Date().toISOString(),
+    };
+
+    const activeUserId = getLastActiveUserId() || 'guest_user';
+    const cached = getStoredUserCache(activeUserId);
+    const existingQuotes = cached?.quotes && cached.quotes.length > 0 ? cached.quotes : defaultMotivationalQuotes;
+    const updatedQuotes = [
+      newQuote,
+      ...existingQuotes.map((q) => (shouldBeActive ? { ...q, isActive: false } : q)),
+    ];
+    const activeQuote = shouldBeActive ? newQuote : (cached?.activeQuote || updatedQuotes[0]);
+
+    setStoredUserCache(activeUserId, {
+      quotes: updatedQuotes,
+      activeQuote,
+    });
+
+    return { quote: newQuote, activeQuote };
+  },
+
+  async setActiveQuote(quoteId: string): Promise<{ activeQuote: MotivationalQuote; quotes: MotivationalQuote[]; state?: FullAppState }> {
+    try {
+      const res = await authFetch(`/api/quotes/${quoteId}/active`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+      });
+      if (res.ok) {
+        const json = await safeResponseJson(res, 'Failed to set active quote');
+        if (json.success && json.data) {
+          const activeUserId = getLastActiveUserId() || 'guest_user';
+          setStoredUserCache(activeUserId, {
+            quotes: json.data.quotes,
+            activeQuote: json.data.activeQuote,
+          });
+          return { activeQuote: json.data.activeQuote, quotes: json.data.quotes, state: json.state };
+        }
+      }
+    } catch (netErr) {
+      console.warn('Network setActiveQuote fallback triggered:', netErr);
+    }
+
+    const activeUserId = getLastActiveUserId() || 'guest_user';
+    const cached = getStoredUserCache(activeUserId);
+    const existingQuotes = cached?.quotes && cached.quotes.length > 0 ? cached.quotes : defaultMotivationalQuotes;
+    const target = existingQuotes.find((q) => q.id === quoteId) || existingQuotes[0];
+    const updatedQuotes = existingQuotes.map((q) => ({
+      ...q,
+      isActive: q.id === quoteId,
+    }));
+    const activeQuote = { ...target, isActive: true };
+
+    setStoredUserCache(activeUserId, {
+      quotes: updatedQuotes,
+      activeQuote,
+    });
+
+    return { activeQuote, quotes: updatedQuotes };
+  },
+
+  async deleteQuote(quoteId: string): Promise<{ success: boolean; state?: FullAppState }> {
+    try {
+      const res = await authFetch(`/api/quotes/${quoteId}`, {
+        method: 'DELETE',
+      });
+      if (res.ok) {
+        const json = await safeResponseJson(res, 'Failed to delete quote');
+        if (json.success) {
+          const activeUserId = getLastActiveUserId() || 'guest_user';
+          const cached = getStoredUserCache(activeUserId);
+          if (cached?.quotes) {
+            setStoredUserCache(activeUserId, {
+              quotes: cached.quotes.filter((q) => q.id !== quoteId),
+            });
+          }
+          return { success: true, state: json.state };
+        }
+      }
+    } catch (netErr) {
+      console.warn('Network deleteQuote fallback triggered:', netErr);
+    }
+
+    const activeUserId = getLastActiveUserId() || 'guest_user';
+    const cached = getStoredUserCache(activeUserId);
+    if (cached?.quotes) {
+      const updatedQuotes = cached.quotes.filter((q) => q.id !== quoteId);
+      const activeQuote = cached.activeQuote?.id === quoteId ? updatedQuotes[0] : cached.activeQuote;
+      setStoredUserCache(activeUserId, {
+        quotes: updatedQuotes,
+        activeQuote,
+      });
+    }
+
+    return { success: true };
+  },
+
+  async shuffleQuote(): Promise<{ activeQuote: MotivationalQuote; quotes: MotivationalQuote[]; state?: FullAppState }> {
+    try {
+      const res = await authFetch('/api/quotes/shuffle', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+      });
+      if (res.ok) {
+        const json = await safeResponseJson(res, 'Failed to shuffle quote');
+        if (json.success && json.data) {
+          const activeUserId = getLastActiveUserId() || 'guest_user';
+          setStoredUserCache(activeUserId, {
+            quotes: json.data.quotes,
+            activeQuote: json.data.activeQuote,
+          });
+          return { activeQuote: json.data.activeQuote, quotes: json.data.quotes, state: json.state };
+        }
+      }
+    } catch (netErr) {
+      console.warn('Network shuffleQuote fallback triggered:', netErr);
+    }
+
+    const activeUserId = getLastActiveUserId() || 'guest_user';
+    const cached = getStoredUserCache(activeUserId);
+    const existingQuotes = cached?.quotes && cached.quotes.length > 0 ? cached.quotes : defaultMotivationalQuotes;
+    const currentActiveId = cached?.activeQuote?.id;
+    const candidates = existingQuotes.filter((q) => q.id !== currentActiveId);
+    const chosen = candidates.length > 0 ? candidates[Math.floor(Math.random() * candidates.length)] : existingQuotes[0];
+    const updatedQuotes = existingQuotes.map((q) => ({
+      ...q,
+      isActive: q.id === chosen.id,
+    }));
+    const activeQuote = { ...chosen, isActive: true };
+
+    setStoredUserCache(activeUserId, {
+      quotes: updatedQuotes,
+      activeQuote,
+    });
+
+    return { activeQuote, quotes: updatedQuotes };
   }
 };

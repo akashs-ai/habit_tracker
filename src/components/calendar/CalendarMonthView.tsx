@@ -130,7 +130,10 @@ export const CalendarMonthView: React.FC<CalendarMonthViewProps> = ({
                     className="w-full text-left px-2 py-1 rounded bg-slate-100 dark:bg-[#151820] hover:bg-slate-200 dark:hover:bg-[#1A1D24] border border-slate-200 dark:border-white/6 hover:border-slate-300 dark:hover:border-white/12 transition-all group/chip cursor-pointer relative overflow-hidden"
                     style={{ borderLeftWidth: '3px', borderLeftColor: evt.color }}
                   >
-                    <div className="text-[10px] font-semibold text-slate-800 dark:text-[#F5F7FF] truncate leading-tight group-hover/chip:text-slate-950 dark:group-hover/chip:text-white">
+                    <div className={`text-[10px] font-semibold truncate leading-tight group-hover/chip:text-slate-950 dark:group-hover/chip:text-white ${
+                      evt.completed ? 'line-through text-slate-400 dark:text-[#6F7789]' : 'text-slate-800 dark:text-[#F5F7FF]'
+                    }`}>
+                      {evt.completed && <span className="text-[#10B981] font-bold mr-0.5">✓</span>}
                       {evt.title}
                     </div>
                     {evt.startTime && !evt.allDay && (

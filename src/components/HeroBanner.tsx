@@ -23,18 +23,25 @@ import {
   ArrowRight,
   Zap,
 } from 'lucide-react';
-import { UserProfile } from '../types';
+import { UserProfile, MotivationalQuote } from '../types';
 import { getCurrentTimeInfo, formatFullDayHeader, getLiveTodayISO } from '../utils/dateUtils';
 
 interface HeroBannerProps {
   user: UserProfile;
   onNavigateTab?: (tab: string) => void;
+  activeQuote?: MotivationalQuote;
+  onOpenQuotesModal?: () => void;
 }
 
 const TOTAL_SLIDES = 4;
 const SLIDE_INTERVAL_MS = 4800;
 
-export const HeroBanner: React.FC<HeroBannerProps> = ({ user, onNavigateTab }) => {
+export const HeroBanner: React.FC<HeroBannerProps> = ({ 
+  user, 
+  onNavigateTab,
+  activeQuote,
+  onOpenQuotesModal
+}) => {
   const [currentSlide, setCurrentSlide] = useState(0);
   const [direction, setDirection] = useState(1);
   const [isPaused, setIsPaused] = useState(false);
@@ -231,11 +238,25 @@ export const HeroBanner: React.FC<HeroBannerProps> = ({ user, onNavigateTab }) =
                     {/* Handwritten Quote in the top right */}
                     <div 
                       id="hero-banner-quote-container"
-                      className="absolute top-4 sm:top-6 right-6 sm:right-10 text-right select-none transform -rotate-1"
+                      onClick={onOpenQuotesModal}
+                      className="absolute top-4 sm:top-6 right-6 sm:right-10 text-right select-none transform -rotate-1 cursor-pointer group"
+                      title="Click to change or inscribe daily wisdom quotes"
+                      role="button"
+                      tabIndex={0}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' || e.key === ' ') {
+                          e.preventDefault();
+                          onOpenQuotesModal?.();
+                        }
+                      }}
                     >
-                      <span className="font-handwriting text-2xl sm:text-3xl lg:text-4xl text-[#2B3674] dark:text-[#D1D9FF] font-semibold tracking-wide drop-shadow-2xs">
-                        Progress, not perfection.
+                      <span className="font-handwriting text-2xl sm:text-3xl lg:text-4xl text-[#2B3674] dark:text-[#D1D9FF] font-semibold tracking-wide drop-shadow-2xs group-hover:text-[#7C6CFF] dark:group-hover:text-amber-300 transition-colors">
+                        {activeQuote?.text || 'Progress, not perfection.'}
                       </span>
+                      <div className="text-[11px] text-[#556987] dark:text-slate-400 group-hover:text-[#7C6CFF] dark:group-hover:text-amber-300 transition-colors italic flex items-center justify-end gap-1 mt-0.5">
+                        <span>— {activeQuote?.author || 'Alex Rivera'}</span>
+                        <span className="opacity-0 group-hover:opacity-100 transition-opacity text-[10px] font-sans font-bold px-1.5 py-0.2 rounded-md bg-white/80 dark:bg-black/40">Edit ✎</span>
+                      </div>
                     </div>
                   </div>
 

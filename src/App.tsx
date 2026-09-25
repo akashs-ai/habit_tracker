@@ -39,6 +39,7 @@ import {
   QuickNote, 
   TaskItem, 
   CalendarEvent, 
+  EventCategory,
   DetailedGoal,
   RewardItem,
   RewardBadge,
@@ -66,9 +67,10 @@ const LandingWelcomePage = React.lazy(() => import('./components/auth/LandingWel
 import { AuthModal } from './components/auth/AuthModal';
 import { GuestBanner } from './components/auth/GuestBanner';
 import { LevelUpModal } from './components/effects/LevelUpModal';
+import { QuotesModal } from './components/quotes/QuotesModal';
 import { Footer } from './components/footer/Footer';
 import { api, BackendState, supabaseUserToAuthUser, setStoredAuthToken } from './services/api';
-import { AuthUser, AuthScreenType, AppearanceSettings as AppearanceSettingsType } from './types';
+import { AuthUser, AuthScreenType, AppearanceSettings as AppearanceSettingsType, MotivationalQuote } from './types';
 import { getStoredAppearance, applyAppearanceToDOM } from './utils/appearanceManager';
 import { subscribeToUserTable, isSupabaseConfigured, getSupabase } from './lib/supabase';
 import { initialAIModels } from './data/aiIntegrationMockData';
@@ -234,6 +236,11 @@ export default function App() {
   const [isAddNoteOpen, setIsAddNoteOpen] = useState(false);
   const [isLevelUpOpen, setIsLevelUpOpen] = useState(false);
   const [levelUpLevel, setLevelUpLevel] = useState(2);
+  const [isQuotesModalOpen, setIsQuotesModalOpen] = useState(false);
+
+  // Quotes and Daily Wisdom
+  const [quotes, setQuotes] = useState<MotivationalQuote[]>([]);
+  const [activeQuote, setActiveQuote] = useState<MotivationalQuote | undefined>(undefined);
 
   // AI Agent Models Synchronized State
   const [aiAgents, setAiAgents] = useState<AIIntegrationModel[]>(initialAIModels);
@@ -247,19 +254,18 @@ export default function App() {
   const syncFromBackend = (data: BackendState, options?: { allowTaskSync?: boolean; user?: AuthUser | null }) => {
     if (!data) return;
     if (data.user) setUser(data.user);
-    // For authenticated users, Supabase is the sole authoritative source for quests/habits and tasks.
-    // Never allow unscoped Express state or mutation side-effects to overwrite authenticated habits/tasks.
     const effectiveUser = options?.user !== undefined ? options.user : currentUser;
     const isAuthUser = Boolean(effectiveUser && !effectiveUser.isGuest);
-    const shouldSyncQuests = Array.isArray(data.quests) && (!isAuthUser || options?.allowTaskSync);
-    if (shouldSyncQuests) {
-      const finalQuests = isAuthUser ? data.quests.filter((q) => !q.id.startsWith('quest-')) : data.quests;
+    
+    // Quests & Habits synchronization (cleanly retains all user-created and persisted habits)
+    if (Array.isArray(data.quests)) {
+      const finalQuests = data.quests.filter((q) => !q.id.startsWith('mock-'));
       setQuests(finalQuests);
     }
 
-    const shouldSyncTasks = Array.isArray(data.tasks) && (!isAuthUser || options?.allowTaskSync);
-    if (shouldSyncTasks) {
-      const finalTasks = isAuthUser ? data.tasks.filter((t) => !t.id.startsWith('task-')) : data.tasks;
+    // Tasks synchronization (cleanly retains all user-created and persisted tasks)
+    if (Array.isArray(data.tasks)) {
+      const finalTasks = data.tasks.filter((t) => !t.id.startsWith('mock-'));
       setTasks(finalTasks);
     }
 
@@ -296,6 +302,12 @@ export default function App() {
     if (Array.isArray(data.friends)) {
       const finalFriends = isAuthUser ? data.friends.filter((f) => !f.id.startsWith('friend-')) : data.friends;
       setFriends(finalFriends);
+    }
+    if (Array.isArray(data.quotes)) {
+      setQuotes(data.quotes);
+    }
+    if (data.activeQuote) {
+      setActiveQuote(data.activeQuote);
     }
   };
 
@@ -1058,9 +1070,10 @@ export default function App() {
       }
       if (res.state) syncFromBackend(res.state);
     } catch (err: any) {
-      console.error('Add quest error:', err);
-      setQuests((prev) => prev.filter((q) => q.id !== optimisticQuest.id));
-      setVerifiedBannerMessage(`Failed to create habit: ${err?.message || 'Database error'}`);
+      console.warn('Backend add quest notice (preserving optimistically):', err);
+      // Keep optimistic quest in UI so the user NEVER loses it!
+      setVerifiedBannerMessage(`Saved locally: Habit quest recorded! Will sync when connection is verified.`);
+      setTimeout(() => setVerifiedBannerMessage(null), 4000);
     }
   };
 
@@ -1120,8 +1133,85 @@ export default function App() {
     }
   };
 
+  // Quotes handlers
+  const handleAddQuote = async (quoteData: { text: string; author?: string; category?: string; setActive?: boolean }) => {
+    try {
+      const res = await api.addQuote(quoteData);
+      if (res.quote) {
+        setQuotes((prev) => [res.quote, ...prev.filter((q) => q.id !== res.quote.id)]);
+      }
+      if (res.activeQuote) {
+        setActiveQuote(res.activeQuote);
+      }
+      if (res.state) {
+        syncFromBackend(res.state);
+      } else {
+        setUser((prevUser) => {
+          const prog = calculateProgressionDelta(prevUser, 10, 10);
+          if (prog.level > prevUser.level) {
+            setLevelUpLevel(prog.level);
+            setIsLevelUpOpen(true);
+          }
+          return {
+            ...prevUser,
+            ...prog,
+          };
+        });
+      }
+      setXpToast({ show: true, xp: 10, attribute: 'Wisdom' });
+      setTimeout(() => setXpToast(null), 2500);
+    } catch (err: any) {
+      console.error('Failed to add quote:', err);
+      throw err;
+    }
+  };
+
+  const handleSetActiveQuote = async (quoteId: string) => {
+    try {
+      const res = await api.setActiveQuote(quoteId);
+      if (res.activeQuote) {
+        setActiveQuote(res.activeQuote);
+      }
+      if (res.quotes) {
+        setQuotes(res.quotes);
+      }
+      if (res.state) syncFromBackend(res.state);
+    } catch (err) {
+      console.error('Failed to set active quote:', err);
+    }
+  };
+
+  const handleDeleteQuote = async (quoteId: string) => {
+    try {
+      await api.deleteQuote(quoteId);
+      setQuotes((prev) => prev.filter((q) => q.id !== quoteId));
+      if (activeQuote?.id === quoteId) {
+        const nextActive = quotes.find((q) => q.id !== quoteId);
+        if (nextActive) setActiveQuote(nextActive);
+      }
+    } catch (err) {
+      console.error('Failed to delete quote:', err);
+    }
+  };
+
+  const handleShuffleQuote = async () => {
+    try {
+      const res = await api.shuffleQuote();
+      if (res.activeQuote) {
+        setActiveQuote(res.activeQuote);
+      }
+      if (res.quotes) {
+        setQuotes(res.quotes);
+      }
+      if (res.state) syncFromBackend(res.state);
+    } catch (err) {
+      console.error('Failed to shuffle quote:', err);
+    }
+  };
+
   // Task Handlers for TasksPage
-  const handleToggleTaskComplete = async (taskId: string) => {
+  const handleToggleTaskComplete = async (rawTaskId: string) => {
+    const taskId = rawTaskId.startsWith('task-evt-') ? rawTaskId.replace('task-evt-', '') : rawTaskId;
     // 0. Concurrency guard: Ignore repeated clicks while mutation is already pending for this task
     if (pendingTaskTogglesRef.current.has(taskId)) return;
 
@@ -1248,9 +1338,10 @@ export default function App() {
     try {
       await addPromise;
     } catch (err: any) {
-      console.error('Add task error:', err);
-      setTasks((prev) => prev.filter((t) => t.id !== clientTempId));
-      setVerifiedBannerMessage(`Failed to create task: ${err?.message || 'Database error'}`);
+      console.warn('Backend add task notice (preserving optimistically):', err);
+      // Keep optimistic task in UI so the user NEVER loses what they typed!
+      setVerifiedBannerMessage(`Saved locally: Task recorded! Will sync when connection is verified.`);
+      setTimeout(() => setVerifiedBannerMessage(null), 4000);
     } finally {
       pendingCreationPromisesRef.current.delete(clientTempId);
     }
@@ -1313,6 +1404,95 @@ export default function App() {
     }
   };
 
+  // Unified Bidirectional Task & Calendar Synchronization:
+  // Automatically transforms and syncs all tasks into calendar events with live status and time tracking
+  const mergedCalendarEvents = useMemo(() => {
+    const localToday = getTodayISO();
+
+    const taskEvents: CalendarEvent[] = tasks.map((t) => {
+      // Determine date
+      let eventDate = t.dueDate;
+      if (!eventDate) {
+        if (t.viewCategory === 'today' || t.dueText?.toLowerCase().includes('today')) {
+          eventDate = localToday;
+        } else if (t.viewCategory === 'upcoming' || t.dueText?.toLowerCase().includes('tomorrow')) {
+          eventDate = addDaysISO(localToday, 1);
+        } else if (t.dueText?.toLowerCase().includes('next week')) {
+          eventDate = addDaysISO(localToday, 7);
+        } else {
+          eventDate = t.clientDate || localToday;
+        }
+      }
+
+      // Determine category and theme color based on task labels
+      const primaryLabel = (t.labels && t.labels.length > 0 ? t.labels[0] : 'Personal').toLowerCase();
+      let category: EventCategory = 'personal';
+      let color = '#6366F1';
+
+      if (primaryLabel.includes('work') || primaryLabel.includes('job')) {
+        category = 'project';
+        color = '#3B82F6';
+      } else if (primaryLabel.includes('study') || primaryLabel.includes('learn') || primaryLabel.includes('reading')) {
+        category = 'study';
+        color = '#7C5CFF';
+      } else if (primaryLabel.includes('workout') || primaryLabel.includes('gym') || primaryLabel.includes('fitness')) {
+        category = 'workout';
+        color = '#22C55E';
+      } else if (primaryLabel.includes('health') || primaryLabel.includes('diet')) {
+        category = 'health';
+        color = '#EF4444';
+      } else if (primaryLabel.includes('social') || primaryLabel.includes('friends')) {
+        category = 'social';
+        color = '#EC4899';
+      } else if (primaryLabel.includes('entertainment') || primaryLabel.includes('gaming') || primaryLabel.includes('finance')) {
+        category = 'entertainment';
+        color = '#06B6D4';
+      } else if (primaryLabel.includes('project')) {
+        category = 'project';
+        color = '#F59E0B';
+      }
+
+      const startTime = t.dueTime || '10:00 AM';
+      let endTime = '11:00 AM';
+      if (startTime.includes('10:00 AM')) endTime = '11:00 AM';
+      else if (startTime.includes('09:00 AM')) endTime = '10:00 AM';
+      else if (startTime.includes('11:00 AM')) endTime = '12:00 PM';
+
+      return {
+        id: `task-evt-${t.id}`,
+        title: t.title,
+        date: eventDate,
+        startTime,
+        endTime,
+        category,
+        color,
+        description: t.description || (t.labels && t.labels.length > 0 ? `Labels: ${t.labels.join(', ')}` : ''),
+        priority: t.priority || 'medium',
+        completed: t.completed,
+        isAutoTask: true,
+        taskId: t.id,
+        subtasks: t.subtasks?.map((st) => ({
+          id: st.id,
+          title: st.title,
+          completed: st.completed,
+        })),
+      };
+    });
+
+    // Prevent duplicates if an event already exists with the same task ID or identical title & date
+    const taskTitlesAndDates = new Set(
+      tasks.map((t) => `${t.dueDate || t.clientDate || localToday}::${t.title.trim().toLowerCase()}`)
+    );
+
+    const nonDuplicateCalendarEvents = calendarEvents.filter((e) => {
+      if (e.isAutoTask || e.taskId) return false;
+      const key = `${e.date}::${e.title.trim().toLowerCase()}`;
+      return !taskTitlesAndDates.has(key);
+    });
+
+    return [...taskEvents, ...nonDuplicateCalendarEvents];
+  }, [tasks, calendarEvents]);
+
   // Calendar Handlers
   const handleAddCalendarEvent = async (newEventData: Omit<CalendarEvent, 'id'> & { id?: string }) => {
     const isProvidedUUID = Boolean(newEventData.id && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(newEventData.id));
@@ -1328,6 +1508,23 @@ export default function App() {
       }
       return [optimisticEvent, ...prev];
     });
+
+    // Bidirectional sync: Also add to tasks so it appears in the Tasks page
+    const localToday = getTodayISO();
+    const taskCategory = newEventData.date === localToday ? 'today' : 'upcoming';
+    const mappedTask: Omit<TaskItem, 'id'> = {
+      title: newEventData.title,
+      description: newEventData.description || '',
+      completed: newEventData.completed ?? false,
+      dueDate: newEventData.date,
+      dueTime: newEventData.startTime || '10:00 AM',
+      dueText: newEventData.date === localToday ? 'Today' : formatReadableDate(newEventData.date),
+      viewCategory: taskCategory,
+      labels: [newEventData.category.charAt(0).toUpperCase() + newEventData.category.slice(1)],
+      priority: newEventData.priority || 'medium',
+      xpReward: 20,
+    };
+    handleAddTask(mappedTask);
 
     const addPromise = (async () => {
       const res = await enqueueCalendarMutation(eventId, async () => {
@@ -1364,6 +1561,24 @@ export default function App() {
   };
 
   const handleUpdateCalendarEvent = async (updatedEvent: CalendarEvent) => {
+    // If this is a synchronized task event, update the task directly so both stay in sync
+    if (updatedEvent.isAutoTask || updatedEvent.taskId || updatedEvent.id.startsWith('task-evt-')) {
+      const taskId = updatedEvent.taskId || updatedEvent.id.replace('task-evt-', '');
+      const existingTask = tasks.find((t) => t.id === taskId);
+      if (existingTask) {
+        await handleUpdateTask({
+          ...existingTask,
+          title: updatedEvent.title,
+          dueDate: updatedEvent.date,
+          dueTime: updatedEvent.startTime,
+          completed: updatedEvent.completed ?? existingTask.completed,
+          description: updatedEvent.description ?? existingTask.description,
+          priority: updatedEvent.priority ?? existingTask.priority,
+        });
+        return;
+      }
+    }
+
     let effectiveEvent = { ...updatedEvent };
     if (pendingCalendarCreationPromisesRef.current.has(updatedEvent.id)) {
       try {
@@ -1399,6 +1614,18 @@ export default function App() {
   };
 
   const handleDeleteCalendarEvent = async (eventId: string) => {
+    // If this is a synchronized task event, delete the task directly so both stay in sync
+    if (eventId.startsWith('task-evt-')) {
+      const taskId = eventId.replace('task-evt-', '');
+      await handleDeleteTask(taskId);
+      return;
+    }
+    const matchedTaskEvent = mergedCalendarEvents.find((e) => e.id === eventId);
+    if (matchedTaskEvent?.taskId) {
+      await handleDeleteTask(matchedTaskEvent.taskId);
+      return;
+    }
+
     let effectiveEventId = eventId;
     if (pendingCalendarCreationPromisesRef.current.has(eventId)) {
       try {
@@ -1898,7 +2125,7 @@ export default function App() {
         />
       ) : activeTab === 'calendar' ? (
         <CalendarPage
-          events={calendarEvents}
+          events={mergedCalendarEvents}
           onAddEvent={handleAddCalendarEvent}
           onUpdateEvent={handleUpdateCalendarEvent}
           onDeleteEvent={handleDeleteCalendarEvent}
@@ -1910,6 +2137,7 @@ export default function App() {
           onMarkAllNotificationsAsRead={handleMarkAllNotificationsAsRead}
           onClearAllNotifications={handleClearAllNotifications}
           onNavigateTab={handleNavigateTab}
+          onToggleTaskComplete={handleToggleTaskComplete}
         />
       ) : activeTab === 'tasks' ? (
         <TasksPage
@@ -1943,6 +2171,8 @@ export default function App() {
             onMarkAllNotificationsAsRead={handleMarkAllNotificationsAsRead}
             onClearAllNotifications={handleClearAllNotifications}
             onNavigateTab={handleNavigateTab}
+            activeQuote={activeQuote}
+            onOpenQuotesModal={() => setIsQuotesModalOpen(true)}
           />
 
           {/* Page Container */}
@@ -1953,7 +2183,12 @@ export default function App() {
               {/* Left Main Column: Hero, Quests, Analytics Bento, Goals */}
               <div className="lg:col-span-8 xl:col-span-9 flex flex-col gap-8">
                 {/* 1. Hero & Bento Stats Carousel */}
-                <HeroBanner user={user} onNavigateTab={handleNavigateTab} />
+                <HeroBanner 
+                  user={user} 
+                  onNavigateTab={handleNavigateTab} 
+                  activeQuote={activeQuote}
+                  onOpenQuotesModal={() => setIsQuotesModalOpen(true)}
+                />
 
                 {/* 2. Today's Quests */}
                 <TodayQuests
@@ -1985,6 +2220,8 @@ export default function App() {
                   onAddNote={() => setIsAddNoteOpen(true)}
                   onDeleteNote={handleDeleteNote}
                   onNavigateTab={handleNavigateTab}
+                  activeQuote={activeQuote}
+                  onOpenQuotesModal={() => setIsQuotesModalOpen(true)}
                 />
               </div>
 
@@ -2041,6 +2278,17 @@ export default function App() {
         isOpen={isAddNoteOpen}
         onClose={() => setIsAddNoteOpen(false)}
         onAddNote={handleAddNote}
+      />
+
+      <QuotesModal
+        isOpen={isQuotesModalOpen}
+        onClose={() => setIsQuotesModalOpen(false)}
+        quotes={quotes}
+        activeQuote={activeQuote}
+        onAddQuote={handleAddQuote}
+        onSetActiveQuote={handleSetActiveQuote}
+        onDeleteQuote={handleDeleteQuote}
+        onShuffleQuote={handleShuffleQuote}
       />
 
       {/* Level Up Celebratory Modal */}

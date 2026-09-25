@@ -32,7 +32,9 @@ import {
   FriendUser,
   FriendRequest,
   SuggestedFriend,
-  CalendarIntegrationState
+  CalendarIntegrationState,
+  MotivationalQuote,
+  QuoteCategory
 } from '../src/types';
 import { 
   initialUserProfile, 
@@ -252,10 +254,87 @@ export interface AppStoreData {
   weeklyData: WeeklyData[];
   activityHistory: ActivityCheckIn[];
   termsPolicy: RewardTermsPolicy;
+  quotes?: MotivationalQuote[];
+  activeQuote?: MotivationalQuote;
   aiAgents?: AIIntegrationModel[];
   calendarIntegration?: CalendarIntegrationState;
   lastUpdated: string;
 }
+
+export const defaultMotivationalQuotes: MotivationalQuote[] = [
+  {
+    id: 'quote-1',
+    text: 'Progress, not perfection.',
+    author: 'Alex Rivera',
+    category: 'mindset',
+    isActive: true,
+    isCustom: false,
+    createdAt: new Date().toISOString(),
+  },
+  {
+    id: 'quote-2',
+    text: 'Discipline today, a brighter tomorrow.',
+    author: 'Ancient Wisdom',
+    category: 'discipline',
+    isActive: false,
+    isCustom: false,
+    createdAt: new Date().toISOString(),
+  },
+  {
+    id: 'quote-3',
+    text: 'Small steps, bigger tomorrow.',
+    author: 'Daily Stoic',
+    category: 'growth',
+    isActive: false,
+    isCustom: false,
+    createdAt: new Date().toISOString(),
+  },
+  {
+    id: 'quote-4',
+    text: 'We suffer more often in imagination than in reality.',
+    author: 'Seneca',
+    category: 'mindset',
+    isActive: false,
+    isCustom: false,
+    createdAt: new Date().toISOString(),
+  },
+  {
+    id: 'quote-5',
+    text: 'You do not rise to the level of your goals. You fall to the level of your systems.',
+    author: 'James Clear',
+    category: 'discipline',
+    isActive: false,
+    isCustom: false,
+    createdAt: new Date().toISOString(),
+  },
+  {
+    id: 'quote-6',
+    text: 'The obstacle is the way.',
+    author: 'Marcus Aurelius',
+    category: 'courage',
+    isActive: false,
+    isCustom: false,
+    createdAt: new Date().toISOString(),
+  },
+  {
+    id: 'quote-7',
+    text: 'Focus on being productive instead of busy.',
+    author: 'Tim Ferriss',
+    category: 'focus',
+    isActive: false,
+    isCustom: false,
+    createdAt: new Date().toISOString(),
+  },
+  {
+    id: 'quote-8',
+    text: 'Small daily victories compound into legendary achievements.',
+    author: 'LifeRPG Philosophy',
+    category: 'growth',
+    isActive: false,
+    isCustom: false,
+    createdAt: new Date().toISOString(),
+  },
+];
 
 export const defaultAIAgents: AIIntegrationModel[] = [
   {
@@ -758,115 +837,7 @@ class LifeRpgDatabase {
   public createStarterStore(name: string, isGuest: boolean): AppStoreData {
     const todayStr = getTodayDateStr();
 
-    if (isGuest) {
-      const starterQuests: Quest[] = [
-        {
-          id: `quest-${Date.now()}-1`,
-          title: 'Morning Focus Sprint',
-          subtitle: '25 min deep work sprint',
-          category: 'focus',
-          durationMinutes: 25,
-          xpReward: 35,
-          attribute: 'Intellect',
-          completed: false,
-        },
-        {
-          id: `quest-${Date.now()}-2`,
-          title: 'Daily Reflection & Plan',
-          subtitle: 'Review priorities for the day',
-          category: 'personal',
-          durationMinutes: 10,
-          xpReward: 20,
-          attribute: 'Discipline',
-          completed: false,
-        },
-      ];
-
-      const starterTasks: TaskItem[] = [
-        {
-          id: `task-${Date.now()}-1`,
-          title: 'Explore LifeRPG Dashboard',
-          description: 'Check out habits, tasks, calendar, and AI coaching guidance.',
-          completed: false,
-          viewCategory: 'today',
-          dueText: 'Today',
-          dueDate: todayStr,
-          clientDate: todayStr,
-          dueTime: '11:00 AM',
-          labels: ['Discipline', 'Onboarding'],
-          priority: 'high',
-          xpReward: 30,
-        },
-        {
-          id: `task-${Date.now()}-2`,
-          title: 'Check in with AI Coach',
-          description: 'Ask AI Coach for habit strategies and productivity momentum.',
-          completed: false,
-          viewCategory: 'today',
-          dueText: 'Today',
-          dueDate: todayStr,
-          clientDate: todayStr,
-          dueTime: '02:00 PM',
-          labels: ['Focus'],
-          priority: 'medium',
-          xpReward: 20,
-        },
-      ];
-
-      return {
-        user: {
-          name,
-          level: 1,
-          currentXp: 0,
-          nextLevelXp: 500,
-          streakDays: 0,
-          streak: 0,
-          totalPoints: 0,
-          questsDoneThisWeek: 0,
-          momentumPoints: 50,
-          pointsThisWeek: 0,
-          weeklyConsistency: 100,
-        },
-        quests: starterQuests,
-        tasks: starterTasks,
-        calendarEvents: createLiveAnchoredEvents(todayStr),
-        goals: initialGoalsData.slice(0, 2),
-        rewards: initialFeaturedRewards,
-        badges: initialBadges,
-        collectionItems: initialCollectionItems,
-        waysToEarn: initialWaysToEarn,
-        claims: [],
-        notes: [
-          {
-            id: `note-${Date.now()}`,
-            type: 'purple',
-            title: 'Guest Explorer Note',
-            content: 'You are currently in Guest Mode. Check off tasks, complete quests, and earn XP. Click "Create Account" when ready to permanently preserve your progress!',
-            bullets: [
-              'Complete daily quests to build streaks',
-              'Time-box tasks on the Calendar',
-              'Earn Momentum Points to redeem rewards',
-            ],
-          },
-        ],
-        attributes: initialAttributes,
-        weeklyData: weeklyProgressData,
-        activityHistory: [
-          {
-            date: todayStr,
-            habitsCompleted: 0,
-            tasksCompleted: 0,
-            xpEarned: 0,
-            momentumPointsEarned: 0,
-          },
-        ],
-        termsPolicy: REWARD_TERMS_POLICY,
-        aiAgents: defaultAIAgents,
-        lastUpdated: new Date().toISOString(),
-      };
-    }
-
-    // Authenticated users: pure zero-state across all application entities
+    // Pure zero-state across all application entities for new and fresh users
     return {
       user: {
         ...freshUserProfile,
@@ -897,6 +868,8 @@ class LifeRpgDatabase {
       weeklyData: freshWeeklyData,
       activityHistory: [],
       termsPolicy: REWARD_TERMS_POLICY,
+      quotes: [...defaultMotivationalQuotes],
+      activeQuote: defaultMotivationalQuotes[0],
       aiAgents: defaultAIAgents,
       lastUpdated: new Date().toISOString(),
     };
@@ -1035,9 +1008,9 @@ class LifeRpgDatabase {
       name: `${myAccount?.fullName || 'Alex'} (You)`,
       username: myAccount?.username || 'alex',
       avatarUrl: myAccount?.avatarUrl || (myStore.user as any).avatarUrl || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop&q=80',
-      level: myStore.user.level || 12,
-      xp: (myStore.user as any).xp || myStore.user.currentXp || 2860,
-      consistencyDays: myStore.user.streakDays || 21,
+      level: myStore.user.level ?? 1,
+      xp: (myStore.user as any).xp ?? myStore.user.currentXp ?? 0,
+      consistencyDays: myStore.user.streakDays ?? 0,
       status: 'online',
       activityStatus: 'Studying',
       bio: (myStore.user as any).bio || 'Consistency > Intensity. Mastering fullstack systems.',
@@ -1747,6 +1720,13 @@ class LifeRpgDatabase {
           }
         }
 
+        if (!parsed.quotes || parsed.quotes.length === 0) {
+          parsed.quotes = [...defaultMotivationalQuotes];
+        }
+        if (!parsed.activeQuote) {
+          parsed.activeQuote = parsed.quotes.find((q: any) => q.isActive) || parsed.quotes[0];
+        }
+
         return parsed;
       }
     } catch (e) {
@@ -1804,6 +1784,8 @@ class LifeRpgDatabase {
       weeklyData: formatWeeklyWithToday(weeklyProgressData),
       activityHistory: history,
       termsPolicy: REWARD_TERMS_POLICY,
+      quotes: [...defaultMotivationalQuotes],
+      activeQuote: defaultMotivationalQuotes[0],
       aiAgents: defaultAIAgents,
       lastUpdated: new Date().toISOString(),
     };
@@ -1949,6 +1931,29 @@ class LifeRpgDatabase {
     return quest;
   }
 
+  public deleteQuest(questId: string): boolean {
+    const initialLen = this.data.quests.length;
+    this.data.quests = this.data.quests.filter((q) => q.id !== questId);
+    this.persist();
+    return this.data.quests.length < initialLen;
+  }
+
+  public updateAvatar(avatarUrl: string): UserProfile {
+    this.data.user.avatarUrl = avatarUrl;
+    const uid = userContextStorage.getStore()?.userId || this.defaultUserId;
+    const userAcc = this.users.find((u) => u.id === uid);
+    if (userAcc) {
+      userAcc.avatarUrl = avatarUrl;
+      this.saveUsers();
+    }
+    this.persist();
+    return this.data.user;
+  }
+
+  public getUserCount(): number {
+    return this.users.length;
+  }
+
   // --- Tasks ---
   public toggleTask(taskId: string, forceCompleted?: boolean): TaskItem | null {
     const task = this.data.tasks.find((t) => t.id === taskId);
@@ -1963,7 +1968,7 @@ class LifeRpgDatabase {
     const xpDelta = isNowCompleted ? (task.xpReward || 15) : -(task.xpReward || 15);
     const mpDelta = isNowCompleted ? 15 : -15;
 
-    const mainLabel = task.labels[0] || 'Discipline';
+    const mainLabel = (task.labels && task.labels[0]) || 'Discipline';
     this.addXpAndPoints(xpDelta, mpDelta, mainLabel);
 
     const today = getTodayDateStr();
@@ -2001,10 +2006,27 @@ class LifeRpgDatabase {
   }
 
   public addTask(taskData: Omit<TaskItem, 'id'>): TaskItem {
+    const rawLabels = Array.isArray(taskData.labels)
+      ? taskData.labels
+      : (taskData.labels ? [taskData.labels] : ['General']);
+
     const task: TaskItem = {
       id: `task-${Date.now()}`,
+      completed: Boolean(taskData.completed),
+      priority: taskData.priority || 'medium',
+      labels: rawLabels.length > 0 ? rawLabels : ['General'],
+      subtasks: Array.isArray(taskData.subtasks) ? taskData.subtasks : [],
+      xpReward: typeof taskData.xpReward === 'number' ? taskData.xpReward : 15,
       ...taskData,
     };
+
+    if (!Array.isArray(task.labels) || task.labels.length === 0) {
+      task.labels = ['General'];
+    }
+    if (!Array.isArray(task.subtasks)) {
+      task.subtasks = [];
+    }
+
     this.data.tasks = [task, ...this.data.tasks];
 
     // Automatically create a corresponding Calendar Event if it has a due date or is scheduled
@@ -2028,7 +2050,7 @@ class LifeRpgDatabase {
         date: eventDate,
         startTime: startTime,
         endTime: endTime,
-        category: (task.labels[0]?.toLowerCase() as any) || 'study',
+        category: ((task.labels && task.labels[0])?.toLowerCase() as any) || 'study',
         color: task.priority === 'high' ? '#EF4444' : task.priority === 'medium' ? '#F59E0B' : '#6366F1',
         description: task.description || `Task: ${task.title}`,
         priority: task.priority,
@@ -2044,7 +2066,17 @@ class LifeRpgDatabase {
   public updateTask(updatedTask: TaskItem): TaskItem | null {
     const idx = this.data.tasks.findIndex((t) => t.id === updatedTask.id);
     if (idx === -1) return null;
-    this.data.tasks[idx] = updatedTask;
+    const existing = this.data.tasks[idx];
+    const safeLabels = Array.isArray(updatedTask.labels) && updatedTask.labels.length > 0
+      ? updatedTask.labels
+      : (existing.labels || ['General']);
+    const safeTask: TaskItem = {
+      ...existing,
+      ...updatedTask,
+      labels: safeLabels,
+      subtasks: Array.isArray(updatedTask.subtasks) ? updatedTask.subtasks : (existing.subtasks || []),
+    };
+    this.data.tasks[idx] = safeTask;
 
     // Synchronize auto calendar event
     const calEventIdx = this.data.calendarEvents.findIndex((e) => e.id === `evt-auto-${updatedTask.id}`);
@@ -2209,16 +2241,16 @@ class LifeRpgDatabase {
 
       if (g.category === 'Career') {
         const dsaTasks = this.data.tasks.filter(
-          (t) => t.labels.includes('DSA') || t.labels.includes('Study')
+          (t) => (t.labels || []).includes('DSA') || (t.labels || []).includes('Study')
         );
         catTotalTasks = dsaTasks.length;
         catTasksCompleted = dsaTasks.filter((t) => t.completed).length;
       } else if (g.category === 'Health') {
-        const healthTasks = this.data.tasks.filter((t) => t.labels.includes('Health'));
+        const healthTasks = this.data.tasks.filter((t) => (t.labels || []).includes('Health'));
         catTotalTasks = healthTasks.length;
         catTasksCompleted = healthTasks.filter((t) => t.completed).length;
       } else if (g.category === 'Personal') {
-        const personalTasks = this.data.tasks.filter((t) => t.labels.includes('Reading'));
+        const personalTasks = this.data.tasks.filter((t) => (t.labels || []).includes('Reading'));
         catTotalTasks = personalTasks.length;
         catTasksCompleted = personalTasks.filter((t) => t.completed).length;
       }
@@ -2424,6 +2456,125 @@ class LifeRpgDatabase {
     this.data.notes = this.data.notes.filter((n) => n.id !== noteId);
     this.persist();
     return this.data.notes.length < initialLen;
+  }
+
+  // --- Quotes & Daily Wisdom Engine ---
+  public getQuotes(): { quotes: MotivationalQuote[]; activeQuote: MotivationalQuote } {
+    if (!this.data.quotes || this.data.quotes.length === 0) {
+      this.data.quotes = [...defaultMotivationalQuotes];
+      this.data.activeQuote = defaultMotivationalQuotes[0];
+      this.persist();
+    }
+    const activeQuote = this.data.activeQuote || this.data.quotes.find((q) => q.isActive) || this.data.quotes[0];
+    return {
+      quotes: this.data.quotes,
+      activeQuote,
+    };
+  }
+
+  public addQuote(quoteData: { text: string; author?: string; category?: string; setActive?: boolean }): {
+    quote: MotivationalQuote;
+    activeQuote: MotivationalQuote;
+    quotes: MotivationalQuote[];
+    user: any;
+  } {
+    if (!this.data.quotes || this.data.quotes.length === 0) {
+      this.data.quotes = [...defaultMotivationalQuotes];
+    }
+
+    const text = (quoteData.text || '').trim();
+    if (!text) {
+      throw new Error('Quote text cannot be empty');
+    }
+
+    const shouldBeActive = quoteData.setActive !== false;
+    if (shouldBeActive) {
+      this.data.quotes.forEach((q) => {
+        q.isActive = false;
+      });
+    }
+
+    const newQuote: MotivationalQuote = {
+      id: `quote-${Date.now()}`,
+      text,
+      author: (quoteData.author || this.data.user.displayName || this.data.user.name || 'Adventurer').trim(),
+      category: (quoteData.category as any) || 'mindset',
+      isActive: shouldBeActive,
+      isCustom: true,
+      createdAt: new Date().toISOString(),
+      likesCount: 1,
+    };
+
+    this.data.quotes = [newQuote, ...this.data.quotes];
+    if (shouldBeActive) {
+      this.data.activeQuote = newQuote;
+    }
+
+    // Award XP for inscribing wisdom (+10 XP and +10 Momentum Points)
+    this.data.user.currentXp += 10;
+    this.data.user.totalPoints += 10;
+    this.data.user.momentumPoints += 10;
+    while (this.data.user.currentXp >= this.data.user.nextLevelXp) {
+      this.data.user.currentXp -= this.data.user.nextLevelXp;
+      this.data.user.level += 1;
+      this.data.user.nextLevelXp = 500 + (this.data.user.level - 1) * 200;
+    }
+
+    this.persist();
+    return {
+      quote: newQuote,
+      activeQuote: this.data.activeQuote || newQuote,
+      quotes: this.data.quotes,
+      user: this.data.user,
+    };
+  }
+
+  public setActiveQuote(quoteId: string): { activeQuote: MotivationalQuote; quotes: MotivationalQuote[] } {
+    if (!this.data.quotes || this.data.quotes.length === 0) {
+      this.data.quotes = [...defaultMotivationalQuotes];
+    }
+    const target = this.data.quotes.find((q) => q.id === quoteId);
+    if (!target) {
+      throw new Error('Quote not found');
+    }
+    this.data.quotes.forEach((q) => {
+      q.isActive = q.id === quoteId;
+    });
+    target.isActive = true;
+    this.data.activeQuote = target;
+    this.persist();
+    return { activeQuote: target, quotes: this.data.quotes };
+  }
+
+  public deleteQuote(quoteId: string): boolean {
+    if (!this.data.quotes) return false;
+    const initialLen = this.data.quotes.length;
+    this.data.quotes = this.data.quotes.filter((q) => q.id !== quoteId);
+    if (this.data.activeQuote?.id === quoteId) {
+      this.data.activeQuote = this.data.quotes[0] || defaultMotivationalQuotes[0];
+      if (this.data.activeQuote) this.data.activeQuote.isActive = true;
+    }
+    this.persist();
+    return this.data.quotes.length < initialLen;
+  }
+
+  public shuffleQuote(): { activeQuote: MotivationalQuote; quotes: MotivationalQuote[] } {
+    if (!this.data.quotes || this.data.quotes.length === 0) {
+      this.data.quotes = [...defaultMotivationalQuotes];
+    }
+    const currentId = this.data.activeQuote?.id;
+    const candidates = this.data.quotes.filter((q) => q.id !== currentId);
+    const chosen = candidates.length > 0
+      ? candidates[Math.floor(Math.random() * candidates.length)]
+      : this.data.quotes[0];
+
+    this.data.quotes.forEach((q) => {
+      q.isActive = q.id === chosen.id;
+    });
+    chosen.isActive = true;
+    this.data.activeQuote = chosen;
+    this.persist();
+    return { activeQuote: chosen, quotes: this.data.quotes };
   }
 
   // --- Analytics Derivation Engine ---

@@ -16,8 +16,16 @@ export const Footer: React.FC<FooterProps> = ({ className = '' }) => {
   // Cached developer stats by member ID - auto synced in background
   const [memberStatsMap, setMemberStatsMap] = useState<Record<string, GitHubDeveloperStats>>({});
 
-  // Cached Instagram avatars by member ID - auto synced in background
-  const [memberInstagramMap, setMemberInstagramMap] = useState<Record<string, string>>({});
+  // Cached Instagram avatars by member ID - pre-seeded from verified team data and auto-synced in background
+  const [memberInstagramMap, setMemberInstagramMap] = useState<Record<string, string>>(() => {
+    const initial: Record<string, string> = {};
+    TEAM_MEMBERS.forEach((m) => {
+      if (m.profileImage) {
+        initial[m.id] = m.profileImage;
+      }
+    });
+    return initial;
+  });
 
   // Automatically fetch/sync GitHub stats and Instagram avatars for all developers on mount (non-blocking, parallel)
   useEffect(() => {

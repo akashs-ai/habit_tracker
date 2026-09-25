@@ -60,6 +60,76 @@ export interface QuickNote {
   bullets?: string[];
 }
 
+export type QuoteCategory = 'discipline' | 'courage' | 'focus' | 'mindset' | 'growth' | 'wisdom';
+
+export interface MotivationalQuote {
+  id: string;
+  text: string;
+  author: string;
+  category: QuoteCategory;
+  isActive: boolean;
+  isCustom?: boolean;
+  createdAt?: string;
+  likesCount?: number;
+}
+
+export const defaultMotivationalQuotes: MotivationalQuote[] = [
+  {
+    id: 'quote-1',
+    text: 'Progress, not perfection.',
+    author: 'Alex Rivera',
+    category: 'mindset',
+    isActive: true,
+    isCustom: false,
+    createdAt: '2025-01-01T00:00:00.000Z',
+  },
+  {
+    id: 'quote-2',
+    text: 'Discipline today, a brighter tomorrow.',
+    author: 'Ancient Wisdom',
+    category: 'discipline',
+    isActive: false,
+    isCustom: false,
+    createdAt: '2025-01-01T00:00:00.000Z',
+  },
+  {
+    id: 'quote-3',
+    text: 'Small steps, bigger tomorrow.',
+    author: 'Daily Stoic',
+    category: 'growth',
+    isActive: false,
+    isCustom: false,
+    createdAt: '2025-01-01T00:00:00.000Z',
+  },
+  {
+    id: 'quote-4',
+    text: 'We suffer more often in imagination than in reality.',
+    author: 'Seneca',
+    category: 'wisdom',
+    isActive: false,
+    isCustom: false,
+    createdAt: '2025-01-01T00:00:00.000Z',
+  },
+  {
+    id: 'quote-5',
+    text: 'The impediment to action advances action. What stands in the way becomes the way.',
+    author: 'Marcus Aurelius',
+    category: 'courage',
+    isActive: false,
+    isCustom: false,
+    createdAt: '2025-01-01T00:00:00.000Z',
+  },
+  {
+    id: 'quote-6',
+    text: 'Focus is a muscle; train it through consistency every single day.',
+    author: 'Hero Mindset',
+    category: 'focus',
+    isActive: false,
+    isCustom: false,
+    createdAt: '2025-01-01T00:00:00.000Z',
+  },
+];
+
 export interface UserProfile {
   name: string;
   displayName?: string;
@@ -258,6 +328,7 @@ export interface CalendarEvent {
   googleEventId?: string;
   taskId?: string;
   isAutoTask?: boolean;
+  completed?: boolean;
   createdAt?: string;
   updatedAt?: string;
 }

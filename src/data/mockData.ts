@@ -159,15 +159,24 @@ export const weeklyProgressData: WeeklyData[] = [
   { day: 'Sunday', dayShort: 'Sun', xp: 220, heightPercent: 58 },
 ];
 
-export const freshWeeklyData: WeeklyData[] = [
-  { day: 'Monday', dayShort: 'Mon', xp: 0, heightPercent: 0 },
-  { day: 'Tuesday', dayShort: 'Tue', xp: 0, heightPercent: 0 },
-  { day: 'Wednesday', dayShort: 'Wed', xp: 0, heightPercent: 0 },
-  { day: 'Thursday', dayShort: 'Thu', xp: 0, heightPercent: 0 },
-  { day: 'Friday', dayShort: 'Fri', xp: 0, heightPercent: 0 },
-  { day: 'Saturday', dayShort: 'Sat', xp: 0, heightPercent: 0 },
-  { day: 'Sunday', dayShort: 'Sun', xp: 0, heightPercent: 0 },
-];
+export const getFreshWeeklyData = (): WeeklyData[] => {
+  const currentDayIndex = (new Date().getDay() + 6) % 7; // Mon=0, Tue=1, ... Sun=6
+  const baseDays = [
+    { day: 'Monday', dayShort: 'Mon', xp: 0, heightPercent: 0 },
+    { day: 'Tuesday', dayShort: 'Tue', xp: 0, heightPercent: 0 },
+    { day: 'Wednesday', dayShort: 'Wed', xp: 0, heightPercent: 0 },
+    { day: 'Thursday', dayShort: 'Thu', xp: 0, heightPercent: 0 },
+    { day: 'Friday', dayShort: 'Fri', xp: 0, heightPercent: 0 },
+    { day: 'Saturday', dayShort: 'Sat', xp: 0, heightPercent: 0 },
+    { day: 'Sunday', dayShort: 'Sun', xp: 0, heightPercent: 0 },
+  ];
+  return baseDays.map((d, idx) => ({
+    ...d,
+    isToday: idx === currentDayIndex,
+  }));
+};
+
+export const freshWeeklyData: WeeklyData[] = getFreshWeeklyData();
 
 export const leaderboardFriends: FriendLeaderboardItem[] = [
   {

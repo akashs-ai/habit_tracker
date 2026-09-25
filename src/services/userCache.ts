@@ -13,7 +13,8 @@ import {
   WeeklyData, 
   AIIntegrationModel, 
   AuthUser,
-  FriendUser
+  FriendUser,
+  MotivationalQuote
 } from '../types';
 
 const CACHE_KEY_PREFIX = 'liferpg_user_cache_';
@@ -50,6 +51,8 @@ export interface CachedUserData {
   notes: QuickNote[];
   attributes: Attribute[];
   weeklyData: WeeklyData[];
+  quotes?: MotivationalQuote[];
+  activeQuote?: MotivationalQuote;
   aiAgents?: AIIntegrationModel[];
   friends?: FriendUser[];
   cachedAt: number;
